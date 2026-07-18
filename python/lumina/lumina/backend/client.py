@@ -62,3 +62,12 @@ class LuminaClient:
         if not payload_metrics:
             return
         self._request("POST", f"/api/v1/runs/{run_id}/metrics", {"metrics": payload_metrics})
+
+    def log_system_metrics(self, run_id: str, metrics: dict[str, Any], step: Optional[int] = None) -> None:
+        payload_metrics = []
+        for key, value in metrics.items():
+            if isinstance(value, (int, float)):
+                payload_metrics.append({"key": key, "value": float(value), "step": step or 0})
+        if not payload_metrics:
+            return
+        self._request("POST", f"/api/v1/runs/{run_id}/system-metrics", {"metrics": payload_metrics})

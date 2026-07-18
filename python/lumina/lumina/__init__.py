@@ -60,6 +60,16 @@ def log(metrics: dict, step: int | None = None, **kwargs):
     return _WANDB_LOG(metrics, step=step, **kwargs)
 
 
+def log_system(metrics: dict, step: int | None = None, **kwargs):
+    """Log system metrics for the current Lumina run."""
+    ctx = get_run_context()
+    if ctx.run_id:
+        client = LuminaClient()
+        client.log_system_metrics(ctx.run_id, metrics, step)
+        return
+    return _WANDB_LOG(metrics, step=step, **kwargs)
+
+
 def finish(**kwargs):
     """Finish the current Lumina run."""
     ctx = get_run_context()
