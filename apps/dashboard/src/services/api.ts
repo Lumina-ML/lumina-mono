@@ -2,7 +2,7 @@ const API_BASE_URL = import.meta.env.VITE_LUMINA_API_URL || "";
 
 export interface FetchOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
-  params?: Record<string, string | number | boolean | undefined>;
+  params?: any;
   body?: unknown;
   headers?: Record<string, string>;
 }
