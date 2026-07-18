@@ -21,6 +21,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1090.0",
     "@aws-sdk/s3-request-presigner": "^3.1090.0",
+    "@clickhouse/client": "^1.23.1",
     "@fastify/cors": "^9.0.0",
     "@fastify/multipart": "^10.1.0",
     "@opentelemetry/api": "^1.9.1",

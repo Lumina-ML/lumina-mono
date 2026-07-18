@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import fastify from "fastify";
 import { configPlugin } from "./plugins/config.js";
 import { prismaPlugin } from "./plugins/prisma.js";
+import { clickhousePlugin } from "./plugins/clickhouse.js";
 import { storagePlugin } from "./plugins/storage.js";
 import { authPlugin } from "./plugins/auth.js";
 import { telemetryPlugin } from "./plugins/telemetry.js";
@@ -48,6 +49,7 @@ export async function buildApp() {
 
   // 2. Core infrastructure
   await app.register(prismaPlugin);
+  await app.register(clickhousePlugin);
   await app.register(storagePlugin);
   await app.register(telemetryPlugin);
   await app.register(busPlugin);
