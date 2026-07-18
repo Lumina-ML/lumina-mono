@@ -1,5 +1,5 @@
 import type { PrismaClient } from "../../generated/prisma/index.js";
-import type { CreateProjectInput } from "./schema.js";
+import type { CreateProjectInput, UpdateProjectInput } from "./schema.js";
 import { ProjectRepository } from "./repository.js";
 
 export class ProjectService {
@@ -23,5 +23,17 @@ export class ProjectService {
 
   async findById(id: string) {
     return this.repository.findById(id);
+  }
+
+  async list(workspaceId: string, params: { limit: number; offset: number }) {
+    return this.repository.list(workspaceId, params);
+  }
+
+  async update(id: string, data: UpdateProjectInput) {
+    return this.repository.update(id, data);
+  }
+
+  async delete(id: string) {
+    return this.repository.delete(id);
   }
 }

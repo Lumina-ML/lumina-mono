@@ -8,4 +8,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.post("/projects", handler.create.bind(handler));
   app.get("/projects", handler.list.bind(handler));
+  app.get("/projects/:id", handler.getById.bind(handler));
+  app.patch("/projects/:id", handler.update.bind(handler));
+  app.delete("/projects/:id", handler.delete.bind(handler));
 }
