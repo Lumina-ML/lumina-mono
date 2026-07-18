@@ -17,6 +17,8 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1090.0",
+    "@aws-sdk/s3-request-presigner": "^3.1090.0",
     "@fastify/cors": "^9.0.0",
     "@prisma/client": "^5.16.0",
     "fastify": "^4.28.0",

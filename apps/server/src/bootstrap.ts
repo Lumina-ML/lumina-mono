@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import fastify from "fastify";
 import { prismaPlugin } from "./plugins/prisma.js";
+import { storagePlugin } from "./plugins/storage.js";
 import { logLineRoutes } from "./modules/log-line/routes.js";
 import { metricRoutes } from "./modules/metric/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
@@ -23,6 +24,7 @@ export async function buildApp() {
   });
 
   await app.register(prismaPlugin);
+  await app.register(storagePlugin);
 
   // Ensure default workspace exists
   await app.prisma.workspace.upsert({
