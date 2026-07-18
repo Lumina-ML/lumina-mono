@@ -26,8 +26,6 @@
     "lucide-vue-next": "^0.400.0",
     "naive-ui": "^2.44.1",
     "pinia": "^2.1.0",
-    "radix-vue": "^1.9.17",
-    "shadcn-vue": "^2.8.0",
     "tailwind-merge": "^3.6.0",
     "vee-validate": "^4.15.1",
     "vfonts": "^0.0.3",

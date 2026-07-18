@@ -25,7 +25,7 @@ open http://localhost:3000
 ## Architecture
 
 - `apps/server` - Fastify backend API (Run + Metric modules)
-- `apps/dashboard` - Web dashboard (placeholder HTML, Vue 3 in Week 5)
+- `apps/dashboard` - Vue 3 + Vite web dashboard (Projects, Runs, Metrics, Logs, System, Tags)
 - `packages/shared` - Shared TypeScript types and schemas
 - `packages/lumina-ui` - Internal UI component library
 - `python/lumina` - Python SDK, rebased from WandB
@@ -66,6 +66,9 @@ pnpm --filter @lumina/server db:migrate
 
 # Start backend
 pnpm --filter @lumina/server dev
+
+# Start dashboard (in another terminal)
+pnpm --filter @lumina/dashboard dev
 
 # Install Python SDK
 cd python/lumina && pip install -e .
