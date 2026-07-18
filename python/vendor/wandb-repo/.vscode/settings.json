@@ -1,0 +1,38 @@
+{
+  "files.exclude": {
+    "**/*.pyc": true,
+    "docs/_build": true,
+    "build": true
+  },
+  "git.ignoreLimitWarning": true,
+  "editor.formatOnSave": true,
+  "editor.lineHeight": 1.4,
+  "editor.scrollBeyondLastLine": false,
+  "python.analysis.extraPaths": [
+    "./wandb/vendor/gql-0.2.0",
+    "./wandb/vendor/graphql-core-1.1"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": [
+    "."
+  ],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4
+  },
+  "rust-analyzer.linkedProjects": [
+    "./xpu/Cargo.toml",
+    "./experimental/rust-sdk/Cargo.toml",
+    "./experimental/rust-sdk/examples/basic/Cargo.toml",
+    "./parquet-rust-wrapper/Cargo.toml",
+  ],
+  "python.analysis.autoImportCompletions": false,
+  "python.analysis.typeCheckingMode": "off",
+  "go.testFlags": [
+    "-race",
+    "-covermode=atomic"
+  ]
+}
