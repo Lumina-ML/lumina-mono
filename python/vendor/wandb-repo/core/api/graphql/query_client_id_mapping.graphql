@@ -1,5 +1,0 @@
-query ClientIDMapping($clientID: ID!) {
-  clientIDMapping(clientID: $clientID) {
-    serverID
-  }
-}

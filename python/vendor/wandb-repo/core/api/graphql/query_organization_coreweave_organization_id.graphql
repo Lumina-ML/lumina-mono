@@ -1,7 +1,0 @@
-query OrganizationCoreWeaveOrganizationID($entityName: String!) {
-  entity(name: $entityName) {
-    organization {
-      coreWeaveOrganizationId
-    }
-  }
-}
