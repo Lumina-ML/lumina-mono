@@ -5,6 +5,9 @@ CREATE TYPE "WorkspaceRole" AS ENUM ('owner', 'admin', 'member', 'viewer');
 CREATE TYPE "RunStatus" AS ENUM ('pending', 'running', 'finished', 'failed', 'crashed', 'killed');
 
 -- CreateEnum
+CREATE TYPE "SweepState" AS ENUM ('pending', 'running', 'finished', 'crashed', 'cancelled');
+
+-- CreateEnum
 CREATE TYPE "ArtifactType" AS ENUM ('dataset', 'model', 'checkpoint', 'file', 'table');
 
 -- CreateEnum
@@ -77,6 +80,7 @@ CREATE TABLE "Run" (
     "id" TEXT NOT NULL,
     "runId" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
+    "sweepId" TEXT,
     "name" TEXT NOT NULL,
     "status" "RunStatus" NOT NULL DEFAULT 'running',
     "config" JSONB NOT NULL DEFAULT '{}',
@@ -89,6 +93,21 @@ CREATE TABLE "Run" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Run_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Sweep" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "method" TEXT NOT NULL,
+    "config" JSONB NOT NULL DEFAULT '{}',
+    "state" "SweepState" NOT NULL DEFAULT 'running',
+    "bestRunId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Sweep_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -344,6 +363,18 @@ CREATE INDEX "Run_projectId_name_idx" ON "Run"("projectId", "name");
 CREATE INDEX "Run_runId_idx" ON "Run"("runId");
 
 -- CreateIndex
+CREATE INDEX "Run_sweepId_createdAt_idx" ON "Run"("sweepId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Sweep_projectId_createdAt_idx" ON "Sweep"("projectId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Sweep_projectId_state_idx" ON "Sweep"("projectId", "state");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Sweep_projectId_name_key" ON "Sweep"("projectId", "name");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Tag_projectId_name_key" ON "Tag"("projectId", "name");
 
 -- CreateIndex
@@ -444,6 +475,12 @@ ALTER TABLE "Project" ADD CONSTRAINT "Project_workspaceId_fkey" FOREIGN KEY ("wo
 
 -- AddForeignKey
 ALTER TABLE "Run" ADD CONSTRAINT "Run_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Run" ADD CONSTRAINT "Run_sweepId_fkey" FOREIGN KEY ("sweepId") REFERENCES "Sweep"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Sweep" ADD CONSTRAINT "Sweep_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Tag" ADD CONSTRAINT "Tag_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
