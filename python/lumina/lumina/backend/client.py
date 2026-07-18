@@ -390,6 +390,46 @@ class LuminaClient:
     def delete_report(self, report_id: str) -> dict[str, Any]:
         return self._request("DELETE", f"/api/v1/reports/{report_id}")
 
+    def create_run_media(
+        self,
+        project_id: str,
+        key: str,
+        type: str,
+        artifact_version_id: str,
+        run_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "key": key,
+            "type": type,
+            "artifactVersionId": artifact_version_id,
+        }
+        if run_id:
+            payload["runId"] = run_id
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/projects/{project_id}/run-media", payload)
+
+    def list_run_media(
+        self,
+        project_id: str,
+        run_id: Optional[str] = None,
+        type: Optional[str] = None,
+    ) -> dict[str, Any]:
+        params: dict[str, str] = {}
+        if run_id:
+            params["runId"] = run_id
+        if type:
+            params["type"] = type
+        query = "&".join(f"{k}={v}" for k, v in params.items())
+        path = f"/api/v1/projects/{project_id}/run-media"
+        if query:
+            path += f"?{query}"
+        return self._request("GET", path)
+
+    def get_run_media(self, run_media_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/run-media/{run_media_id}")
+
     def upload_file_to_url(self, url: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         req = Request(url, data=data, headers={"Content-Type": content_type}, method="PUT")
         try:

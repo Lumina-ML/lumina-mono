@@ -17,6 +17,7 @@ _wb_logging.configure_wandb_logger()
 from lumina import sdk as wandb_sdk
 import lumina
 import os as _os
+from typing import Any
 lumina.wandb_lib = wandb_sdk.lib
 
 # Lumina backend integration: if LUMINA_API_URL is set, use the simplified
@@ -36,6 +37,8 @@ from lumina.backend.trace import finish_trace as _lumina_finish_trace
 from lumina.backend.trace import start_span as _lumina_start_span
 from lumina.backend.trace import finish_span as _lumina_finish_span
 from lumina.backend.report import LuminaReport
+from lumina.backend.media import LuminaTable, log_media as _log_media
+from lumina.backend.media import _is_media_value
 
 _WANDB_INIT = wandb_sdk.init
 _WANDB_FINISH = wandb_sdk.finish
@@ -67,11 +70,20 @@ def init(
 def log(metrics: dict, step: int | None = None, **kwargs):
     """Log metrics for the current Lumina run."""
     ctx = get_run_context()
-    if ctx.run_id:
+    if ctx.run_id or _os.getenv("LUMINA_API_URL"):
         if step is not None:
             ctx.step = step
-        client = LuminaClient()
-        client.log_metrics(ctx.run_id, metrics, ctx.step)
+        # Split scalar metrics from media objects
+        scalar_metrics: dict[str, Any] = {}
+        for key, value in metrics.items():
+            if _is_media_value(value):
+                from lumina.backend.media import _infer_media_type
+                _log_media(key, value, type=_infer_media_type(value))
+            else:
+                scalar_metrics[key] = value
+        if scalar_metrics:
+            client = LuminaClient()
+            client.log_metrics(ctx.run_id, scalar_metrics, ctx.step)
         return
     return _WANDB_LOG(metrics, step=step, **kwargs)
 
@@ -263,6 +275,10 @@ def finish_span(span_id=None, status="ok", output_data=None, latency_ms=None):
     return _lumina_finish_span(span_id, status=status, output_data=output_data, latency_ms=latency_ms)
 
 
+def log_media(key, value, *, type="file", project=None, run_id=None, metadata=None):
+    return _log_media(key, value, type=type, project=project, run_id=run_id, metadata=metadata)
+
+
 define_metric = _preinit.PreInitCallable('wandb.define_metric', Run.define_metric)
 mark_preempting = _preinit.PreInitCallable('wandb.mark_preempting', Run.mark_preempting)
 alert = _preinit.PreInitCallable('wandb.alert', Run.alert)
@@ -293,4 +309,4 @@ if 'dev' in __version__:
     import lumina.env
     import os
     os.environ[lumina.env.ERROR_REPORTING] = os.environ.get(lumina.env.ERROR_REPORTING, 'false')
-__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')
+__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'log_media', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')

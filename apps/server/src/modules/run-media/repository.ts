@@ -34,7 +34,7 @@ export class RunMediaRepository {
         orderBy: { createdAt: "desc" },
         take: params.limit,
         skip: params.offset,
-        include: { artifactVersion: { include: { files: true, artifact: true } } },
+        include: { artifactVersion: { include: { artifact: true } } },
       }),
       this.prisma.runMedia.count({ where }),
     ]);
