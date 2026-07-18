@@ -42,7 +42,7 @@ def init(
         ctx.config = config or {}
         client = LuminaClient()
         run = client.create_run(ctx.project, ctx.name, ctx.config)
-        ctx.run_id = run["id"]
+        ctx.run_id = run["runId"]
         get_run_context().__dict__.update(ctx.__dict__)
         return run
     return _WANDB_INIT(project=project, name=name, config=config, **kwargs)
@@ -58,6 +58,36 @@ def log(metrics: dict, step: int | None = None, **kwargs):
         client.log_metrics(ctx.run_id, metrics, ctx.step)
         return
     return _WANDB_LOG(metrics, step=step, **kwargs)
+
+
+def log_system(metrics: dict, step: int | None = None, **kwargs):
+    """Log system metrics for the current Lumina run."""
+    ctx = get_run_context()
+    if ctx.run_id:
+        client = LuminaClient()
+        client.log_system_metrics(ctx.run_id, metrics, step)
+        return
+    return _WANDB_LOG(metrics, step=step, **kwargs)
+
+
+def log_line(message: str, level: str = "INFO", step: int | None = None, **kwargs):
+    """Log a line of console output for the current Lumina run."""
+    ctx = get_run_context()
+    if ctx.run_id:
+        client = LuminaClient()
+        client.log_lines(ctx.run_id, [{"level": level, "message": message, "step": step}])
+        return
+    return _WANDB_LOG({"message": message, "level": level}, step=step, **kwargs)
+
+
+def add_tag(name: str, color: str | None = None, **kwargs):
+    """Attach a tag to the current Lumina run."""
+    ctx = get_run_context()
+    if ctx.run_id:
+        client = LuminaClient()
+        client.add_tag(ctx.run_id, name, color)
+        return
+    return _WANDB_LOG({"tag": name}, step=0, **kwargs)
 
 
 def finish(**kwargs):

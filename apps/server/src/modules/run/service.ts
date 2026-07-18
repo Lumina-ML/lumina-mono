@@ -9,32 +9,38 @@ export class RunService {
     this.repository = new RunRepository(prisma);
   }
 
-  async create(data: CreateRunInput) {
-    return this.repository.create(data);
+  async create(projectId: string, data: CreateRunInput) {
+    return this.repository.create(projectId, data);
+  }
+
+  async getByRunId(runId: string) {
+    return this.repository.findByRunId(runId);
   }
 
   async getById(id: string) {
-    const run = await this.repository.findById(id);
-    if (!run) {
-      throw new Error(`Run not found: ${id}`);
-    }
-    return run;
+    return this.repository.findById(id);
   }
 
   async list(params: {
-    project?: string;
+    projectId?: string;
     status?: string;
+    createdAfter?: Date;
+    createdBefore?: Date;
     limit: number;
     offset: number;
   }) {
     return this.repository.list(params);
   }
 
-  async update(id: string, data: UpdateRunInput) {
-    return this.repository.update(id, data);
+  async delete(runId: string) {
+    return this.repository.deleteByRunId(runId);
   }
 
-  async finish(id: string) {
-    return this.repository.update(id, { status: "finished" });
+  async update(runId: string, data: UpdateRunInput) {
+    return this.repository.updateByRunId(runId, data);
+  }
+
+  async finish(runId: string) {
+    return this.repository.updateByRunId(runId, { status: "finished" });
   }
 }

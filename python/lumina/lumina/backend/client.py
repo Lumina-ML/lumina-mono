@@ -62,3 +62,27 @@ class LuminaClient:
         if not payload_metrics:
             return
         self._request("POST", f"/api/v1/runs/{run_id}/metrics", {"metrics": payload_metrics})
+
+    def log_system_metrics(self, run_id: str, metrics: dict[str, Any], step: Optional[int] = None) -> None:
+        payload_metrics = []
+        for key, value in metrics.items():
+            if isinstance(value, (int, float)):
+                payload_metrics.append({"key": key, "value": float(value), "step": step or 0})
+        if not payload_metrics:
+            return
+        self._request("POST", f"/api/v1/runs/{run_id}/system-metrics", {"metrics": payload_metrics})
+
+    def log_lines(self, run_id: str, lines: list[dict[str, Any]]) -> None:
+        payload = []
+        for line in lines:
+            item: dict[str, Any] = {"level": line.get("level", "INFO"), "message": line["message"]}
+            if line.get("step") is not None:
+                item["step"] = line["step"]
+            payload.append(item)
+        self._request("POST", f"/api/v1/runs/{run_id}/logs", {"logs": payload})
+
+    def add_tag(self, run_id: str, name: str, color: Optional[str] = None) -> None:
+        payload: dict[str, Any] = {"name": name}
+        if color:
+            payload["color"] = color
+        self._request("POST", f"/api/v1/runs/{run_id}/tags", payload)

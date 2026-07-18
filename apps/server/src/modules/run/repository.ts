@@ -1,16 +1,27 @@
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { CreateRunInput, UpdateRunInput } from "./schema.js";
+import { uuidv7 } from "../../shared/uuid7.js";
 
 export class RunRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create(data: CreateRunInput) {
+  async create(projectId: string, data: CreateRunInput) {
     return this.prisma.run.create({
       data: {
-        project: data.project,
+        projectId,
+        runId: uuidv7(),
         name: data.name,
+        status: "running",
         config: data.config as any,
+        metadata: data.metadata as any,
       },
+    });
+  }
+
+  async findByRunId(runId: string) {
+    return this.prisma.run.findUnique({
+      where: { runId },
+      include: { _count: { select: { metrics: true } } },
     });
   }
 
@@ -22,14 +33,21 @@ export class RunRepository {
   }
 
   async list(params: {
-    project?: string;
+    projectId?: string;
     status?: string;
+    createdAfter?: Date;
+    createdBefore?: Date;
     limit: number;
     offset: number;
   }) {
     const where: Record<string, unknown> = {};
-    if (params.project) where.project = params.project;
+    if (params.projectId) where.projectId = params.projectId;
     if (params.status) where.status = params.status;
+    if (params.createdAfter || params.createdBefore) {
+      where.createdAt = {};
+      if (params.createdAfter) (where.createdAt as Record<string, Date>).gte = params.createdAfter;
+      if (params.createdBefore) (where.createdAt as Record<string, Date>).lte = params.createdBefore;
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.run.findMany({
@@ -44,18 +62,25 @@ export class RunRepository {
     return { items, total };
   }
 
-  async update(id: string, data: UpdateRunInput) {
+  async deleteByRunId(runId: string) {
+    await this.prisma.run.delete({ where: { runId } });
+  }
+
+  async updateByRunId(runId: string, data: UpdateRunInput) {
     const updateData: Record<string, unknown> = {};
     if (data.status !== undefined) {
       updateData.status = data.status;
-      if (data.status === "finished") {
+      if (["finished", "failed", "crashed", "killed"].includes(data.status)) {
         updateData.finishedAt = new Date();
       }
     }
     if (data.config !== undefined) updateData.config = data.config as any;
+    if (data.summary !== undefined) updateData.summary = data.summary as any;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.metadata !== undefined) updateData.metadata = data.metadata as any;
 
     return this.prisma.run.update({
-      where: { id },
+      where: { runId },
       data: updateData,
     });
   }

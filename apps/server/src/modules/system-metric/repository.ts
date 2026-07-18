@@ -1,10 +1,10 @@
 import type { PrismaClient } from "../../generated/prisma/index.js";
-import type { LogMetricsInput } from "./schema.js";
+import type { LogSystemMetricsInput } from "./schema.js";
 
-export class MetricRepository {
+export class SystemMetricRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async createMany(runId: string, projectId: string, data: LogMetricsInput) {
+  async createMany(runId: string, projectId: string, data: LogSystemMetricsInput) {
     const metrics = data.metrics.map((m) => ({
       runId,
       projectId,
@@ -13,7 +13,7 @@ export class MetricRepository {
       value: m.value,
     }));
 
-    await this.prisma.metric.createMany({
+    await this.prisma.systemMetric.createMany({
       data: metrics,
       skipDuplicates: true,
     });
@@ -25,7 +25,7 @@ export class MetricRepository {
       where.key = { in: params.keys };
     }
 
-    const metrics = await this.prisma.metric.findMany({
+    const metrics = await this.prisma.systemMetric.findMany({
       where,
       orderBy: [{ key: "asc" }, { step: "asc" }],
       take: params.limit,

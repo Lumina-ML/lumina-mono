@@ -1,11 +1,15 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { MetricService } from "./service.js";
-import { ListMetricsQuerySchema, LogMetricsSchema, type ListMetricsQuery } from "./schema.js";
+import { LogLineService } from "./service.js";
+import {
+  ListLogLinesQuerySchema,
+  LogLinesSchema,
+  type ListLogLinesQuery,
+} from "./schema.js";
 import { RunService } from "../run/service.js";
 
-export class MetricHandler {
+export class LogLineHandler {
   constructor(
-    private readonly metricService: MetricService,
+    private readonly logLineService: LogLineService,
     private readonly runService: RunService,
   ) {}
 
@@ -13,29 +17,28 @@ export class MetricHandler {
     req: FastifyRequest<{ Params: { runId: string } }>,
     reply: FastifyReply,
   ) {
-    const data = LogMetricsSchema.parse(req.body);
+    const data = LogLinesSchema.parse(req.body);
     const run = await this.runService.getByRunId(req.params.runId);
     if (!run) {
       reply.status(404).send({ error: "Run not found" });
       return;
     }
-    await this.metricService.log(run.runId, run.projectId, data);
+    await this.logLineService.log(run.runId, run.projectId, data);
     reply.status(201).send({ success: true });
   }
 
   async list(
-    req: FastifyRequest<{ Params: { runId: string }; Querystring: ListMetricsQuery }>,
+    req: FastifyRequest<{ Params: { runId: string }; Querystring: ListLogLinesQuery }>,
     reply: FastifyReply,
   ) {
-    const query = ListMetricsQuerySchema.parse(req.query);
+    const query = ListLogLinesQuerySchema.parse(req.query);
     const run = await this.runService.getByRunId(req.params.runId);
     if (!run) {
       reply.status(404).send({ error: "Run not found" });
       return;
     }
-    const keys = query.keys ? query.keys.split(",") : undefined;
-    const result = await this.metricService.list(run.runId, {
-      keys,
+    const result = await this.logLineService.list(run.runId, {
+      level: query.level,
       limit: query.limit,
     });
     reply.send(result);
