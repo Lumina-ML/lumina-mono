@@ -351,6 +351,45 @@ class LuminaClient:
             payload["finishedAt"] = finished_at
         return self._request("PATCH", f"/api/v1/spans/{span_id}", payload)
 
+    def create_report(
+        self,
+        project_id: str,
+        title: str,
+        blocks: Optional[list[dict[str, Any]]] = None,
+        created_by: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"title": title}
+        if blocks:
+            payload["blocks"] = blocks
+        if created_by:
+            payload["createdBy"] = created_by
+        return self._request("POST", f"/api/v1/projects/{project_id}/reports", payload)
+
+    def list_reports(self, project_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/projects/{project_id}/reports")
+
+    def get_report(self, report_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/reports/{report_id}")
+
+    def patch_report(
+        self,
+        report_id: str,
+        title: Optional[str] = None,
+        blocks: Optional[list[dict[str, Any]]] = None,
+        created_by: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if title:
+            payload["title"] = title
+        if blocks:
+            payload["blocks"] = blocks
+        if created_by:
+            payload["createdBy"] = created_by
+        return self._request("PATCH", f"/api/v1/reports/{report_id}", payload)
+
+    def delete_report(self, report_id: str) -> dict[str, Any]:
+        return self._request("DELETE", f"/api/v1/reports/{report_id}")
+
     def upload_file_to_url(self, url: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         req = Request(url, data=data, headers={"Content-Type": content_type}, method="PUT")
         try:
