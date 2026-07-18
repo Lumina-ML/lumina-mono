@@ -9,32 +9,463 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Run {
-  id         String   @id @default(uuid())
-  project    String
-  name       String
-  status     String   @default("running") // running | finished | failed
-  config     Json     @default("{}")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  finishedAt DateTime?
+// ============================================================
+// Identity & Access
+// ============================================================
 
-  metrics Metric[]
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([project, createdAt])
-  @@index([status])
+  memberships WorkspaceMembership[]
+
+  @@index([email])
 }
 
-model Metric {
-  id       String   @id @default(uuid())
-  runId    String
-  key      String
-  step     Int      @default(0)
-  value    Float
-  loggedAt DateTime @default(now())
+model Workspace {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayName String?
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships WorkspaceMembership[]
+  projects    Project[]
+
+  @@index([name])
+}
+
+model WorkspaceMembership {
+  id          String              @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole       @default(member)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+enum WorkspaceRole {
+  owner
+  admin
+  member
+  viewer
+}
+
+// ============================================================
+// Project
+// ============================================================
+
+model Project {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  displayName String?
+  description String?
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runs         Run[]
+  metrics      Metric[]
+  logLines     LogLine[]
+  systemMetrics SystemMetric[]
+  tags         Tag[]
+  artifacts    Artifact[]
+  reports      Report[]
+  registryModels RegistryModel[]
+  evaluations  Evaluation[]
+  traces       Trace[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, createdAt])
+}
+
+// ============================================================
+// Run
+// ============================================================
+
+model Run {
+  id          String   @id @default(uuid())
+  runId       String   @unique // UUID v7, globally unique across regions/projects
+  projectId   String
+  name        String
+  status      RunStatus @default(running)
+  config      Json     @default("{}")
+  summary     Json     @default("{}")
+  notes       String?
+  metadata    Json     @default("{}")
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  metrics       Metric[]
+  logLines      LogLine[]
+  systemMetrics SystemMetric[]
+  tags          RunTag[]
+  evaluations   Evaluation[]
+  traces        Trace[]
+
+  @@index([projectId, createdAt])
+  @@index([projectId, status])
+  @@index([projectId, name])
+  @@index([runId])
+}
+
+enum RunStatus {
+  pending
+  running
+  finished
+  failed
+  crashed
+  killed
+}
+
+// ============================================================
+// Tags
+// ============================================================
+
+model Tag {
+  id        String   @id @default(uuid())
+  projectId String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runs    RunTag[]
+
+  @@unique([projectId, name])
+}
+
+model RunTag {
+  id     String @id @default(uuid())
+  runId  String
+  tagId  String
 
   run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
-  @@index([runId, key, step])
+  @@unique([runId, tagId])
+  @@index([tagId])
+}
+
+// ============================================================
+// Metrics
+// ============================================================
+
+model Metric {
+  id        String   @id @default(uuid())
+  runId     String
+  projectId String
+  key       String
+  step      Int      @default(0)
+  value     Float
+  metadata  Json     @default("{}")
+  loggedAt  DateTime @default(now())
+
+  run     Run     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, key, step])
+  @@index([projectId, key, loggedAt])
   @@index([runId, loggedAt])
+}
+
+model SystemMetric {
+  id        String   @id @default(uuid())
+  runId     String
+  projectId String
+  key       String
+  step      Int      @default(0)
+  value     Float
+  loggedAt  DateTime @default(now())
+
+  run     Run     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([runId, key, loggedAt])
+  @@index([projectId, key, loggedAt])
+}
+
+// ============================================================
+// Logs
+// ============================================================
+
+model LogLine {
+  id        String   @id @default(uuid())
+  runId     String
+  projectId String
+  level     String   @default("INFO")
+  message   String
+  step      Int?
+  timestamp DateTime @default(now())
+
+  run     Run     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([runId, timestamp])
+  @@index([projectId, timestamp])
+}
+
+// ============================================================
+// Artifacts
+// ============================================================
+
+model Artifact {
+  id          String           @id @default(uuid())
+  projectId   String
+  name        String
+  type        ArtifactType     @default(file)
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  project   Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions  ArtifactVersion[]
+
+  @@unique([projectId, name])
+  @@index([projectId, createdAt])
+}
+
+enum ArtifactType {
+  dataset
+  model
+  checkpoint
+  file
+  table
+}
+
+model ArtifactVersion {
+  id          String            @id @default(uuid())
+  artifactId  String
+  version     String
+  aliases     String[]          @default([])
+  metadata    Json              @default("{}")
+  state       ArtifactVersionState @default(committed)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  artifact Artifact            @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  files    ArtifactFile[]
+  parents  ArtifactLineage[]   @relation("ChildVersion")
+  children ArtifactLineage[]   @relation("ParentVersion")
+  evaluationsAsDataset Evaluation[] @relation("EvaluationDataset")
+  evaluationsAsModel   Evaluation[] @relation("EvaluationModel")
+  registryModelVersions RegistryModelVersion[]
+
+  @@unique([artifactId, version])
+  @@index([artifactId, createdAt])
+}
+
+enum ArtifactVersionState {
+  pending
+  committed
+  deleted
+}
+
+model ArtifactFile {
+  id                  String   @id @default(uuid())
+  artifactVersionId   String
+  path                String
+  size                BigInt   @default(0)
+  md5                 String?
+  storageKey          String
+  createdAt           DateTime @default(now())
+
+  artifactVersion ArtifactVersion @relation(fields: [artifactVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([artifactVersionId, path])
+}
+
+model ArtifactLineage {
+  id                      String   @id @default(uuid())
+  artifactVersionId       String
+  parentArtifactVersionId String
+  type                    String   @default("derived_from")
+
+  artifactVersion       ArtifactVersion @relation("ChildVersion", fields: [artifactVersionId], references: [id], onDelete: Cascade)
+  parentArtifactVersion ArtifactVersion @relation("ParentVersion", fields: [parentArtifactVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([artifactVersionId, parentArtifactVersionId])
+  @@index([parentArtifactVersionId])
+}
+
+// ============================================================
+// Reports
+// ============================================================
+
+model Report {
+  id        String   @id @default(uuid())
+  projectId String
+  title     String
+  blocks    Json     @default("[]")
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+}
+
+// ============================================================
+// Model Registry
+// ============================================================
+
+model RegistryModel {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project  Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions RegistryModelVersion[]
+
+  @@unique([projectId, name])
+}
+
+model RegistryModelVersion {
+  id                  String   @id @default(uuid())
+  registryModelId     String
+  version             String
+  artifactVersionId   String
+  aliases             String[] @default([])
+  metadata            Json     @default("{}")
+  createdAt           DateTime @default(now())
+
+  registryModel   RegistryModel   @relation(fields: [registryModelId], references: [id], onDelete: Cascade)
+  artifactVersion ArtifactVersion @relation(fields: [artifactVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([registryModelId, version])
+  @@index([registryModelId, createdAt])
+}
+
+// ============================================================
+// Evaluations
+// ============================================================
+
+model Evaluation {
+  id                       String   @id @default(uuid())
+  projectId                String
+  name                     String
+  runId                    String?
+  datasetArtifactVersionId String?
+  modelArtifactVersionId   String?
+  status                   EvaluationStatus @default(pending)
+  summary                  Json     @default("{}")
+  metadata                 Json     @default("{}")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  project              Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run                  Run?               @relation(fields: [runId], references: [id], onDelete: SetNull)
+  datasetArtifactVersion ArtifactVersion? @relation("EvaluationDataset", fields: [datasetArtifactVersionId], references: [id], onDelete: SetNull)
+  modelArtifactVersion   ArtifactVersion? @relation("EvaluationModel", fields: [modelArtifactVersionId], references: [id], onDelete: SetNull)
+  results                EvaluationResult[]
+
+  @@index([projectId, createdAt])
+  @@index([projectId, status])
+}
+
+enum EvaluationStatus {
+  pending
+  running
+  completed
+  failed
+}
+
+model EvaluationResult {
+  id            String   @id @default(uuid())
+  evaluationId  String
+  key           String
+  value         Float
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now())
+
+  evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@index([evaluationId, key])
+}
+
+// ============================================================
+// Traces (LLM / Agent Observability)
+// ============================================================
+
+model Trace {
+  id        String   @id @default(uuid())
+  projectId String
+  runId     String?
+  traceId   String   @unique
+  name      String
+  status    TraceStatus @default(ok)
+  latencyMs Int?
+  metadata  Json     @default("{}")
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run     Run?    @relation(fields: [runId], references: [id], onDelete: SetNull)
+  spans   Span[]
+
+  @@index([projectId, startedAt])
+  @@index([traceId])
+}
+
+enum TraceStatus {
+  ok
+  error
+}
+
+model Span {
+  id           String   @id @default(uuid())
+  traceId      String
+  parentSpanId String?
+  spanId       String   @unique
+  name         String
+  kind         SpanKind @default(internal)
+  input        Json     @default("{}")
+  output       Json     @default("{}")
+  latencyMs    Int?
+  status       SpanStatus @default(ok)
+  startedAt    DateTime @default(now())
+  finishedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  trace      Trace  @relation(fields: [traceId], references: [id], onDelete: Cascade)
+  parentSpan Span?  @relation("SpanChildren", fields: [parentSpanId], references: [id], onDelete: Cascade)
+  childSpans Span[] @relation("SpanChildren")
+
+  @@index([traceId, startedAt])
+  @@index([parentSpanId])
+}
+
+enum SpanKind {
+  llm
+  tool
+  retriever
+  chain
+  agent
+  internal
+}
+
+enum SpanStatus {
+  ok
+  error
 }
