@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Run {
+  id         String   @id @default(uuid())
+  project    String
+  name       String
+  status     String   @default("running") // running | finished | failed
+  config     Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  finishedAt DateTime?
+
+  metrics Metric[]
+
+  @@index([project, createdAt])
+  @@index([status])
+}
+
+model Metric {
+  id       String   @id @default(uuid())
+  runId    String
+  key      String
+  step     Int      @default(0)
+  value    Float
+  loggedAt DateTime @default(now())
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, key, step])
+  @@index([runId, loggedAt])
+}

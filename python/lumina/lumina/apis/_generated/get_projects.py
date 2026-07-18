@@ -1,0 +1,17 @@
+from __future__ import annotations
+from pydantic import Field
+from lumina._pydantic import GQLResult
+from .fragments import PageInfoFragment, ProjectFragment
+
+class GetProjects(GQLResult):
+    models: GetProjectsModels | None
+
+class GetProjectsModels(GQLResult):
+    page_info: PageInfoFragment = Field(alias='pageInfo')
+    edges: list[GetProjectsModelsEdges]
+
+class GetProjectsModelsEdges(GQLResult):
+    node: ProjectFragment | None
+GetProjects.model_rebuild()
+GetProjectsModels.model_rebuild()
+GetProjectsModelsEdges.model_rebuild()

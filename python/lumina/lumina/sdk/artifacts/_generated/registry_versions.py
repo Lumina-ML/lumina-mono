@@ -1,0 +1,26 @@
+from __future__ import annotations
+from pydantic import Field
+from lumina._pydantic import GQLResult
+from .fragments import ArtifactMembershipFragment, PageInfoFragment
+
+class RegistryVersions(GQLResult):
+    organization: RegistryVersionsOrganization | None
+
+class RegistryVersionsOrganization(GQLResult):
+    org_entity: RegistryVersionsOrganizationOrgEntity | None = Field(alias='orgEntity')
+
+class RegistryVersionsOrganizationOrgEntity(GQLResult):
+    name: str
+    artifact_memberships: RegistryVersionsOrganizationOrgEntityArtifactMemberships | None = Field(alias='artifactMemberships')
+
+class RegistryVersionsOrganizationOrgEntityArtifactMemberships(GQLResult):
+    page_info: PageInfoFragment = Field(alias='pageInfo')
+    edges: list[RegistryVersionsOrganizationOrgEntityArtifactMembershipsEdges]
+
+class RegistryVersionsOrganizationOrgEntityArtifactMembershipsEdges(GQLResult):
+    node: ArtifactMembershipFragment | None
+RegistryVersions.model_rebuild()
+RegistryVersionsOrganization.model_rebuild()
+RegistryVersionsOrganizationOrgEntity.model_rebuild()
+RegistryVersionsOrganizationOrgEntityArtifactMemberships.model_rebuild()
+RegistryVersionsOrganizationOrgEntityArtifactMembershipsEdges.model_rebuild()

@@ -1,0 +1,21 @@
+from __future__ import annotations
+from pydantic import Field
+from lumina._pydantic import GQLResult
+from .fragments import PageInfoFields, TriggerFields
+
+class GetEntityAutomations(GQLResult):
+    scope: GetEntityAutomationsScope | None
+
+class GetEntityAutomationsScope(GQLResult):
+    triggers: GetEntityAutomationsScopeTriggers
+
+class GetEntityAutomationsScopeTriggers(GQLResult):
+    page_info: PageInfoFields = Field(alias='pageInfo')
+    edges: list[GetEntityAutomationsScopeTriggersEdges]
+
+class GetEntityAutomationsScopeTriggersEdges(GQLResult):
+    node: TriggerFields
+GetEntityAutomations.model_rebuild()
+GetEntityAutomationsScope.model_rebuild()
+GetEntityAutomationsScopeTriggers.model_rebuild()
+GetEntityAutomationsScopeTriggersEdges.model_rebuild()

@@ -1,0 +1,26 @@
+from __future__ import annotations
+from pydantic import Field
+from lumina._pydantic import GQLResult
+from .fragments import ArtifactAliasFragment, CollectionInfoFragment
+
+class FetchLinkedArtifacts(GQLResult):
+    artifact: FetchLinkedArtifactsArtifact | None
+
+class FetchLinkedArtifactsArtifact(GQLResult):
+    artifact_memberships: FetchLinkedArtifactsArtifactArtifactMemberships = Field(alias='artifactMemberships')
+
+class FetchLinkedArtifactsArtifactArtifactMemberships(GQLResult):
+    edges: list[FetchLinkedArtifactsArtifactArtifactMembershipsEdges]
+
+class FetchLinkedArtifactsArtifactArtifactMembershipsEdges(GQLResult):
+    node: FetchLinkedArtifactsArtifactArtifactMembershipsEdgesNode | None
+
+class FetchLinkedArtifactsArtifactArtifactMembershipsEdgesNode(GQLResult):
+    version_index: int | None = Field(alias='versionIndex')
+    aliases: list[ArtifactAliasFragment]
+    artifact_collection: CollectionInfoFragment | None = Field(alias='artifactCollection')
+FetchLinkedArtifacts.model_rebuild()
+FetchLinkedArtifactsArtifact.model_rebuild()
+FetchLinkedArtifactsArtifactArtifactMemberships.model_rebuild()
+FetchLinkedArtifactsArtifactArtifactMembershipsEdges.model_rebuild()
+FetchLinkedArtifactsArtifactArtifactMembershipsEdgesNode.model_rebuild()
