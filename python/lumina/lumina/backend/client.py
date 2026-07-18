@@ -11,11 +11,25 @@ class LuminaClientError(Exception):
     """Raised when a Lumina backend request fails."""
 
 
+_API_KEY: Optional[str] = None
+
+
+def set_api_key(api_key: Optional[str]) -> None:
+    """Set the global API key used by all LuminaClient instances."""
+    global _API_KEY
+    _API_KEY = api_key
+
+
+def get_api_key() -> Optional[str]:
+    return _API_KEY or os.getenv("LUMINA_API_KEY")
+
+
 class LuminaClient:
     """A thin HTTP client that talks to the Lumina backend."""
 
-    def __init__(self, base_url: Optional[str] = None):
+    def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
         self.base_url = (base_url or os.getenv("LUMINA_API_URL", "http://localhost:8000")).rstrip("/")
+        self.api_key = api_key or get_api_key()
 
     def _request(
         self,
@@ -25,6 +39,8 @@ class LuminaClient:
     ) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
         headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         body = json.dumps(data).encode("utf-8") if data is not None else None
         req = Request(url, data=body, headers=headers, method=method)
 
@@ -429,6 +445,66 @@ class LuminaClient:
 
     def get_run_media(self, run_media_id: str) -> dict[str, Any]:
         return self._request("GET", f"/api/v1/run-media/{run_media_id}")
+
+    def create_user(
+        self,
+        email: str,
+        name: Optional[str] = None,
+        avatar: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"email": email}
+        if name:
+            payload["name"] = name
+        if avatar:
+            payload["avatar"] = avatar
+        return self._request("POST", "/api/v1/users", payload)
+
+    def list_users(self) -> dict[str, Any]:
+        return self._request("GET", "/api/v1/users")
+
+    def get_user(self, user_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/users/{user_id}")
+
+    def get_current_user(self) -> dict[str, Any]:
+        return self._request("GET", "/api/v1/users/me")
+
+    def update_user(self, user_id: str, name: Optional[str] = None, avatar: Optional[str] = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if name:
+            payload["name"] = name
+        if avatar:
+            payload["avatar"] = avatar
+        return self._request("PATCH", f"/api/v1/users/{user_id}", payload)
+
+    def delete_user(self, user_id: str) -> dict[str, Any]:
+        return self._request("DELETE", f"/api/v1/users/{user_id}")
+
+    def generate_api_key(self, user_id: str) -> dict[str, Any]:
+        return self._request("POST", f"/api/v1/users/{user_id}/api-key")
+
+    def create_workspace_membership(
+        self,
+        workspace_id: str,
+        user_id: str,
+        role: str = "member",
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            "/api/v1/workspace-memberships",
+            {"workspaceId": workspace_id, "userId": user_id, "role": role},
+        )
+
+    def list_workspace_memberships(self, workspace_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/workspaces/{workspace_id}/memberships")
+
+    def list_user_memberships(self, user_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/users/{user_id}/memberships")
+
+    def update_workspace_membership(self, membership_id: str, role: str) -> dict[str, Any]:
+        return self._request("PATCH", f"/api/v1/workspace-memberships/{membership_id}", {"role": role})
+
+    def delete_workspace_membership(self, membership_id: str) -> dict[str, Any]:
+        return self._request("DELETE", f"/api/v1/workspace-memberships/{membership_id}")
 
     def upload_file_to_url(self, url: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         req = Request(url, data=data, headers={"Content-Type": content_type}, method="PUT")

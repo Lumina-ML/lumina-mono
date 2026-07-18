@@ -10,7 +10,8 @@ export class UserService {
   }
 
   async createUser(data: CreateUserInput) {
-    return this.repository.createUser(data);
+    const apiKey = this.repository.generateApiKey();
+    return this.repository.createUser({ ...data, apiKey } as CreateUserInput);
   }
 
   async findById(id: string) {

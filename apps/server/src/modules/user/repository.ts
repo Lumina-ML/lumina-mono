@@ -5,12 +5,13 @@ import type { CreateUserInput, UpdateUserInput, GenerateApiKeyInput } from "./sc
 export class UserRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async createUser(data: CreateUserInput) {
+  async createUser(data: CreateUserInput & { apiKey?: string }) {
     return this.prisma.user.create({
       data: {
         email: data.email,
         name: data.name,
         avatar: data.avatar,
+        apiKey: data.apiKey,
       },
     });
   }
