@@ -68,6 +68,10 @@ Sidebar:
 - Opacity: 0.6 → 1 on hover
 ```
 
+## Mobile-First
+
+所有基础组件默认适配移动端。详见 `mobile-first.md`。
+
 ## 当前阶段
 
 Phase 1：Foundation

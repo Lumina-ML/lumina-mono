@@ -51,8 +51,21 @@
 3. 列表页中的 `NCard` → `LCard`
 4. 逐步替换其他组件
 
+## Mobile-First 要求
+
+所有包装组件必须默认考虑移动端：
+
+- `LButton`：触摸设备最小 44×44 点击区（已实现）
+- `LCard`：移动端更紧凑的 padding（已实现）
+- `LSidebar`：移动端改为 drawer
+- `LDataTable`：小屏改为横向滚动或 card list
+- `LSelect` / `LTabs`：小屏考虑 bottom sheet 或横向滚动
+
+详见 `mobile-first.md`。
+
 ## 注意事项
 
 - naive-ui 的类型系统较复杂，wrapper 组件中**不要直接使用 `defineProps<NaiveProps>()`**，应定义简化的本地 props 接口
 - 如果需要透传 naive-ui 的特殊 prop，可以走 `$attrs`
 - 最终目标不是删除 naive-ui，而是让 dashboard 只依赖 `@lumina/ui`
+- 所有组件默认 mobile-first，桌面端是扩展
