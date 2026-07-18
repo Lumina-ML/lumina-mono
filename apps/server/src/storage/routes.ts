@@ -26,6 +26,6 @@ export async function storageLocalRoutes(app: FastifyInstance) {
   app.get("/uploads/*", async (req: FastifyRequest, reply: FastifyReply) => {
     const key = decodeURIComponent((req.params as Record<string, string>)["*"]);
     const stream = await provider.getStream(key);
-    reply.send(stream);
+    reply.type("application/octet-stream").send(stream);
   });
 }

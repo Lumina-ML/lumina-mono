@@ -46,7 +46,7 @@ export async function buildApp() {
   await app.register(logLineRoutes, { prefix: "/api/v1" });
   await app.register(tagRoutes, { prefix: "/api/v1" });
   await app.register(artifactRoutes, { prefix: "/api/v1" });
-  await app.register(storageLocalRoutes);
+  await app.register(storageLocalRoutes, { prefix: "/api/v1" });
 
   app.get("/health", async () => ({ status: "ok" }));
 
