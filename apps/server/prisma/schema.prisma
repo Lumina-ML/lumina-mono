@@ -156,7 +156,7 @@ model RunTag {
   runId  String
   tagId  String
 
-  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run Run @relation(fields: [runId], references: [runId], onDelete: Cascade)
   tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([runId, tagId])
@@ -177,7 +177,7 @@ model Metric {
   metadata  Json     @default("{}")
   loggedAt  DateTime @default(now())
 
-  run     Run     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run     Run     @relation(fields: [runId], references: [runId], onDelete: Cascade)
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([runId, key, step])
@@ -194,7 +194,7 @@ model SystemMetric {
   value     Float
   loggedAt  DateTime @default(now())
 
-  run     Run     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run     Run     @relation(fields: [runId], references: [runId], onDelete: Cascade)
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([runId, key, loggedAt])
@@ -214,7 +214,7 @@ model LogLine {
   step      Int?
   timestamp DateTime @default(now())
 
-  run     Run     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run     Run     @relation(fields: [runId], references: [runId], onDelete: Cascade)
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([runId, timestamp])
@@ -374,7 +374,7 @@ model Evaluation {
   updatedAt                DateTime @updatedAt
 
   project              Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  run                  Run?               @relation(fields: [runId], references: [id], onDelete: SetNull)
+  run                  Run?               @relation(fields: [runId], references: [runId], onDelete: SetNull)
   datasetArtifactVersion ArtifactVersion? @relation("EvaluationDataset", fields: [datasetArtifactVersionId], references: [id], onDelete: SetNull)
   modelArtifactVersion   ArtifactVersion? @relation("EvaluationModel", fields: [modelArtifactVersionId], references: [id], onDelete: SetNull)
   results                EvaluationResult[]
@@ -421,7 +421,7 @@ model Trace {
   createdAt DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  run     Run?    @relation(fields: [runId], references: [id], onDelete: SetNull)
+  run     Run?    @relation(fields: [runId], references: [runId], onDelete: SetNull)
   spans   Span[]
 
   @@index([projectId, startedAt])

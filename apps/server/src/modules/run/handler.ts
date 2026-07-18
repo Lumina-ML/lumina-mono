@@ -6,13 +6,25 @@ import {
   UpdateRunSchema,
   type ListRunsQuery,
 } from "./schema.js";
+import { ProjectService } from "../project/service.js";
+
+const DEFAULT_WORKSPACE_ID = "default";
 
 export class RunHandler {
-  constructor(private readonly service: RunService) {}
+  constructor(
+    private readonly runService: RunService,
+    private readonly projectService: ProjectService,
+  ) {}
 
   async create(req: FastifyRequest, reply: FastifyReply) {
     const data = CreateRunSchema.parse(req.body);
-    const run = await this.service.create(data);
+
+    const project = await this.projectService.findOrCreate(
+      DEFAULT_WORKSPACE_ID,
+      { name: data.project },
+    );
+
+    const run = await this.runService.create(project.id, data);
     reply.status(201).send(run);
   }
 
@@ -21,7 +33,22 @@ export class RunHandler {
     reply: FastifyReply,
   ) {
     const query = ListRunsQuerySchema.parse(req.query);
-    const result = await this.service.list(query);
+
+    let projectId: string | undefined;
+    if (query.project) {
+      const project = await this.projectService.findByName(
+        DEFAULT_WORKSPACE_ID,
+        query.project,
+      );
+      projectId = project?.id;
+    }
+
+    const result = await this.runService.list({
+      projectId,
+      status: query.status,
+      limit: query.limit,
+      offset: query.offset,
+    });
     reply.send(result);
   }
 
@@ -29,7 +56,7 @@ export class RunHandler {
     req: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
   ) {
-    const run = await this.service.getById(req.params.id);
+    const run = await this.runService.getByRunId(req.params.id);
     reply.send(run);
   }
 
@@ -38,7 +65,7 @@ export class RunHandler {
     reply: FastifyReply,
   ) {
     const data = UpdateRunSchema.parse(req.body);
-    const run = await this.service.update(req.params.id, data);
+    const run = await this.runService.update(req.params.id, data);
     reply.send(run);
   }
 }

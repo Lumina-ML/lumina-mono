@@ -1,16 +1,27 @@
 import { z } from "zod";
 
-export const RunStatusSchema = z.enum(["running", "finished", "failed"]);
+export const RunStatusSchema = z.enum([
+  "pending",
+  "running",
+  "finished",
+  "failed",
+  "crashed",
+  "killed",
+]);
 
 export const CreateRunSchema = z.object({
-  project: z.string().min(1),
-  name: z.string().min(1),
+  project: z.string().min(1).max(128),
+  name: z.string().min(1).max(256),
   config: z.record(z.unknown()).default({}),
+  metadata: z.record(z.unknown()).default({}),
 });
 
 export const UpdateRunSchema = z.object({
   status: RunStatusSchema.optional(),
   config: z.record(z.unknown()).optional(),
+  summary: z.record(z.unknown()).optional(),
+  notes: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 export const ListRunsQuerySchema = z.object({

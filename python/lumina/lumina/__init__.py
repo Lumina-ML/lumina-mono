@@ -42,7 +42,7 @@ def init(
         ctx.config = config or {}
         client = LuminaClient()
         run = client.create_run(ctx.project, ctx.name, ctx.config)
-        ctx.run_id = run["id"]
+        ctx.run_id = run["runId"]
         get_run_context().__dict__.update(ctx.__dict__)
         return run
     return _WANDB_INIT(project=project, name=name, config=config, **kwargs)

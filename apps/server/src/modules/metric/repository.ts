@@ -4,9 +4,10 @@ import type { LogMetricsInput } from "./schema.js";
 export class MetricRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async createMany(runId: string, data: LogMetricsInput) {
+  async createMany(runId: string, projectId: string, data: LogMetricsInput) {
     const metrics = data.metrics.map((m) => ({
       runId,
+      projectId,
       key: m.key,
       step: m.step,
       value: m.value,
@@ -30,7 +31,10 @@ export class MetricRepository {
       take: params.limit,
     });
 
-    const grouped: Record<string, Array<{ step: number; value: number; loggedAt: string }>> = {};
+    const grouped: Record<
+      string,
+      Array<{ step: number; value: number; loggedAt: string }>
+    > = {};
     for (const m of metrics) {
       if (!grouped[m.key]) grouped[m.key] = [];
       grouped[m.key].push({

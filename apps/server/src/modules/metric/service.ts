@@ -9,8 +9,8 @@ export class MetricService {
     this.repository = new MetricRepository(prisma);
   }
 
-  async log(runId: string, data: LogMetricsInput) {
-    return this.repository.createMany(runId, data);
+  async log(runId: string, projectId: string, data: LogMetricsInput) {
+    return this.repository.createMany(runId, projectId, data);
   }
 
   async list(runId: string, params: { keys?: string[]; limit: number }) {
