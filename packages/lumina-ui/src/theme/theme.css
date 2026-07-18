@@ -1,0 +1,92 @@
+/**
+ * Lumina Design Language — Theme Variables
+ *
+ * 所有语义化颜色以 HSL 格式定义，便于暗色模式切换。
+ * 如需新增 token，请同步更新 tokens/colors.ts。
+ */
+
+:root {
+  /* Foreground */
+  --ldl-foreground: 222.2 84% 4.9%;
+  --ldl-foreground-muted: 215.4 16.3% 46.9%;
+  --ldl-foreground-disabled: 215.4 16.3% 60%;
+
+  /* Layer System — Light */
+  --ldl-canvas: 0 0% 100%;
+  --ldl-surface: 0 0% 100%;
+  --ldl-panel: 0 0% 100%;
+  --ldl-panel-hover: 210 40% 96.1%;
+  --ldl-card: 0 0% 100%;
+  --ldl-card-hover: 210 40% 96.1%;
+  --ldl-overlay: 0 0% 100% / 0.8;
+  --ldl-floating: 0 0% 100%;
+
+  /* Borders */
+  --ldl-border: 214.3 31.8% 91.4%;
+  --ldl-divider: 214.3 31.8% 91.4%;
+  --ldl-selection: 210 40% 96.1%;
+
+  /* Brand */
+  --ldl-primary: 222.2 47.4% 11.2%;
+  --ldl-primary-foreground: 210 40% 98%;
+  --ldl-secondary: 210 40% 96.1%;
+  --ldl-secondary-foreground: 222.2 47.4% 11.2%;
+  --ldl-accent: 210 40% 96.1%;
+  --ldl-accent-foreground: 222.2 47.4% 11.2%;
+
+  /* States */
+  --ldl-muted: 210 40% 96.1%;
+  --ldl-muted-foreground: 215.4 16.3% 46.9%;
+  --ldl-destructive: 0 84.2% 60.2%;
+  --ldl-destructive-foreground: 210 40% 98%;
+  --ldl-info: 217 91% 60%;
+  --ldl-success: 142 76% 36%;
+  --ldl-warning: 38 92% 50%;
+  --ldl-error: 0 84% 60%;
+
+  /* Focus */
+  --ldl-ring: 222.2 84% 4.9%;
+}
+
+.dark {
+  /* Foreground */
+  --ldl-foreground: 210 40% 98%;
+  --ldl-foreground-muted: 215 20.2% 65.1%;
+  --ldl-foreground-disabled: 215 20.2% 45%;
+
+  /* Layer System — Dark */
+  --ldl-canvas: 222.2 84% 4.9%;
+  --ldl-surface: 222.2 84% 4.9%;
+  --ldl-panel: 222.2 84% 4.9%;
+  --ldl-panel-hover: 217.2 32.6% 17.5%;
+  --ldl-card: 222.2 84% 4.9%;
+  --ldl-card-hover: 217.2 32.6% 17.5%;
+  --ldl-overlay: 222.2 84% 4.9% / 0.8;
+  --ldl-floating: 222.2 84% 4.9%;
+
+  /* Borders */
+  --ldl-border: 217.2 32.6% 17.5%;
+  --ldl-divider: 217.2 32.6% 17.5%;
+  --ldl-selection: 217.2 32.6% 17.5%;
+
+  /* Brand */
+  --ldl-primary: 210 40% 98%;
+  --ldl-primary-foreground: 222.2 47.4% 11.2%;
+  --ldl-secondary: 217.2 32.6% 17.5%;
+  --ldl-secondary-foreground: 210 40% 98%;
+  --ldl-accent: 217.2 32.6% 17.5%;
+  --ldl-accent-foreground: 210 40% 98%;
+
+  /* States */
+  --ldl-muted: 217.2 32.6% 17.5%;
+  --ldl-muted-foreground: 215 20.2% 65.1%;
+  --ldl-destructive: 0 62.8% 30.6%;
+  --ldl-destructive-foreground: 210 40% 98%;
+  --ldl-info: 217 91% 60%;
+  --ldl-success: 142 71% 45%;
+  --ldl-warning: 38 92% 50%;
+  --ldl-error: 0 62.8% 30.6%;
+
+  /* Focus */
+  --ldl-ring: 212.7 26.8% 83.9%;
+}

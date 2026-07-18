@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h } from "vue";
 import { RouterLink } from "vue-router";
-import { NButton } from "naive-ui";
+import { LButton } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
 import DataTable from "@/components/DataTable.vue";
 import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
@@ -61,7 +61,7 @@ const columns: ColumnDef<Run>[] = [
       h(
         RouterLink,
         { to: `/runs/${row.original.runId}` },
-        () => h(NButton, { size: "small" }, () => "View"),
+        () => h(LButton, { size: "sm" }, () => "View"),
       ),
   },
 ];
