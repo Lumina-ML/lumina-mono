@@ -104,6 +104,18 @@ class LuminaClient:
             return
         self._request("POST", f"/api/v1/runs/{run_id}/metrics", {"metrics": payload_metrics})
 
+    def list_metrics(
+        self,
+        run_id: str,
+        keys: Optional[list[str]] = None,
+        limit: int = 10000,
+    ) -> dict[str, Any]:
+        query_parts: list[str] = [f"limit={limit}"]
+        if keys:
+            query_parts.append("keys=" + ",".join(keys))
+        query = "&".join(query_parts)
+        return self._request("GET", f"/api/v1/runs/{run_id}/metrics?{query}")
+
     def log_system_metrics(self, run_id: str, metrics: dict[str, Any], step: Optional[int] = None) -> None:
         payload_metrics = []
         for key, value in metrics.items():

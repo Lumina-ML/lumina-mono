@@ -156,6 +156,7 @@ class LuminaRun:
         self._client = client or LuminaClient()
         self._config = LuminaConfig(config, sync_callback=self._sync_config)
         self._summary = LuminaSummary(sync_callback=self._sync_summary)
+        self._metric_defs: dict[str, dict[str, Any]] = {}
         self._step = 0
         self._finished = False
 
@@ -270,6 +271,85 @@ class LuminaRun:
                 scalar_metrics[key] = value
         if scalar_metrics:
             self._client.log_metrics(self._run_id, scalar_metrics, self._step)
+            # Mirror wandb behavior: keep the latest scalar value in summary,
+            # unless the metric is explicitly hidden or summary aggregation
+            # is disabled.
+            self._update_summary_from_metrics(scalar_metrics)
+
+    def _update_summary_from_metrics(self, metrics: dict[str, Any]) -> None:
+        """Update the local summary with the latest scalar metrics.
+
+        This avoids triggering a backend sync on every log call; the final
+        aggregated summary is pushed once in ``finish()``.
+        """
+        for key, value in metrics.items():
+            if not isinstance(value, (int, float)):
+                continue
+            definition = self._metric_defs.get(key, {})
+            if definition.get("hidden"):
+                continue
+            summary_mode = definition.get("summary", "last")
+            if summary_mode == "none":
+                continue
+            # Directly update internal data to avoid per-step backend sync.
+            self._summary._data[key] = value
+
+    def _compute_summary_aggregations(self) -> dict[str, Any]:
+        """Fetch all metrics and compute summary aggregations.
+
+        Returns a dict ready to be sent as the run summary.
+        """
+        # Start from manually-set summary values.
+        summary = dict(self._summary._data)
+
+        if not self._metric_defs:
+            return summary
+
+        # Fetch metrics from the backend. Limit is high enough for MVP runs.
+        result = self._client.list_metrics(self._run_id, limit=10000)
+        grouped = result.get("metrics", {})
+
+        # Group values by metric key.
+        series: dict[str, list[float]] = {}
+        for key, entries in grouped.items():
+            if not isinstance(entries, list):
+                continue
+            values: list[float] = []
+            for entry in entries:
+                value = entry.get("value")
+                if isinstance(value, (int, float)):
+                    values.append(float(value))
+            if values:
+                series[key] = values
+
+        for key, definition in self._metric_defs.items():
+            if definition.get("hidden"):
+                continue
+            summary_mode = definition.get("summary", "last")
+            values = series.get(key, [])
+            if not values:
+                continue
+
+            if summary_mode == "none":
+                continue
+            if summary_mode == "last":
+                summary[key] = values[-1]
+            elif summary_mode == "first":
+                summary[key] = values[0]
+            elif summary_mode == "min":
+                summary[key] = min(values)
+            elif summary_mode == "max":
+                summary[key] = max(values)
+            elif summary_mode == "mean":
+                summary[key] = sum(values) / len(values)
+            elif summary_mode == "best":
+                goal = definition.get("goal", "minimize")
+                if goal == "maximize":
+                    summary[key] = max(values)
+                else:
+                    summary[key] = min(values)
+
+        return summary
 
     def log_system(self, metrics: dict[str, Any], step: int | None = None) -> None:
         """Log system metrics for this run."""
@@ -298,6 +378,10 @@ class LuminaRun:
         """Finish this run."""
         if self._finished:
             return
+        # Compute final summary aggregations and push them once.
+        final_summary = self._compute_summary_aggregations()
+        if final_summary:
+            self._client.update_run(self._run_id, summary=final_summary)
         self._client.finish_run(self._run_id)
         self._finished = True
         # Reset global module bindings so subsequent top-level calls fail
@@ -452,10 +536,29 @@ class LuminaRun:
         summary: str | None = None,
         goal: str | None = None,
         overwrite: bool | None = None,
-    ) -> Any:
-        """Define metric customization. (Stub)"""
-        warnings.warn("lumina.Run.define_metric() is not yet backed by the Lumina backend.")
-        return None
+    ) -> dict[str, Any]:
+        """Define how a metric should be summarized and displayed.
+
+        Supported ``summary`` aggregations: ``last``, ``first``, ``min``,
+        ``max``, ``mean``, ``best``, ``none``.
+        """
+        if not overwrite and name in self._metric_defs:
+            return self._metric_defs[name]
+
+        definition: dict[str, Any] = {"name": name}
+        if step_metric is not None:
+            definition["step_metric"] = step_metric
+        if step_sync is not None:
+            definition["step_sync"] = step_sync
+        if hidden is not None:
+            definition["hidden"] = hidden
+        if summary is not None:
+            definition["summary"] = summary
+        if goal is not None:
+            definition["goal"] = goal
+
+        self._metric_defs[name] = definition
+        return definition
 
     def mark_preempting(self) -> None:
         """Mark the run as preempting. (Stub)"""
