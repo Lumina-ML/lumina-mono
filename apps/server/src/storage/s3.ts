@@ -1,6 +1,8 @@
 import {
   S3Client,
   DeleteObjectCommand,
+  CreateBucketCommand,
+  HeadBucketCommand,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -58,5 +60,18 @@ export class S3StorageProvider implements StorageProvider {
       Key: key,
     });
     await this.client.send(command);
+  }
+
+  async ensureBucket() {
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.config.bucket }));
+    } catch (err) {
+      const e = err as { name?: string; Code?: string };
+      if (e.name === "NotFound" || e.Code === "NoSuchBucket" || e.Code === "404") {
+        await this.client.send(new CreateBucketCommand({ Bucket: this.config.bucket }));
+      } else {
+        throw err;
+      }
+    }
   }
 }

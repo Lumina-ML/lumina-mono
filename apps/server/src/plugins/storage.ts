@@ -1,6 +1,7 @@
 import fp from "fastify-plugin";
 import {
   createStorageProvider,
+  S3StorageProvider,
   type StorageProvider,
   type StorageOptions,
 } from "../storage/index.js";
@@ -33,5 +34,8 @@ function parseStorageOptions(): StorageOptions {
 export const storagePlugin = fp(async (app) => {
   const options = parseStorageOptions();
   const storage = createStorageProvider(options);
+  if (storage instanceof S3StorageProvider) {
+    await storage.ensureBucket();
+  }
   app.decorate("storage", storage);
 });
