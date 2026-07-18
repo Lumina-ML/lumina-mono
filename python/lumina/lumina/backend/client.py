@@ -75,6 +75,26 @@ class LuminaClient:
     def finish_run(self, run_id: str) -> dict[str, Any]:
         return self._request("PATCH", f"/api/v1/runs/{run_id}", {"status": "finished"})
 
+    def update_run(
+        self,
+        run_id: str,
+        *,
+        config: dict[str, Any] | None = None,
+        summary: dict[str, Any] | None = None,
+        notes: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if config is not None:
+            payload["config"] = config
+        if summary is not None:
+            payload["summary"] = summary
+        if notes is not None:
+            payload["notes"] = notes
+        if metadata is not None:
+            payload["metadata"] = metadata
+        return self._request("PATCH", f"/api/v1/runs/{run_id}", payload)
+
     def log_metrics(self, run_id: str, metrics: dict[str, Any], step: Optional[int] = None) -> None:
         payload_metrics = []
         for key, value in metrics.items():

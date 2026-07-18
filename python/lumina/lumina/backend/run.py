@@ -15,16 +15,33 @@ from lumina.backend.run_context import get_run_context
 
 
 class _DictLike:
-    """Base class for dict-like config/summary objects."""
+    """Base class for dict-like config/summary objects.
 
-    def __init__(self, initial: dict[str, Any] | None = None) -> None:
-        self._data: dict[str, Any] = dict(initial) if initial else {}
+    Optionally accepts a ``sync_callback`` that is invoked with the current
+    data dict after every mutation. This allows `LuminaRun` to push config
+    and summary changes to the Lumina backend.
+    """
+
+    def __init__(
+        self,
+        initial: dict[str, Any] | None = None,
+        sync_callback: Callable[[dict[str, Any]], None] | None = None,
+    ) -> None:
+        # Use object.__setattr__ to bypass our own override during init.
+        object.__setattr__(self, "_data", dict(initial) if initial else {})
+        object.__setattr__(self, "_sync_callback", sync_callback)
+
+    def _trigger_sync(self) -> None:
+        callback = object.__getattribute__(self, "_sync_callback")
+        if callback:
+            callback(self._data)
 
     def __getitem__(self, key: str) -> Any:
         return self._data[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
         self._data[key] = value
+        self._trigger_sync()
 
     def __getattr__(self, key: str) -> Any:
         if key.startswith("_"):
@@ -39,6 +56,13 @@ class _DictLike:
             object.__setattr__(self, key, value)
         else:
             self._data[key] = value
+            self._trigger_sync()
+
+    def __delitem__(self, key: str) -> None:
+        del self._data[key]
+        self._trigger_sync()
+
+    __delattr__ = __delitem__
 
     def __contains__(self, key: str) -> bool:
         return key in self._data
@@ -67,10 +91,15 @@ class _DictLike:
         allow_val_change: bool | None = None,
         **kwargs: Any,
     ) -> None:
+        changed = False
         if data:
             self._data.update(data)
+            changed = True
         if kwargs:
             self._data.update(kwargs)
+            changed = True
+        if changed:
+            self._trigger_sync()
 
     def as_dict(self) -> dict[str, Any]:
         return dict(self._data)
@@ -81,6 +110,9 @@ class LuminaConfig(_DictLike):
 
     Behaves like `wandb.sdk.wandb_config.Config`: supports both attribute
     and item access, ``.update()``, ``.as_dict()``.
+
+    Mutations are synced to the Lumina backend via the callback provided by
+    the owning `LuminaRun`.
     """
 
     pass
@@ -91,6 +123,9 @@ class LuminaSummary(_DictLike):
 
     Behaves like `wandb.sdk.wandb_summary.Summary`: supports both attribute
     and item access, ``.update()``, ``.as_dict()``.
+
+    Mutations are synced to the Lumina backend via the callback provided by
+    the owning `LuminaRun`.
     """
 
     pass
@@ -119,10 +154,20 @@ class LuminaRun:
         self._name = name
         self._sweep_id = sweep_id
         self._client = client or LuminaClient()
-        self._config = LuminaConfig(config)
-        self._summary = LuminaSummary()
+        self._config = LuminaConfig(config, sync_callback=self._sync_config)
+        self._summary = LuminaSummary(sync_callback=self._sync_summary)
         self._step = 0
         self._finished = False
+
+    def _sync_config(self, data: dict[str, Any]) -> None:
+        if self._finished:
+            return
+        self._client.update_run(self._run_id, config=data)
+
+    def _sync_summary(self, data: dict[str, Any]) -> None:
+        if self._finished:
+            return
+        self._client.update_run(self._run_id, summary=data)
 
     # ------------------------------------------------------------------
     # Properties mirroring wandb.Run
