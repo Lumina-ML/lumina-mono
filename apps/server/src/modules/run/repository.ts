@@ -10,6 +10,7 @@ export class RunRepository {
       data: {
         projectId,
         runId: uuidv7(),
+        sweepId: data.sweepId,
         name: data.name,
         status: "running",
         config: data.config as any,

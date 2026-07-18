@@ -78,12 +78,14 @@ model Project {
 
   workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   runs         Run[]
+  sweeps       Sweep[]
   metrics      Metric[]
   logLines     LogLine[]
   systemMetrics SystemMetric[]
   tags         Tag[]
   artifacts    Artifact[]
   reports      Report[]
+  runMedia     RunMedia[]
   registryModels RegistryModel[]
   evaluations  Evaluation[]
   traces       Trace[]
@@ -100,6 +102,7 @@ model Run {
   id          String   @id @default(uuid())
   runId       String   @unique // UUID v7, globally unique across regions/projects
   projectId   String
+  sweepId     String?
   name        String
   status      RunStatus @default(running)
   config      Json     @default("{}")
@@ -112,17 +115,20 @@ model Run {
   updatedAt   DateTime @updatedAt
 
   project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sweep         Sweep?         @relation(fields: [sweepId], references: [id], onDelete: SetNull)
   metrics       Metric[]
   logLines      LogLine[]
   systemMetrics SystemMetric[]
   tags          RunTag[]
   evaluations   Evaluation[]
   traces        Trace[]
+  runMedia      RunMedia[]
 
   @@index([projectId, createdAt])
   @@index([projectId, status])
   @@index([projectId, name])
   @@index([runId])
+  @@index([sweepId, createdAt])
 }
 
 enum RunStatus {
@@ -132,6 +138,37 @@ enum RunStatus {
   failed
   crashed
   killed
+}
+
+// ============================================================
+// Sweeps
+// ============================================================
+
+model Sweep {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  method      String   // random | grid | bayes
+  config      Json     @default("{}")
+  state       SweepState @default(running)
+  bestRunId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runs    Run[]
+
+  @@unique([projectId, name])
+  @@index([projectId, createdAt])
+  @@index([projectId, state])
+}
+
+enum SweepState {
+  pending
+  running
+  finished
+  crashed
+  cancelled
 }
 
 // ============================================================
@@ -266,6 +303,7 @@ model ArtifactVersion {
   evaluationsAsDataset Evaluation[] @relation("EvaluationDataset")
   evaluationsAsModel   Evaluation[] @relation("EvaluationModel")
   registryModelVersions RegistryModelVersion[]
+  runMedia RunMedia[]
 
   @@unique([artifactId, version])
   @@index([artifactId, createdAt])
@@ -320,6 +358,38 @@ model Report {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, createdAt])
+}
+
+// ============================================================
+// Tables & Media
+// ============================================================
+
+model RunMedia {
+  id                String    @id @default(uuid())
+  runId             String
+  projectId         String
+  key               String
+  type              MediaType
+  artifactVersionId String
+  metadata          Json      @default("{}")
+  createdAt         DateTime  @default(now())
+
+  run             Run             @relation(fields: [runId], references: [runId], onDelete: Cascade)
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  artifactVersion ArtifactVersion @relation(fields: [artifactVersionId], references: [id], onDelete: Cascade)
+
+  @@index([runId, createdAt])
+  @@index([projectId, createdAt])
+}
+
+enum MediaType {
+  table
+  image
+  video
+  audio
+  plotly
+  html
+  file
 }
 
 // ============================================================

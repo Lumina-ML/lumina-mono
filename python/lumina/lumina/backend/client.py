@@ -43,10 +43,13 @@ class LuminaClient:
         project: str,
         name: Optional[str] = None,
         config: Optional[dict[str, Any]] = None,
+        sweep_id: Optional[str] = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {"project": project}
         if name:
             payload["name"] = name
+        if sweep_id:
+            payload["sweepId"] = sweep_id
         if config:
             payload["config"] = config
         return self._request("POST", "/api/v1/runs", payload)
@@ -151,6 +154,281 @@ class LuminaClient:
         if metadata:
             payload["metadata"] = metadata
         return self._request("PATCH", f"/api/v1/versions/{version_id}", payload)
+
+    def create_registry_model(
+        self,
+        project_id: str,
+        name: str,
+        description: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name}
+        if description:
+            payload["description"] = description
+        return self._request("POST", f"/api/v1/projects/{project_id}/registry-models", payload)
+
+    def list_registry_models(self, project_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/projects/{project_id}/registry-models")
+
+    def get_registry_model(self, model_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/registry-models/{model_id}")
+
+    def create_registry_model_version(
+        self,
+        model_id: str,
+        artifact_version_id: str,
+        version: Optional[str] = None,
+        aliases: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"artifactVersionId": artifact_version_id}
+        if version:
+            payload["version"] = version
+        if aliases:
+            payload["aliases"] = aliases
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/registry-models/{model_id}/versions", payload)
+
+    def list_registry_model_versions(self, model_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/registry-models/{model_id}/versions")
+
+    def get_registry_model_version(self, version_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/registry-model-versions/{version_id}")
+
+    def patch_registry_model_version(
+        self,
+        version_id: str,
+        aliases: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if aliases:
+            payload["aliases"] = aliases
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("PATCH", f"/api/v1/registry-model-versions/{version_id}", payload)
+
+    def create_evaluation(
+        self,
+        project_id: str,
+        name: str,
+        run_id: Optional[str] = None,
+        dataset_artifact_version_id: Optional[str] = None,
+        model_artifact_version_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name}
+        if run_id:
+            payload["runId"] = run_id
+        if dataset_artifact_version_id:
+            payload["datasetArtifactVersionId"] = dataset_artifact_version_id
+        if model_artifact_version_id:
+            payload["modelArtifactVersionId"] = model_artifact_version_id
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/projects/{project_id}/evaluations", payload)
+
+    def list_evaluations(self, project_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/projects/{project_id}/evaluations")
+
+    def get_evaluation(self, evaluation_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/evaluations/{evaluation_id}")
+
+    def patch_evaluation(
+        self,
+        evaluation_id: str,
+        status: Optional[str] = None,
+        summary: Optional[dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if status:
+            payload["status"] = status
+        if summary:
+            payload["summary"] = summary
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("PATCH", f"/api/v1/evaluations/{evaluation_id}", payload)
+
+    def add_evaluation_result(
+        self,
+        evaluation_id: str,
+        key: str,
+        value: float,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"key": key, "value": value}
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/evaluations/{evaluation_id}/results", payload)
+
+    def create_trace(
+        self,
+        project_id: str,
+        name: str,
+        trace_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name}
+        if trace_id:
+            payload["traceId"] = trace_id
+        if run_id:
+            payload["runId"] = run_id
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/projects/{project_id}/traces", payload)
+
+    def list_traces(self, project_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/projects/{project_id}/traces")
+
+    def get_trace(self, trace_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/traces/{trace_id}")
+
+    def patch_trace(
+        self,
+        trace_id: str,
+        status: Optional[str] = None,
+        latency_ms: Optional[int] = None,
+        metadata: Optional[dict[str, Any]] = None,
+        finished_at: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if status:
+            payload["status"] = status
+        if latency_ms is not None:
+            payload["latencyMs"] = latency_ms
+        if metadata:
+            payload["metadata"] = metadata
+        if finished_at:
+            payload["finishedAt"] = finished_at
+        return self._request("PATCH", f"/api/v1/traces/{trace_id}", payload)
+
+    def create_span(
+        self,
+        trace_id: str,
+        name: str,
+        span_id: Optional[str] = None,
+        parent_span_id: Optional[str] = None,
+        kind: str = "internal",
+        input_data: Optional[dict[str, Any]] = None,
+        output_data: Optional[dict[str, Any]] = None,
+        latency_ms: Optional[int] = None,
+        status: str = "ok",
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name, "kind": kind, "status": status}
+        if span_id:
+            payload["spanId"] = span_id
+        if parent_span_id:
+            payload["parentSpanId"] = parent_span_id
+        if input_data:
+            payload["input"] = input_data
+        if output_data:
+            payload["output"] = output_data
+        if latency_ms is not None:
+            payload["latencyMs"] = latency_ms
+        return self._request("POST", f"/api/v1/traces/{trace_id}/spans", payload)
+
+    def get_span(self, span_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/spans/{span_id}")
+
+    def patch_span(
+        self,
+        span_id: str,
+        status: Optional[str] = None,
+        output_data: Optional[dict[str, Any]] = None,
+        latency_ms: Optional[int] = None,
+        finished_at: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if status:
+            payload["status"] = status
+        if output_data:
+            payload["output"] = output_data
+        if latency_ms is not None:
+            payload["latencyMs"] = latency_ms
+        if finished_at:
+            payload["finishedAt"] = finished_at
+        return self._request("PATCH", f"/api/v1/spans/{span_id}", payload)
+
+    def create_report(
+        self,
+        project_id: str,
+        title: str,
+        blocks: Optional[list[dict[str, Any]]] = None,
+        created_by: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"title": title}
+        if blocks:
+            payload["blocks"] = blocks
+        if created_by:
+            payload["createdBy"] = created_by
+        return self._request("POST", f"/api/v1/projects/{project_id}/reports", payload)
+
+    def list_reports(self, project_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/projects/{project_id}/reports")
+
+    def get_report(self, report_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/reports/{report_id}")
+
+    def patch_report(
+        self,
+        report_id: str,
+        title: Optional[str] = None,
+        blocks: Optional[list[dict[str, Any]]] = None,
+        created_by: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if title:
+            payload["title"] = title
+        if blocks:
+            payload["blocks"] = blocks
+        if created_by:
+            payload["createdBy"] = created_by
+        return self._request("PATCH", f"/api/v1/reports/{report_id}", payload)
+
+    def delete_report(self, report_id: str) -> dict[str, Any]:
+        return self._request("DELETE", f"/api/v1/reports/{report_id}")
+
+    def create_run_media(
+        self,
+        project_id: str,
+        key: str,
+        type: str,
+        artifact_version_id: str,
+        run_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "key": key,
+            "type": type,
+            "artifactVersionId": artifact_version_id,
+        }
+        if run_id:
+            payload["runId"] = run_id
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/projects/{project_id}/run-media", payload)
+
+    def list_run_media(
+        self,
+        project_id: str,
+        run_id: Optional[str] = None,
+        type: Optional[str] = None,
+    ) -> dict[str, Any]:
+        params: dict[str, str] = {}
+        if run_id:
+            params["runId"] = run_id
+        if type:
+            params["type"] = type
+        query = "&".join(f"{k}={v}" for k, v in params.items())
+        path = f"/api/v1/projects/{project_id}/run-media"
+        if query:
+            path += f"?{query}"
+        return self._request("GET", path)
+
+    def get_run_media(self, run_media_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/run-media/{run_media_id}")
 
     def upload_file_to_url(self, url: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         req = Request(url, data=data, headers={"Content-Type": content_type}, method="PUT")

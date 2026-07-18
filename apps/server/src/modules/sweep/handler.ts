@@ -1,0 +1,58 @@
+import type { FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
+import { SweepService } from "./service.js";
+import { CreateSweepSchema, UpdateSweepSchema } from "./schema.js";
+import { ProjectService } from "../project/service.js";
+import { RunService } from "../run/service.js";
+
+const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
+const SweepParamsSchema = z.object({ sweepId: z.string().uuid() });
+
+export class SweepHandler {
+  constructor(
+    private readonly sweepService: SweepService,
+    private readonly projectService: ProjectService,
+    private readonly runService: RunService,
+  ) {}
+
+  async create(req: FastifyRequest, reply: FastifyReply) {
+    const { projectId } = ProjectParamsSchema.parse(req.params);
+    const data = CreateSweepSchema.parse(req.body);
+    const project = await this.projectService.findById(projectId);
+    if (!project) {
+      reply.status(404).send({ error: "Project not found" });
+      return;
+    }
+    const sweep = await this.sweepService.create(projectId, data);
+    reply.status(201).send(sweep);
+  }
+
+  async list(req: FastifyRequest, reply: FastifyReply) {
+    const { projectId } = ProjectParamsSchema.parse(req.params);
+    const sweeps = await this.sweepService.listByProject(projectId);
+    reply.send({ items: sweeps });
+  }
+
+  async getById(req: FastifyRequest, reply: FastifyReply) {
+    const { sweepId } = SweepParamsSchema.parse(req.params);
+    const sweep = await this.sweepService.findById(sweepId);
+    if (!sweep) {
+      reply.status(404).send({ error: "Sweep not found" });
+      return;
+    }
+    reply.send(sweep);
+  }
+
+  async update(req: FastifyRequest, reply: FastifyReply) {
+    const { sweepId } = SweepParamsSchema.parse(req.params);
+    const data = UpdateSweepSchema.parse(req.body);
+    const sweep = await this.sweepService.update(sweepId, data);
+    reply.send(sweep);
+  }
+
+  async delete(req: FastifyRequest, reply: FastifyReply) {
+    const { sweepId } = SweepParamsSchema.parse(req.params);
+    await this.sweepService.delete(sweepId);
+    reply.status(204).send();
+  }
+}
