@@ -1,5 +1,4 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
-import { createReadStream } from "node:fs";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { StorageProvider } from "./interface.js";
 
@@ -29,8 +28,8 @@ export class LocalStorageProvider implements StorageProvider {
     await writeFile(filePath, data);
   }
 
-  async getStream(key: string) {
-    return createReadStream(this.objectPath(key));
+  async getBuffer(key: string) {
+    return readFile(this.objectPath(key));
   }
 
   async delete(key: string) {
