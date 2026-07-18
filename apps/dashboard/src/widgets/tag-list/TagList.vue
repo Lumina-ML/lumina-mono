@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NTag, NEmpty } from "naive-ui";
+import { LTag, LEmpty } from "@lumina/ui";
 import type { Tag } from "@/types/tag";
 
 defineProps<{
@@ -26,17 +26,17 @@ function getTagColor(tag: Tag, index: number): string {
   <div>
     <div v-if="loading" class="py-8 text-center text-muted-foreground">Loading tags...</div>
     <div v-else-if="tags.length === 0" class="py-8">
-      <NEmpty description="No tags attached to this run" />
+      <LEmpty description="No tags attached to this run" />
     </div>
     <div v-else class="flex flex-wrap gap-2">
-      <NTag
+      <LTag
         v-for="(tag, index) in tags"
         :key="tag.id"
         round
         :color="{ textColor: getTagColor(tag, index), borderColor: getTagColor(tag, index) }"
       >
         {{ tag.name }}
-      </NTag>
+      </LTag>
     </div>
   </div>
 </template>

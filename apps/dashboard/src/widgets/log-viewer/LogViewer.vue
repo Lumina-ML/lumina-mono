@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import { NSelect, NEmpty } from "naive-ui";
+import { LSelect, LEmpty } from "@lumina/ui";
 import type { LogLine, LogLevel } from "@/types/log-line";
 
 const props = defineProps<{
@@ -53,7 +53,7 @@ const levelColor: Record<LogLevel, string> = {
 <template>
   <div class="space-y-3">
     <div class="flex items-center justify-between">
-      <NSelect
+      <LSelect
         v-model:value="levelFilter"
         :options="levelOptions"
         placeholder="Filter by level"
@@ -70,7 +70,7 @@ const levelColor: Record<LogLevel, string> = {
       Loading logs...
     </div>
     <div v-else-if="filteredLogs.length === 0" class="h-[400px] flex items-center justify-center">
-      <NEmpty description="No logs available" />
+      <LEmpty description="No logs available" />
     </div>
     <div
       v-else

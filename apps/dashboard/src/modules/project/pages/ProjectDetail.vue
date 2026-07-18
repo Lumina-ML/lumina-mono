@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { NCard, NSpace, NSelect, NButton } from "naive-ui";
+import { LCard, LButton, LSelect } from "@lumina/ui";
 import { useProject } from "@/modules/project/composables/useProjects";
 import { useRuns } from "@/modules/run/composables/useRuns";
 import RunTable from "@/widgets/run-table/RunTable.vue";
@@ -52,19 +52,19 @@ const statusOptions = [
           {{ project.description }}
         </p>
       </div>
-      <NSpace>
-        <NSelect
+      <div class="flex flex-wrap gap-2">
+        <LSelect
           v-model:value="statusFilter"
           :options="statusOptions"
           placeholder="Filter by status"
           clearable
           style="width: 160px"
         />
-        <NButton @click="refetch()">Refresh</NButton>
-      </NSpace>
+        <LButton @click="refetch()">Refresh</LButton>
+      </div>
     </div>
 
-    <NCard title="Runs">
+    <LCard title="Runs">
       <RunTable
         :runs="runsResponse?.items ?? []"
         :loading="isRunsLoading"
@@ -72,6 +72,6 @@ const statusOptions = [
         v-model:page-size="pageSize"
         :total="runsResponse?.total ?? 0"
       />
-    </NCard>
+    </LCard>
   </div>
 </template>
