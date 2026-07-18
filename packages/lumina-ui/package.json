@@ -15,7 +15,8 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
-    "naive-ui": "^2.44.1"
+    "naive-ui": "^2.44.1",
+    "gridstack": "^12.6.0"
   },
   "peerDependencies": {
     "vue": "^3.4.0",
