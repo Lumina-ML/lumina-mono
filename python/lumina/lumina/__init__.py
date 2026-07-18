@@ -26,6 +26,9 @@ from lumina.backend.artifact import LuminaArtifact, use_lumina_artifact
 from lumina.backend.model_registry import log_model as _lumina_log_model
 from lumina.backend.model_registry import use_model as _lumina_use_model
 from lumina.backend.model_registry import link_model as _lumina_link_model
+from lumina.backend.evaluation import init_eval as _lumina_init_eval
+from lumina.backend.evaluation import log_eval_result as _lumina_log_eval_result
+from lumina.backend.evaluation import finish_eval as _lumina_finish_eval
 
 _WANDB_INIT = wandb_sdk.init
 _WANDB_FINISH = wandb_sdk.finish
@@ -201,6 +204,20 @@ def link_model(path, registered_model_name, *, name=None, aliases=None, project=
     if run is not None:
         return run.link_model(path, registered_model_name, name, aliases)
     raise lumina.Error('You must call wandb.init() before link_model()')
+
+
+def init_eval(name, *, dataset=None, model=None, project=None, metadata=None):
+    return _lumina_init_eval(name, dataset=dataset, model=model, project=project, metadata=metadata)
+
+
+def log_eval_result(key, value, metadata=None):
+    return _lumina_log_eval_result(key, value, metadata)
+
+
+def finish_eval(status="completed"):
+    return _lumina_finish_eval(status)
+
+
 define_metric = _preinit.PreInitCallable('wandb.define_metric', Run.define_metric)
 mark_preempting = _preinit.PreInitCallable('wandb.mark_preempting', Run.mark_preempting)
 alert = _preinit.PreInitCallable('wandb.alert', Run.alert)
@@ -231,4 +248,4 @@ if 'dev' in __version__:
     import lumina.env
     import os
     os.environ[lumina.env.ERROR_REPORTING] = os.environ.get(lumina.env.ERROR_REPORTING, 'false')
-__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')
+__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')

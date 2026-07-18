@@ -208,6 +208,60 @@ class LuminaClient:
             payload["metadata"] = metadata
         return self._request("PATCH", f"/api/v1/registry-model-versions/{version_id}", payload)
 
+    def create_evaluation(
+        self,
+        project_id: str,
+        name: str,
+        run_id: Optional[str] = None,
+        dataset_artifact_version_id: Optional[str] = None,
+        model_artifact_version_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name}
+        if run_id:
+            payload["runId"] = run_id
+        if dataset_artifact_version_id:
+            payload["datasetArtifactVersionId"] = dataset_artifact_version_id
+        if model_artifact_version_id:
+            payload["modelArtifactVersionId"] = model_artifact_version_id
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/projects/{project_id}/evaluations", payload)
+
+    def list_evaluations(self, project_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/projects/{project_id}/evaluations")
+
+    def get_evaluation(self, evaluation_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/evaluations/{evaluation_id}")
+
+    def patch_evaluation(
+        self,
+        evaluation_id: str,
+        status: Optional[str] = None,
+        summary: Optional[dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if status:
+            payload["status"] = status
+        if summary:
+            payload["summary"] = summary
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("PATCH", f"/api/v1/evaluations/{evaluation_id}", payload)
+
+    def add_evaluation_result(
+        self,
+        evaluation_id: str,
+        key: str,
+        value: float,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"key": key, "value": value}
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/evaluations/{evaluation_id}/results", payload)
+
     def upload_file_to_url(self, url: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         req = Request(url, data=data, headers={"Content-Type": content_type}, method="PUT")
         try:

@@ -9,6 +9,7 @@ class _RunContext:
         self.project: Optional[str] = None
         self.name: Optional[str] = None
         self.sweep_id: Optional[str] = None
+        self.eval_id: Optional[str] = None
         self.config: dict[str, Any] = {}
         self.step: int = 0
 
