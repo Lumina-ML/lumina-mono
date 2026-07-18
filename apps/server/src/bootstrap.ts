@@ -9,6 +9,7 @@ import { projectRoutes } from "./modules/project/routes.js";
 import { runRoutes } from "./modules/run/routes.js";
 import { systemMetricRoutes } from "./modules/system-metric/routes.js";
 import { tagRoutes } from "./modules/tag/routes.js";
+import { storageLocalRoutes } from "./storage/routes.js";
 
 const DEFAULT_WORKSPACE_ID = "default";
 
@@ -45,6 +46,7 @@ export async function buildApp() {
   await app.register(logLineRoutes, { prefix: "/api/v1" });
   await app.register(tagRoutes, { prefix: "/api/v1" });
   await app.register(artifactRoutes, { prefix: "/api/v1" });
+  await app.register(storageLocalRoutes);
 
   app.get("/health", async () => ({ status: "ok" }));
 
