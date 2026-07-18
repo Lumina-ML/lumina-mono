@@ -43,10 +43,13 @@ class LuminaClient:
         project: str,
         name: Optional[str] = None,
         config: Optional[dict[str, Any]] = None,
+        sweep_id: Optional[str] = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {"project": project}
         if name:
             payload["name"] = name
+        if sweep_id:
+            payload["sweepId"] = sweep_id
         if config:
             payload["config"] = config
         return self._request("POST", "/api/v1/runs", payload)

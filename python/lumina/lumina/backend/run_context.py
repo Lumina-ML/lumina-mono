@@ -8,6 +8,7 @@ class _RunContext:
         self.run_id: Optional[str] = None
         self.project: Optional[str] = None
         self.name: Optional[str] = None
+        self.sweep_id: Optional[str] = None
         self.config: dict[str, Any] = {}
         self.step: int = 0
 

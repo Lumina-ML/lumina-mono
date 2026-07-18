@@ -32,6 +32,7 @@ def init(
     project: str | None = None,
     name: str | None = None,
     config: dict | None = None,
+    sweep: str | None = None,
     **kwargs,
 ):
     """Start a Lumina run."""
@@ -41,8 +42,9 @@ def init(
         ctx.project = project or _os.getenv("LUMINA_PROJECT", "uncategorized")
         ctx.name = name
         ctx.config = config or {}
+        ctx.sweep_id = sweep
         client = LuminaClient()
-        run = client.create_run(ctx.project, ctx.name, ctx.config)
+        run = client.create_run(ctx.project, ctx.name, ctx.config, sweep_id=sweep)
         ctx.run_id = run["runId"]
         get_run_context().__dict__.update(ctx.__dict__)
         return run
@@ -108,7 +110,6 @@ teardown = _teardown = wandb_sdk.teardown
 join = finish
 login = wandb_sdk.login
 helper = wandb_sdk.helper
-sweep = wandb_sdk.sweep
 controller = wandb_sdk.controller
 require = wandb_sdk.require
 Artifact = wandb_sdk.Artifact
@@ -136,7 +137,8 @@ from lumina.data_types import Molecule
 from lumina.data_types import Histogram
 from lumina.data_types import Classes
 from lumina.data_types import JoinedTable
-from lumina.wandb_agent import agent
+from lumina.wandb_agent import agent as _wandb_agent
+from lumina.backend.sweep import sweep, agent, get_sweep
 from lumina.plot import visualize, plot_table
 from lumina.integration.sagemaker import sagemaker_auth
 from lumina.sdk.internal import profiler
