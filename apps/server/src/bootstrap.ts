@@ -1,8 +1,15 @@
+import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import fastify from "fastify";
+import { configPlugin } from "./plugins/config.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { storagePlugin } from "./plugins/storage.js";
 import { authPlugin } from "./plugins/auth.js";
+import { telemetryPlugin } from "./plugins/telemetry.js";
+import { busPlugin } from "./plugins/bus.js";
+import { cachePlugin } from "./plugins/cache.js";
+import { queuePlugin } from "./plugins/queue.js";
+import { observabilityPlugin } from "./plugins/observability.js";
 import { artifactRoutes } from "./modules/artifact/routes.js";
 import { evaluationRoutes } from "./modules/evaluation/routes.js";
 import { logLineRoutes } from "./modules/log-line/routes.js";
@@ -19,7 +26,7 @@ import { runRoutes } from "./modules/run/routes.js";
 import { sweepRoutes } from "./modules/sweep/routes.js";
 import { systemMetricRoutes } from "./modules/system-metric/routes.js";
 import { tagRoutes } from "./modules/tag/routes.js";
-import { storageLocalRoutes } from "./storage/routes.js";
+import { storageLocalRoutes } from "./infra/storage/routes.js";
 
 const DEFAULT_WORKSPACE_ID = "default";
 
@@ -28,6 +35,7 @@ export async function buildApp() {
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
     },
+    genReqId: () => randomUUID(),
   });
 
   await app.register(cors, {
@@ -35,21 +43,22 @@ export async function buildApp() {
     credentials: true,
   });
 
+  // 1. Configuration
+  await app.register(configPlugin);
+
+  // 2. Core infrastructure
   await app.register(prismaPlugin);
-  await app.register(authPlugin);
   await app.register(storagePlugin);
+  await app.register(telemetryPlugin);
+  await app.register(busPlugin);
+  await app.register(cachePlugin);
+  await app.register(queuePlugin);
 
-  // Ensure default workspace exists
-  await app.prisma.workspace.upsert({
-    where: { id: DEFAULT_WORKSPACE_ID },
-    create: {
-      id: DEFAULT_WORKSPACE_ID,
-      name: "default",
-      displayName: "Default Workspace",
-    },
-    update: {},
-  });
+  // 3. Cross-cutting concerns
+  await app.register(authPlugin);
+  await app.register(observabilityPlugin);
 
+  // 4. Business modules
   await app.register(userRoutes, { prefix: "/api/v1" });
   await app.register(workspaceMembershipRoutes, { prefix: "/api/v1" });
   await app.register(projectRoutes, { prefix: "/api/v1" });
@@ -68,7 +77,16 @@ export async function buildApp() {
   await app.register(launchRoutes, { prefix: "/api/v1" });
   await app.register(storageLocalRoutes, { prefix: "/api/v1" });
 
-  app.get("/health", async () => ({ status: "ok" }));
+  // 5. Default workspace seed
+  await app.prisma.workspace.upsert({
+    where: { id: DEFAULT_WORKSPACE_ID },
+    create: {
+      id: DEFAULT_WORKSPACE_ID,
+      name: "default",
+      displayName: "Default Workspace",
+    },
+    update: {},
+  });
 
   return app;
 }
