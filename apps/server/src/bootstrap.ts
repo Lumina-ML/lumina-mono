@@ -11,6 +11,7 @@ import { busPlugin } from "./plugins/bus.js";
 import { cachePlugin } from "./plugins/cache.js";
 import { queuePlugin } from "./plugins/queue.js";
 import { observabilityPlugin } from "./plugins/observability.js";
+import { websocketPlugin } from "./plugins/websocket.js";
 import { artifactRoutes } from "./modules/artifact/routes.js";
 import { evaluationRoutes } from "./modules/evaluation/routes.js";
 import { logLineRoutes } from "./modules/log-line/routes.js";
@@ -59,6 +60,7 @@ export async function buildApp() {
   // 3. Cross-cutting concerns
   await app.register(authPlugin);
   await app.register(observabilityPlugin);
+  await app.register(websocketPlugin);
 
   // 4. Business modules
   await app.register(userRoutes, { prefix: "/api/v1" });

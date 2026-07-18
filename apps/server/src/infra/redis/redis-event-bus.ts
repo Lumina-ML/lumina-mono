@@ -36,15 +36,8 @@ export class RedisEventBus implements EventBus {
   }
 
   async publish(event: DomainEvent): Promise<void> {
-    const handlers = this.handlers.get(event.type) ?? [];
-    for (const handler of handlers) {
-      try {
-        await handler(event);
-      } catch (err) {
-        console.error(`Local event handler failed for ${event.type}`, err);
-      }
-    }
-
+    // Publish to Redis; the local subscriber will dispatch to handlers,
+    // ensuring consistent delivery whether the event originated locally or remotely.
     await this.publisher.publish(this.channel(event.type), JSON.stringify(event));
   }
 
