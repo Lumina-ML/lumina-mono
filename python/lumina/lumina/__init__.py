@@ -23,6 +23,7 @@ lumina.wandb_lib = wandb_sdk.lib
 # Lumina backend integration: if LUMINA_API_URL is set, use the simplified
 # backend path for init/log/finish. Otherwise fall back to WandB behavior.
 from lumina.backend import LuminaClient, get_run_context, reset_run_context
+from lumina.backend.client import set_api_key
 from lumina.backend.artifact import LuminaArtifact, use_lumina_artifact
 from lumina.backend.model_registry import log_model as _lumina_log_model
 from lumina.backend.model_registry import use_model as _lumina_use_model
@@ -65,6 +66,15 @@ def init(
         get_run_context().__dict__.update(ctx.__dict__)
         return run
     return _WANDB_INIT(project=project, name=name, config=config, **kwargs)
+
+
+def login(api_key: Optional[str] = None, **kwargs):
+    """Set the API key for Lumina backend authentication."""
+    if api_key:
+        set_api_key(api_key)
+        return {"api_key": api_key}
+    # Fall back to WandB login if not in Lumina backend mode
+    return wandb_sdk.login(**kwargs)
 
 
 def log(metrics: dict, step: int | None = None, **kwargs):
@@ -133,7 +143,6 @@ setup = wandb_sdk.setup
 attach = _attach = wandb_sdk._attach
 teardown = _teardown = wandb_sdk.teardown
 join = finish
-login = wandb_sdk.login
 helper = wandb_sdk.helper
 controller = wandb_sdk.controller
 require = wandb_sdk.require
@@ -309,4 +318,4 @@ if 'dev' in __version__:
     import lumina.env
     import os
     os.environ[lumina.env.ERROR_REPORTING] = os.environ.get(lumina.env.ERROR_REPORTING, 'false')
-__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'log_media', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')
+__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'log_media', 'login', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')
