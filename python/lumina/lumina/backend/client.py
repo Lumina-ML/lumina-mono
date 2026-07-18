@@ -71,3 +71,12 @@ class LuminaClient:
         if not payload_metrics:
             return
         self._request("POST", f"/api/v1/runs/{run_id}/system-metrics", {"metrics": payload_metrics})
+
+    def log_lines(self, run_id: str, lines: list[dict[str, Any]]) -> None:
+        payload = []
+        for line in lines:
+            item: dict[str, Any] = {"level": line.get("level", "INFO"), "message": line["message"]}
+            if line.get("step") is not None:
+                item["step"] = line["step"]
+            payload.append(item)
+        self._request("POST", f"/api/v1/runs/{run_id}/logs", {"logs": payload})

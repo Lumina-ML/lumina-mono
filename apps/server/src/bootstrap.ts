@@ -38,6 +38,7 @@ export async function buildApp() {
   await app.register(runRoutes, { prefix: "/api/v1" });
   await app.register(metricRoutes, { prefix: "/api/v1" });
   await app.register(systemMetricRoutes, { prefix: "/api/v1" });
+  await app.register(logLineRoutes, { prefix: "/api/v1" });
 
   app.get("/health", async () => ({ status: "ok" }));
 
