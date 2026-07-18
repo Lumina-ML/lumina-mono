@@ -1,0 +1,16 @@
+from __future__ import annotations
+from typing import Literal
+from pydantic import Field
+from lumina._pydantic import GQLResult, Typename
+from .fragments import WebhookIntegrationFields
+
+class CreateGenericWebhookIntegration(GQLResult):
+    create_generic_webhook_integration: CreateGenericWebhookIntegrationCreateGenericWebhookIntegration | None = Field(alias='createGenericWebhookIntegration')
+
+class CreateGenericWebhookIntegrationCreateGenericWebhookIntegration(GQLResult):
+    integration: CreateGenericWebhookIntegrationCreateGenericWebhookIntegrationIntegrationIntegration | WebhookIntegrationFields = Field(discriminator='typename__')
+
+class CreateGenericWebhookIntegrationCreateGenericWebhookIntegrationIntegrationIntegration(GQLResult):
+    typename__: Typename[Literal['GitHubOAuthIntegration', 'Integration', 'SlackIntegration']]
+CreateGenericWebhookIntegration.model_rebuild()
+CreateGenericWebhookIntegrationCreateGenericWebhookIntegration.model_rebuild()

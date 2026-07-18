@@ -1,0 +1,13 @@
+from __future__ import annotations
+from lumina._pydantic import GQLId, GQLResult
+
+class DeleteArtifact(GQLResult):
+    result: DeleteArtifactResult | None
+
+class DeleteArtifactResult(GQLResult):
+    artifact: DeleteArtifactResultArtifact
+
+class DeleteArtifactResultArtifact(GQLResult):
+    id: GQLId
+DeleteArtifact.model_rebuild()
+DeleteArtifactResult.model_rebuild()

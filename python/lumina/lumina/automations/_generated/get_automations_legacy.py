@@ -1,0 +1,21 @@
+from __future__ import annotations
+from pydantic import Field
+from lumina._pydantic import GQLResult
+from .fragments import PageInfoFields, ProjectTriggersFields
+
+class GetAutomationsLegacy(GQLResult):
+    scope: GetAutomationsLegacyScope | None
+
+class GetAutomationsLegacyScope(GQLResult):
+    projects: GetAutomationsLegacyScopeProjects | None
+
+class GetAutomationsLegacyScopeProjects(GQLResult):
+    page_info: PageInfoFields = Field(alias='pageInfo')
+    edges: list[GetAutomationsLegacyScopeProjectsEdges]
+
+class GetAutomationsLegacyScopeProjectsEdges(GQLResult):
+    node: ProjectTriggersFields | None
+GetAutomationsLegacy.model_rebuild()
+GetAutomationsLegacyScope.model_rebuild()
+GetAutomationsLegacyScopeProjects.model_rebuild()
+GetAutomationsLegacyScopeProjectsEdges.model_rebuild()

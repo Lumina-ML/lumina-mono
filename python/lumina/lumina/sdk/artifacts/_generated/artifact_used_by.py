@@ -1,0 +1,20 @@
+from __future__ import annotations
+from pydantic import Field
+from lumina._pydantic import GQLResult
+from .fragments import RunInfoFragment
+
+class ArtifactUsedBy(GQLResult):
+    artifact: ArtifactUsedByArtifact | None
+
+class ArtifactUsedByArtifact(GQLResult):
+    used_by: ArtifactUsedByArtifactUsedBy = Field(alias='usedBy')
+
+class ArtifactUsedByArtifactUsedBy(GQLResult):
+    edges: list[ArtifactUsedByArtifactUsedByEdges]
+
+class ArtifactUsedByArtifactUsedByEdges(GQLResult):
+    node: RunInfoFragment
+ArtifactUsedBy.model_rebuild()
+ArtifactUsedByArtifact.model_rebuild()
+ArtifactUsedByArtifactUsedBy.model_rebuild()
+ArtifactUsedByArtifactUsedByEdges.model_rebuild()

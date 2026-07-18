@@ -1,0 +1,12 @@
+from __future__ import annotations
+from pydantic import Field
+from lumina._pydantic import GQLResult
+from .fragments import ArtifactCollectionFragment
+
+class UpdateArtifactPortfolio(GQLResult):
+    result: UpdateArtifactPortfolioResult | None
+
+class UpdateArtifactPortfolioResult(GQLResult):
+    artifact_collection: ArtifactCollectionFragment = Field(alias='artifactCollection')
+UpdateArtifactPortfolio.model_rebuild()
+UpdateArtifactPortfolioResult.model_rebuild()

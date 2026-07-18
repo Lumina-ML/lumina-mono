@@ -3,16 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "wandb"
-version = "0.28.2.dev1"
-description = "A Python SDK for experiment tracking and machine learning operations. Based on WandB."
+name = "lumina"
+version = "0.1.0.dev1"
+description = "Lumina Python SDK for experiment tracking and machine learning operations. Based on WandB."
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.9"
 authors = [
     { name = "Lumina Contributors" }
 ]
-keywords = ["ml", "machine-learning", "experiment-tracking", "wandb"]
+keywords = ["ml", "machine-learning", "experiment-tracking", "lumina", "wandb"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -38,18 +38,18 @@ dependencies = [
 ]
 
 [project.scripts]
-wandb = "wandb.cli.cli:cli"
-wandb-docker-run = "wandb.cli.cli:docker_run"
+lumina = "lumina.cli.cli:cli"
+lumina-docker-run = "lumina.cli.cli:docker_run"
 
 [project.urls]
 Homepage = "https://github.com/lumina/lumina"
 Repository = "https://github.com/lumina/lumina"
 
 [tool.hatch.build.targets.wheel]
-packages = ["lumina/wandb"]
+packages = ["lumina"]
 
 [tool.hatch.build]
 artifacts = [
-    "lumina/wandb/**/*.py",
-    "lumina/wandb/**/*.pyi",
+    "lumina/**/*.py",
+    "lumina/**/*.pyi",
 ]
