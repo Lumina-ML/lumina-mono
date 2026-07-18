@@ -85,6 +85,7 @@ model Project {
   tags         Tag[]
   artifacts    Artifact[]
   reports      Report[]
+  runMedia     RunMedia[]
   registryModels RegistryModel[]
   evaluations  Evaluation[]
   traces       Trace[]
@@ -121,6 +122,7 @@ model Run {
   tags          RunTag[]
   evaluations   Evaluation[]
   traces        Trace[]
+  runMedia      RunMedia[]
 
   @@index([projectId, createdAt])
   @@index([projectId, status])
@@ -301,6 +303,7 @@ model ArtifactVersion {
   evaluationsAsDataset Evaluation[] @relation("EvaluationDataset")
   evaluationsAsModel   Evaluation[] @relation("EvaluationModel")
   registryModelVersions RegistryModelVersion[]
+  runMedia RunMedia[]
 
   @@unique([artifactId, version])
   @@index([artifactId, createdAt])
@@ -355,6 +358,38 @@ model Report {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, createdAt])
+}
+
+// ============================================================
+// Tables & Media
+// ============================================================
+
+model RunMedia {
+  id                String    @id @default(uuid())
+  runId             String
+  projectId         String
+  key               String
+  type              MediaType
+  artifactVersionId String
+  metadata          Json      @default("{}")
+  createdAt         DateTime  @default(now())
+
+  run             Run             @relation(fields: [runId], references: [runId], onDelete: Cascade)
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  artifactVersion ArtifactVersion @relation(fields: [artifactVersionId], references: [id], onDelete: Cascade)
+
+  @@index([runId, createdAt])
+  @@index([projectId, createdAt])
+}
+
+enum MediaType {
+  table
+  image
+  video
+  audio
+  plotly
+  html
+  file
 }
 
 // ============================================================

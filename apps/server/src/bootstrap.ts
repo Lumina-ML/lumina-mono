@@ -7,6 +7,7 @@ import { evaluationRoutes } from "./modules/evaluation/routes.js";
 import { logLineRoutes } from "./modules/log-line/routes.js";
 import { traceRoutes } from "./modules/trace/routes.js";
 import { reportRoutes } from "./modules/report/routes.js";
+import { runMediaRoutes } from "./modules/run-media/routes.js";
 import { metricRoutes } from "./modules/metric/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
 import { registryModelRoutes } from "./modules/registry-model/routes.js";
@@ -56,6 +57,7 @@ export async function buildApp() {
   await app.register(evaluationRoutes, { prefix: "/api/v1" });
   await app.register(traceRoutes, { prefix: "/api/v1" });
   await app.register(reportRoutes, { prefix: "/api/v1" });
+  await app.register(runMediaRoutes, { prefix: "/api/v1" });
   await app.register(storageLocalRoutes, { prefix: "/api/v1" });
 
   app.get("/health", async () => ({ status: "ok" }));
