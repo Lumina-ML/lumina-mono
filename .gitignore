@@ -52,5 +52,6 @@ venv/
 # Misc
 *.tsbuildinfo
 
-# private docs
+# Generated code
+apps/server/src/generated/
 docs/
