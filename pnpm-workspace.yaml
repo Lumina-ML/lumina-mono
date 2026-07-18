@@ -1,4 +1,4 @@
 packages:
   - "apps/*"
-  - "packages/*"
+  - "packages/@lumina/ui"
   - "python/*"

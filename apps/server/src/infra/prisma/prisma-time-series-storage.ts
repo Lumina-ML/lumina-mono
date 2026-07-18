@@ -5,9 +5,11 @@ import type {
   TimeSeriesStorage,
   TimeSeriesTable,
 } from "../../core/storage/time-series-storage.js";
+import { toDate, toDateOrNull } from "../../utils/date.js";
+
 
 export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) { }
 
   async insertBatch(table: TimeSeriesTable, rows: TimeSeriesRow[]): Promise<void> {
     if (rows.length === 0) return;
@@ -21,7 +23,7 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
             level: String(r.level ?? "INFO"),
             message: String(r.message),
             step: r.step == null ? null : Number(r.step),
-            timestamp: r.timestamp ? new Date(r.timestamp) : new Date(),
+            timestamp: toDate(r.timestamp),
           })),
         });
         break;
@@ -33,7 +35,7 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
             key: String(r.key),
             step: Number(r.step ?? 0),
             value: Number(r.value),
-            loggedAt: r.loggedAt ? new Date(r.loggedAt) : new Date(),
+            loggedAt: toDate(r.loggedAt),
           })),
         });
         break;
@@ -44,11 +46,11 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
             runId: r.runId == null ? null : String(r.runId),
             traceId: String(r.traceId),
             name: String(r.name),
-            status: String(r.status ?? "ok"),
+            status: String(r.status ?? "ok") as any,
             latencyMs: r.latencyMs == null ? null : Number(r.latencyMs),
-            metadata: (r.metadata as Record<string, unknown>) ?? {},
-            startedAt: r.startedAt ? new Date(r.startedAt) : new Date(),
-            finishedAt: r.finishedAt ? new Date(r.finishedAt) : null,
+            metadata: (r.metadata as any) ?? {},
+            startedAt: toDate(r.startedAt),
+            finishedAt: toDateOrNull(r.finishedAt),
           })),
         });
         break;
@@ -59,13 +61,13 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
             parentSpanId: r.parentSpanId == null ? null : String(r.parentSpanId),
             spanId: String(r.spanId),
             name: String(r.name),
-            kind: String(r.kind ?? "internal"),
-            input: (r.input as Record<string, unknown>) ?? {},
-            output: (r.output as Record<string, unknown>) ?? {},
+            kind: String(r.kind ?? "internal") as any,
+            input: (r.input as any) ?? {},
+            output: (r.output as any) ?? {},
             latencyMs: r.latencyMs == null ? null : Number(r.latencyMs),
-            status: String(r.status ?? "ok"),
-            startedAt: r.startedAt ? new Date(r.startedAt) : new Date(),
-            finishedAt: r.finishedAt ? new Date(r.finishedAt) : null,
+            status: String(r.status ?? "ok") as any,
+            startedAt: toDate(r.startedAt),
+            finishedAt: toDateOrNull(r.finishedAt),
           })),
         });
         break;
@@ -88,7 +90,7 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
       where[timestampColumn] = timeFilter;
     }
 
-    return model.findMany({
+    return (model as any).findMany({
       where,
       orderBy: options.orderBy
         ? { [options.orderBy.column]: options.orderBy.direction }

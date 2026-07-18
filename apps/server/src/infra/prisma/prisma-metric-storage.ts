@@ -7,7 +7,7 @@ import type {
 } from "../../core/storage/metric-storage.js";
 
 export class PrismaMetricStorage implements MetricStorage {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) { }
 
   async insertMetrics(runId: string, projectId: string, metrics: MetricRecord[]): Promise<void> {
     if (metrics.length === 0) return;
@@ -19,7 +19,7 @@ export class PrismaMetricStorage implements MetricStorage {
         key: m.key,
         step: m.step,
         value: m.value,
-        metadata: m.metadata ?? {},
+        metadata: (m.metadata ?? {}) as unknown as Record<string, any>,
         loggedAt: m.loggedAt ?? new Date(),
       })),
       skipDuplicates: true,

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { StorageProvider } from "../../storage/interface.js";
+import type { ObjectStorage } from "../../core/storage/object-storage.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type {
   CreateArtifactInput,
@@ -14,7 +14,7 @@ export class ArtifactService {
 
   constructor(
     prisma: PrismaClient,
-    private readonly storage: StorageProvider,
+    private readonly storage: ObjectStorage,
   ) {
     this.repository = new ArtifactRepository(prisma);
   }
