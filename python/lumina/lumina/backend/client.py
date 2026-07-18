@@ -99,7 +99,11 @@ class LuminaClient:
         payload_metrics = []
         for key, value in metrics.items():
             if isinstance(value, (int, float)):
-                payload_metrics.append({"key": key, "value": float(value), "step": step or 0})
+                f = float(value)
+                # Skip non-finite values; they break JSON serialization.
+                if f != f or f == float("inf") or f == float("-inf"):
+                    continue
+                payload_metrics.append({"key": key, "value": f, "step": step or 0})
         if not payload_metrics:
             return
         self._request("POST", f"/api/v1/runs/{run_id}/metrics", {"metrics": payload_metrics})

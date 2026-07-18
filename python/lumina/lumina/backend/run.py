@@ -161,6 +161,7 @@ class LuminaRun:
         self._metric_defs: dict[str, dict[str, Any]] = {}
         self._alerts: list[dict[str, Any]] = []
         self._alert_last_sent: dict[str, datetime] = {}
+        self._torch_watcher: Any | None = None
         self._step = 0
         self._finished = False
 
@@ -530,12 +531,24 @@ class LuminaRun:
         idx: int | None = None,
         log_graph: bool = False,
     ) -> None:
-        """Watch a PyTorch model. (Stub)"""
-        warnings.warn("lumina.Run.watch() is not yet backed by the Lumina backend.")
+        """Watch a PyTorch model and log parameter/gradient statistics."""
+        from lumina.backend.torch_watch import LuminaTorchWatcher
+
+        if self._torch_watcher is None:
+            self._torch_watcher = LuminaTorchWatcher(log_callback=lambda metrics: self.log(metrics))
+        self._torch_watcher.watch(
+            models,
+            criterion=criterion,
+            log=log,
+            log_freq=log_freq,
+            idx=idx,
+            log_graph=log_graph,
+        )
 
     def unwatch(self, models: Any | None = None) -> None:
-        """Unwatch models. (Stub)"""
-        warnings.warn("lumina.Run.unwatch() is not yet backed by the Lumina backend.")
+        """Unwatch models."""
+        if self._torch_watcher is not None:
+            self._torch_watcher.unwatch(models)
 
     def define_metric(
         self,
