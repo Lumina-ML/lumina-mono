@@ -7,6 +7,7 @@ import { logLineRoutes } from "./modules/log-line/routes.js";
 import { metricRoutes } from "./modules/metric/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
 import { runRoutes } from "./modules/run/routes.js";
+import { sweepRoutes } from "./modules/sweep/routes.js";
 import { systemMetricRoutes } from "./modules/system-metric/routes.js";
 import { tagRoutes } from "./modules/tag/routes.js";
 import { storageLocalRoutes } from "./storage/routes.js";
@@ -45,6 +46,7 @@ export async function buildApp() {
   await app.register(systemMetricRoutes, { prefix: "/api/v1" });
   await app.register(logLineRoutes, { prefix: "/api/v1" });
   await app.register(tagRoutes, { prefix: "/api/v1" });
+  await app.register(sweepRoutes, { prefix: "/api/v1" });
   await app.register(artifactRoutes, { prefix: "/api/v1" });
   await app.register(storageLocalRoutes, { prefix: "/api/v1" });
 

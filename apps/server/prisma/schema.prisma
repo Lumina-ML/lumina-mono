@@ -78,6 +78,7 @@ model Project {
 
   workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   runs         Run[]
+  sweeps       Sweep[]
   metrics      Metric[]
   logLines     LogLine[]
   systemMetrics SystemMetric[]
@@ -100,6 +101,7 @@ model Run {
   id          String   @id @default(uuid())
   runId       String   @unique // UUID v7, globally unique across regions/projects
   projectId   String
+  sweepId     String?
   name        String
   status      RunStatus @default(running)
   config      Json     @default("{}")
@@ -112,6 +114,7 @@ model Run {
   updatedAt   DateTime @updatedAt
 
   project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sweep         Sweep?         @relation(fields: [sweepId], references: [id], onDelete: SetNull)
   metrics       Metric[]
   logLines      LogLine[]
   systemMetrics SystemMetric[]
@@ -123,6 +126,7 @@ model Run {
   @@index([projectId, status])
   @@index([projectId, name])
   @@index([runId])
+  @@index([sweepId, createdAt])
 }
 
 enum RunStatus {
@@ -132,6 +136,37 @@ enum RunStatus {
   failed
   crashed
   killed
+}
+
+// ============================================================
+// Sweeps
+// ============================================================
+
+model Sweep {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  method      String   // random | grid | bayes
+  config      Json     @default("{}")
+  state       SweepState @default(running)
+  bestRunId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runs    Run[]
+
+  @@unique([projectId, name])
+  @@index([projectId, createdAt])
+  @@index([projectId, state])
+}
+
+enum SweepState {
+  pending
+  running
+  finished
+  crashed
+  cancelled
 }
 
 // ============================================================

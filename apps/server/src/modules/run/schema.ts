@@ -12,6 +12,7 @@ export const RunStatusSchema = z.enum([
 export const CreateRunSchema = z.object({
   project: z.string().min(1).max(128),
   name: z.string().min(1).max(256),
+  sweepId: z.string().uuid().optional(),
   config: z.record(z.unknown()).default({}),
   metadata: z.record(z.unknown()).default({}),
 });
