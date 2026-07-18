@@ -52,6 +52,19 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: lumina-redis
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   server:
     build:
       context: .
@@ -74,6 +87,7 @@ services:
       CLICKHOUSE_USER: default
       CLICKHOUSE_PASSWORD: lumina
       CLICKHOUSE_DB: lumina
+      REDIS_URL: redis://redis:6379
     ports:
       - "8000:8000"
     depends_on:
@@ -82,6 +96,8 @@ services:
       minio:
         condition: service_healthy
       clickhouse:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   dashboard:
@@ -98,3 +114,4 @@ volumes:
   postgres_data:
   minio_data:
   clickhouse_data:
+  redis_data:

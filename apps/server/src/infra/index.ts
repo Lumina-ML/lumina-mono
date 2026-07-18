@@ -12,3 +12,6 @@ export {
 } from "./clickhouse/client.js";
 export { ClickHouseMetricStorage } from "./clickhouse/clickhouse-metric-storage.js";
 export { ClickHouseTimeSeriesStorage } from "./clickhouse/clickhouse-time-series-storage.js";
+export { RedisCache, type RedisCacheConfig } from "./redis/redis-cache.js";
+export { RedisEventBus, type RedisEventBusConfig } from "./redis/redis-event-bus.js";
+export { BullMQQueue, type BullMQQueueConfig } from "./bullmq/bullmq-queue.js";

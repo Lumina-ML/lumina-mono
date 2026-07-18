@@ -7,6 +7,8 @@ import { telemetryPlugin } from "./plugins/telemetry.js";
 import { busPlugin } from "./plugins/bus.js";
 import { cachePlugin } from "./plugins/cache.js";
 import { queuePlugin } from "./plugins/queue.js";
+import { createJobWorker } from "./jobs/worker.js";
+import type { JobContext } from "./jobs/types.js";
 
 async function buildWorker() {
   const app = fastify({
@@ -22,7 +24,7 @@ async function buildWorker() {
   await app.register(cachePlugin);
   await app.register(queuePlugin);
 
-  // Subscribe to domain events and perform asynchronous side effects.
+  // Subscribe to domain events for real-time / in-process side effects.
   app.eventBus.subscribe("MetricLogged", async (event) => {
     app.log.info(
       { runId: event.payload.runId, keys: event.payload.keys, count: event.payload.count },
@@ -35,6 +37,25 @@ async function buildWorker() {
       { runId: event.payload.runId, status: event.payload.status },
       "worker received RunFinished",
     );
+  });
+
+  // Start durable job worker when Redis is available.
+  let jobWorker: ReturnType<typeof createJobWorker> | undefined;
+  if (app.config.redisUrl) {
+    const ctx: JobContext = {
+      prisma: app.prisma,
+      metricStorage: app.metricStorage,
+      timeSeriesStorage: app.timeSeriesStorage,
+      cache: app.cache,
+    };
+    jobWorker = createJobWorker({ redisUrl: app.config.redisUrl, ctx });
+    app.log.info({ redisUrl: app.config.redisUrl }, "started BullMQ job worker");
+  }
+
+  app.addHook("onClose", async () => {
+    if (jobWorker) {
+      await jobWorker.close();
+    }
   });
 
   return app;
