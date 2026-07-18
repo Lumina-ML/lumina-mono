@@ -38,9 +38,11 @@ class LuminaClient:
         data: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
-        headers = {"Content-Type": "application/json"}
+        headers: dict[str, str] = {}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        if data is not None:
+            headers["Content-Type"] = "application/json"
         body = json.dumps(data).encode("utf-8") if data is not None else None
         req = Request(url, data=body, headers=headers, method=method)
 
@@ -505,6 +507,92 @@ class LuminaClient:
 
     def delete_workspace_membership(self, membership_id: str) -> dict[str, Any]:
         return self._request("DELETE", f"/api/v1/workspace-memberships/{membership_id}")
+
+    def create_launch_queue(
+        self,
+        project_id: str,
+        name: str,
+        config: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name}
+        if config:
+            payload["config"] = config
+        return self._request("POST", f"/api/v1/projects/{project_id}/launch-queues", payload)
+
+    def list_launch_queues(self, project_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/projects/{project_id}/launch-queues")
+
+    def get_launch_queue(self, queue_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/launch-queues/{queue_id}")
+
+    def create_launch_job(
+        self,
+        project_id: str,
+        name: str,
+        image: Optional[str] = None,
+        command: Optional[list[str]] = None,
+        args: Optional[list[str]] = None,
+        env: Optional[dict[str, str]] = None,
+        config: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name}
+        if image:
+            payload["image"] = image
+        if command:
+            payload["command"] = command
+        if args:
+            payload["args"] = args
+        if env:
+            payload["env"] = env
+        if config:
+            payload["config"] = config
+        return self._request("POST", f"/api/v1/projects/{project_id}/launch-jobs", payload)
+
+    def list_launch_jobs(self, project_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/projects/{project_id}/launch-jobs")
+
+    def get_launch_job(self, job_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/launch-jobs/{job_id}")
+
+    def create_launch_run(
+        self,
+        project_id: str,
+        queue_id: str,
+        job_id: str,
+        run_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"queueId": queue_id, "jobId": job_id}
+        if run_id:
+            payload["runId"] = run_id
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/projects/{project_id}/launch-runs", payload)
+
+    def list_launch_queue_runs(self, queue_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/launch-queues/{queue_id}/runs")
+
+    def get_launch_run(self, run_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/launch-runs/{run_id}")
+
+    def patch_launch_run(
+        self,
+        run_id: str,
+        status: Optional[str] = None,
+        run_id_field: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if status:
+            payload["status"] = status
+        if run_id_field:
+            payload["runId"] = run_id_field
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("PATCH", f"/api/v1/launch-runs/{run_id}", payload)
+
+    def dequeue_launch_run(self, queue_id: str) -> dict[str, Any]:
+        return self._request("POST", f"/api/v1/launch-queues/{queue_id}/dequeue")
 
     def upload_file_to_url(self, url: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         req = Request(url, data=data, headers={"Content-Type": content_type}, method="PUT")
