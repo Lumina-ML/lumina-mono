@@ -6,6 +6,7 @@ import { metricRoutes } from "./modules/metric/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
 import { runRoutes } from "./modules/run/routes.js";
 import { systemMetricRoutes } from "./modules/system-metric/routes.js";
+import { tagRoutes } from "./modules/tag/routes.js";
 
 const DEFAULT_WORKSPACE_ID = "default";
 
@@ -39,6 +40,7 @@ export async function buildApp() {
   await app.register(metricRoutes, { prefix: "/api/v1" });
   await app.register(systemMetricRoutes, { prefix: "/api/v1" });
   await app.register(logLineRoutes, { prefix: "/api/v1" });
+  await app.register(tagRoutes, { prefix: "/api/v1" });
 
   app.get("/health", async () => ({ status: "ok" }));
 

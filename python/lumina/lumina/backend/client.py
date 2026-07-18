@@ -80,3 +80,9 @@ class LuminaClient:
                 item["step"] = line["step"]
             payload.append(item)
         self._request("POST", f"/api/v1/runs/{run_id}/logs", {"logs": payload})
+
+    def add_tag(self, run_id: str, name: str, color: Optional[str] = None) -> None:
+        payload: dict[str, Any] = {"name": name}
+        if color:
+            payload["color"] = color
+        self._request("POST", f"/api/v1/runs/{run_id}/tags", payload)

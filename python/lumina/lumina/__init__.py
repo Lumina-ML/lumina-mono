@@ -80,6 +80,16 @@ def log_line(message: str, level: str = "INFO", step: int | None = None, **kwarg
     return _WANDB_LOG({"message": message, "level": level}, step=step, **kwargs)
 
 
+def add_tag(name: str, color: str | None = None, **kwargs):
+    """Attach a tag to the current Lumina run."""
+    ctx = get_run_context()
+    if ctx.run_id:
+        client = LuminaClient()
+        client.add_tag(ctx.run_id, name, color)
+        return
+    return _WANDB_LOG({"tag": name}, step=0, **kwargs)
+
+
 def finish(**kwargs):
     """Finish the current Lumina run."""
     ctx = get_run_context()
