@@ -12,4 +12,5 @@ export async function runRoutes(app: FastifyInstance) {
   app.get("/runs", handler.list.bind(handler));
   app.get("/runs/:id", handler.getById.bind(handler));
   app.patch("/runs/:id", handler.update.bind(handler));
+  app.delete("/runs/:id", handler.delete.bind(handler));
 }

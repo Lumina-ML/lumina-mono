@@ -46,6 +46,8 @@ export class RunHandler {
     const result = await this.runService.list({
       projectId,
       status: query.status,
+      createdAfter: query.createdAfter,
+      createdBefore: query.createdBefore,
       limit: query.limit,
       offset: query.offset,
     });
@@ -57,6 +59,10 @@ export class RunHandler {
     reply: FastifyReply,
   ) {
     const run = await this.runService.getByRunId(req.params.id);
+    if (!run) {
+      reply.status(404).send({ error: "Run not found" });
+      return;
+    }
     reply.send(run);
   }
 
@@ -67,5 +73,13 @@ export class RunHandler {
     const data = UpdateRunSchema.parse(req.body);
     const run = await this.runService.update(req.params.id, data);
     reply.send(run);
+  }
+
+  async delete(
+    req: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ) {
+    await this.runService.delete(req.params.id);
+    reply.status(204).send();
   }
 }

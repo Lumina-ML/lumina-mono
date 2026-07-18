@@ -35,12 +35,19 @@ export class RunRepository {
   async list(params: {
     projectId?: string;
     status?: string;
+    createdAfter?: Date;
+    createdBefore?: Date;
     limit: number;
     offset: number;
   }) {
     const where: Record<string, unknown> = {};
     if (params.projectId) where.projectId = params.projectId;
     if (params.status) where.status = params.status;
+    if (params.createdAfter || params.createdBefore) {
+      where.createdAt = {};
+      if (params.createdAfter) (where.createdAt as Record<string, Date>).gte = params.createdAfter;
+      if (params.createdBefore) (where.createdAt as Record<string, Date>).lte = params.createdBefore;
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.run.findMany({
@@ -53,6 +60,10 @@ export class RunRepository {
     ]);
 
     return { items, total };
+  }
+
+  async deleteByRunId(runId: string) {
+    await this.prisma.run.delete({ where: { runId } });
   }
 
   async updateByRunId(runId: string, data: UpdateRunInput) {

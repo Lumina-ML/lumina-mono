@@ -14,28 +14,26 @@ export class RunService {
   }
 
   async getByRunId(runId: string) {
-    const run = await this.repository.findByRunId(runId);
-    if (!run) {
-      throw new Error(`Run not found: ${runId}`);
-    }
-    return run;
+    return this.repository.findByRunId(runId);
   }
 
   async getById(id: string) {
-    const run = await this.repository.findById(id);
-    if (!run) {
-      throw new Error(`Run not found: ${id}`);
-    }
-    return run;
+    return this.repository.findById(id);
   }
 
   async list(params: {
     projectId?: string;
     status?: string;
+    createdAfter?: Date;
+    createdBefore?: Date;
     limit: number;
     offset: number;
   }) {
     return this.repository.list(params);
+  }
+
+  async delete(runId: string) {
+    return this.repository.deleteByRunId(runId);
   }
 
   async update(runId: string, data: UpdateRunInput) {

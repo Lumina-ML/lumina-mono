@@ -27,6 +27,8 @@ export const UpdateRunSchema = z.object({
 export const ListRunsQuerySchema = z.object({
   project: z.string().optional(),
   status: RunStatusSchema.optional(),
+  createdAfter: z.coerce.date().optional(),
+  createdBefore: z.coerce.date().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
