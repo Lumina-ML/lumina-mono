@@ -155,6 +155,59 @@ class LuminaClient:
             payload["metadata"] = metadata
         return self._request("PATCH", f"/api/v1/versions/{version_id}", payload)
 
+    def create_registry_model(
+        self,
+        project_id: str,
+        name: str,
+        description: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name}
+        if description:
+            payload["description"] = description
+        return self._request("POST", f"/api/v1/projects/{project_id}/registry-models", payload)
+
+    def list_registry_models(self, project_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/projects/{project_id}/registry-models")
+
+    def get_registry_model(self, model_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/registry-models/{model_id}")
+
+    def create_registry_model_version(
+        self,
+        model_id: str,
+        artifact_version_id: str,
+        version: Optional[str] = None,
+        aliases: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"artifactVersionId": artifact_version_id}
+        if version:
+            payload["version"] = version
+        if aliases:
+            payload["aliases"] = aliases
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/registry-models/{model_id}/versions", payload)
+
+    def list_registry_model_versions(self, model_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/registry-models/{model_id}/versions")
+
+    def get_registry_model_version(self, version_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/registry-model-versions/{version_id}")
+
+    def patch_registry_model_version(
+        self,
+        version_id: str,
+        aliases: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if aliases:
+            payload["aliases"] = aliases
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("PATCH", f"/api/v1/registry-model-versions/{version_id}", payload)
+
     def upload_file_to_url(self, url: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         req = Request(url, data=data, headers={"Content-Type": content_type}, method="PUT")
         try:

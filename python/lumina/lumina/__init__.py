@@ -23,6 +23,9 @@ lumina.wandb_lib = wandb_sdk.lib
 # backend path for init/log/finish. Otherwise fall back to WandB behavior.
 from lumina.backend import LuminaClient, get_run_context, reset_run_context
 from lumina.backend.artifact import LuminaArtifact, use_lumina_artifact
+from lumina.backend.model_registry import log_model as _lumina_log_model
+from lumina.backend.model_registry import use_model as _lumina_use_model
+from lumina.backend.model_registry import link_model as _lumina_link_model
 
 _WANDB_INIT = wandb_sdk.init
 _WANDB_FINISH = wandb_sdk.finish
@@ -158,9 +161,46 @@ save = _preinit.PreInitCallable('wandb.save', Run.save)
 restore = wandb_sdk.wandb_run.restore
 use_artifact = _preinit.PreInitCallable('wandb.use_artifact', Run.use_artifact)
 log_artifact = _preinit.PreInitCallable('wandb.log_artifact', Run.log_artifact)
-log_model = _preinit.PreInitCallable('wandb.log_model', Run.log_model)
-use_model = _preinit.PreInitCallable('wandb.use_model', Run.use_model)
-link_model = _preinit.PreInitCallable('wandb.link_model', Run.link_model)
+
+_WANDB_LOG_MODEL = Run.log_model
+_WANDB_USE_MODEL = Run.use_model
+_WANDB_LINK_MODEL = Run.link_model
+
+
+def log_model(path, name=None, *, description=None, aliases=None, metadata=None, project=None):
+    if _os.getenv("LUMINA_API_URL") or get_run_context().project:
+        return _lumina_log_model(
+            path,
+            name,
+            description=description,
+            aliases=aliases,
+            metadata=metadata,
+            project=project,
+        )
+    if run is not None:
+        return run.log_model(path, name, aliases)
+    raise lumina.Error('You must call wandb.init() before log_model()')
+
+
+def use_model(name, *, alias="latest", project=None, download_dir=None):
+    if _os.getenv("LUMINA_API_URL") or get_run_context().project:
+        return _lumina_use_model(name, alias=alias, project=project, download_dir=download_dir)
+    if run is not None:
+        return run.use_model(name)
+    raise lumina.Error('You must call wandb.init() before use_model()')
+
+
+def link_model(path, registered_model_name, *, name=None, aliases=None, project=None):
+    if _os.getenv("LUMINA_API_URL") or get_run_context().project:
+        return _lumina_link_model(
+            path,
+            registered_model_name,
+            aliases=aliases,
+            project=project,
+        )
+    if run is not None:
+        return run.link_model(path, registered_model_name, name, aliases)
+    raise lumina.Error('You must call wandb.init() before link_model()')
 define_metric = _preinit.PreInitCallable('wandb.define_metric', Run.define_metric)
 mark_preempting = _preinit.PreInitCallable('wandb.mark_preempting', Run.mark_preempting)
 alert = _preinit.PreInitCallable('wandb.alert', Run.alert)
