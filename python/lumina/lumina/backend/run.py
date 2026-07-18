@@ -8,10 +8,12 @@ backend instead of Wandb.
 from __future__ import annotations
 
 import warnings
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, TextIO
 
 from lumina.backend.client import LuminaClient
 from lumina.backend.run_context import get_run_context
+from lumina.sdk.wandb_alerts import AlertLevel
 
 
 class _DictLike:
@@ -157,6 +159,8 @@ class LuminaRun:
         self._config = LuminaConfig(config, sync_callback=self._sync_config)
         self._summary = LuminaSummary(sync_callback=self._sync_summary)
         self._metric_defs: dict[str, dict[str, Any]] = {}
+        self._alerts: list[dict[str, Any]] = []
+        self._alert_last_sent: dict[str, datetime] = {}
         self._step = 0
         self._finished = False
 
@@ -382,6 +386,12 @@ class LuminaRun:
         final_summary = self._compute_summary_aggregations()
         if final_summary:
             self._client.update_run(self._run_id, summary=final_summary)
+        # Push any alerts captured during the run.
+        if self._alerts:
+            self._client.update_run(
+                self._run_id,
+                metadata={"_lumina_alerts": self._alerts},
+            )
         self._client.finish_run(self._run_id)
         self._finished = True
         # Reset global module bindings so subsequent top-level calls fail
@@ -568,11 +578,42 @@ class LuminaRun:
         self,
         title: str,
         text: str,
-        level: str | None = None,
-        wait_duration: Any | None = None,
+        level: str | AlertLevel | None = None,
+        wait_duration: int | float | timedelta | None = None,
     ) -> None:
-        """Create an alert. (Stub)"""
-        warnings.warn("lumina.Run.alert() is not yet backed by the Lumina backend.")
+        """Create an alert for the run.
+
+        Alerts are rate-limited by title. They are logged as console lines and
+        pushed to the run's metadata under ``_lumina_alerts`` on finish.
+        """
+        level = level or AlertLevel.INFO
+        level_str: str = level.value if isinstance(level, AlertLevel) else level
+        if level_str not in {lev.value for lev in AlertLevel}:
+            raise ValueError("level must be one of 'INFO', 'WARN', or 'ERROR'")
+
+        wait_duration = wait_duration or timedelta(minutes=1)
+        if isinstance(wait_duration, (int, float)):
+            wait_duration = timedelta(seconds=wait_duration)
+
+        now = datetime.now(timezone.utc)
+        last_sent = self._alert_last_sent.get(title)
+        if last_sent is not None and now - last_sent < wait_duration:
+            # Rate-limited: skip this alert.
+            return
+
+        self._alert_last_sent[title] = now
+        alert_record = {
+            "title": title,
+            "text": text,
+            "level": level_str,
+            "timestamp": now.isoformat(),
+        }
+        self._alerts.append(alert_record)
+        # Also surface the alert as a log line for immediate visibility.
+        log_level = {"INFO": "INFO", "WARN": "WARNING", "ERROR": "ERROR"}.get(
+            level_str, "INFO"
+        )
+        self.log_line(f"[ALERT {level_str}] {title}: {text}", level=log_level)
 
     def pin_config_keys(self, keys: list[str] = ()) -> None:
         """Pin config keys. (Stub)"""
