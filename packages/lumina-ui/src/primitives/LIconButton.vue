@@ -1,6 +1,6 @@
 <script setup lang="ts">
 interface Props {
-  ariaLabel: string;
+  ariaLabel?: string;
 }
 
 defineProps<Props>();

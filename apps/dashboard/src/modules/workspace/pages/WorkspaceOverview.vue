@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { NStatistic } from "naive-ui";
-import { LCard, LButton, LSkeleton } from "@lumina/ui";
+import { LCard, LButton, LSkeleton, LStatistic } from "@lumina/ui";
 import { FolderKanban, PlayCircle, Box, Activity } from "lucide-vue-next";
 import { RouterLink } from "vue-router";
 import { useProjects } from "@/modules/project/composables/useProjects";
@@ -23,32 +22,32 @@ const recentRuns = computed(() => (runs.value?.items ?? []).slice(0, 5));
 
     <div class="flex flex-wrap gap-4">
       <LCard>
-        <NStatistic label="Projects" :value="projects?.total ?? 0">
+        <LStatistic label="Projects" :value="projects?.total ?? 0">
           <template #prefix>
             <FolderKanban class="w-4 h-4 inline" />
           </template>
-        </NStatistic>
+        </LStatistic>
       </LCard>
       <LCard>
-        <NStatistic label="Total Runs" :value="runs?.total ?? 0">
+        <LStatistic label="Total Runs" :value="runs?.total ?? 0">
           <template #prefix>
             <PlayCircle class="w-4 h-4 inline" />
           </template>
-        </NStatistic>
+        </LStatistic>
       </LCard>
       <LCard>
-        <NStatistic label="Active Runs" :value="activeRuns">
+        <LStatistic label="Active Runs" :value="activeRuns">
           <template #prefix>
             <Activity class="w-4 h-4 inline" />
           </template>
-        </NStatistic>
+        </LStatistic>
       </LCard>
       <LCard>
-        <NStatistic label="Artifacts" :value="0">
+        <LStatistic label="Artifacts" :value="0">
           <template #prefix>
             <Box class="w-4 h-4 inline" />
           </template>
-        </NStatistic>
+        </LStatistic>
       </LCard>
     </div>
 

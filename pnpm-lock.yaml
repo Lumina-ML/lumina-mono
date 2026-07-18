@@ -47,9 +47,6 @@ importers:
       lucide-vue-next:
         specifier: ^0.400.0
         version: 0.400.0(vue@3.5.40(typescript@5.9.3))
-      naive-ui:
-        specifier: ^2.44.1
-        version: 2.44.1(vue@3.5.40(typescript@5.9.3))
       pinia:
         specifier: ^2.1.0
         version: 2.3.1(typescript@5.9.3)(vue@3.5.40(typescript@5.9.3))
@@ -59,9 +56,6 @@ importers:
       vee-validate:
         specifier: ^4.15.1
         version: 4.15.1(vue@3.5.40(typescript@5.9.3))
-      vfonts:
-        specifier: ^0.0.3
-        version: 0.0.3
       vue:
         specifier: ^3.4.0
         version: 3.5.40(typescript@5.9.3)
@@ -2162,9 +2156,6 @@ packages:
     peerDependencies:
       vue: ^3.4.26
 
-  vfonts@0.0.3:
-    resolution: {integrity: sha512-nguyw8L6Un8eelg1vQ31vIU2ESxqid7EYmy8V+MDeMaHBqaRSkg3dTBToC1PR00D89UzS/SLkfYPnx0Wf23IQQ==}
-
   vite-node@1.6.1:
     resolution: {integrity: sha512-YAXkfvGtuTzwWbDSACdJSg4A4DZiAqckWe90Zapc/sEX3XvHcw1NdurM/6od8J207tSDqNbSsgdCacBgvJKFuA==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -4262,8 +4253,6 @@ snapshots:
       '@vue/devtools-api': 7.7.10
       type-fest: 4.41.0
       vue: 3.5.40(typescript@5.9.3)
-
-  vfonts@0.0.3: {}
 
   vite-node@1.6.1(@types/node@20.19.43)(lightningcss@1.32.0)(stylus@0.57.0):
     dependencies:
