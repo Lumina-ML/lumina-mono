@@ -16,12 +16,64 @@ from lumina.sdk.lib import wb_logging as _wb_logging
 _wb_logging.configure_wandb_logger()
 from lumina import sdk as wandb_sdk
 import lumina
+import os as _os
 lumina.wandb_lib = wandb_sdk.lib
-init = wandb_sdk.init
+
+# Lumina backend integration: if LUMINA_API_URL is set, use the simplified
+# backend path for init/log/finish. Otherwise fall back to WandB behavior.
+from lumina.backend import LuminaClient, get_run_context, reset_run_context
+
+_WANDB_INIT = wandb_sdk.init
+_WANDB_FINISH = wandb_sdk.finish
+
+
+def init(
+    project: str | None = None,
+    name: str | None = None,
+    config: dict | None = None,
+    **kwargs,
+):
+    """Start a Lumina run."""
+    if _os.getenv("LUMINA_API_URL") or project:
+        ctx = get_run_context()
+        reset_run_context()
+        ctx.project = project or _os.getenv("LUMINA_PROJECT", "uncategorized")
+        ctx.name = name
+        ctx.config = config or {}
+        client = LuminaClient()
+        run = client.create_run(ctx.project, ctx.name, ctx.config)
+        ctx.run_id = run["id"]
+        get_run_context().__dict__.update(ctx.__dict__)
+        return run
+    return _WANDB_INIT(project=project, name=name, config=config, **kwargs)
+
+
+def log(metrics: dict, step: int | None = None, **kwargs):
+    """Log metrics for the current Lumina run."""
+    ctx = get_run_context()
+    if ctx.run_id:
+        if step is not None:
+            ctx.step = step
+        client = LuminaClient()
+        client.log_metrics(ctx.run_id, metrics, ctx.step)
+        return
+    return _WANDB_LOG(metrics, step=step, **kwargs)
+
+
+def finish(**kwargs):
+    """Finish the current Lumina run."""
+    ctx = get_run_context()
+    if ctx.run_id:
+        client = LuminaClient()
+        client.finish_run(ctx.run_id)
+        reset_run_context()
+        return
+    return _WANDB_FINISH(**kwargs)
+
+
 setup = wandb_sdk.setup
 attach = _attach = wandb_sdk._attach
 teardown = _teardown = wandb_sdk.teardown
-finish = wandb_sdk.finish
 join = finish
 login = wandb_sdk.login
 helper = wandb_sdk.helper
@@ -58,13 +110,15 @@ from lumina.plot import visualize, plot_table
 from lumina.integration.sagemaker import sagemaker_auth
 from lumina.sdk.internal import profiler
 from lumina.sdk.wandb_run import Run
+_WANDB_LOG = Run.log
 from lumina.sdk.artifacts.artifact_ttl import ArtifactTTL
 Api = PublicApi
 api = InternalApi()
 run: Run | None = None
 config = _preinit.PreInitObject('wandb.config', wandb_sdk.wandb_config.Config)
 summary = _preinit.PreInitObject('wandb.summary', wandb_sdk.wandb_summary.Summary)
-log = _preinit.PreInitCallable('wandb.log', Run.log)
+# log is overridden by the Lumina backend path; do not wrap with PreInitCallable
+# log = _preinit.PreInitCallable('lumina.log', log)
 watch = _preinit.PreInitCallable('wandb.watch', Run.watch)
 unwatch = _preinit.PreInitCallable('wandb.unwatch', Run.unwatch)
 save = _preinit.PreInitCallable('wandb.save', Run.save)
