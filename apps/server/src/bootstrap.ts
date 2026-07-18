@@ -12,6 +12,8 @@ import { runMediaRoutes } from "./modules/run-media/routes.js";
 import { metricRoutes } from "./modules/metric/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
 import { registryModelRoutes } from "./modules/registry-model/routes.js";
+import { userRoutes } from "./modules/user/routes.js";
+import { workspaceMembershipRoutes } from "./modules/workspace-membership/routes.js";
 import { runRoutes } from "./modules/run/routes.js";
 import { sweepRoutes } from "./modules/sweep/routes.js";
 import { systemMetricRoutes } from "./modules/system-metric/routes.js";
@@ -47,6 +49,8 @@ export async function buildApp() {
     update: {},
   });
 
+  await app.register(userRoutes, { prefix: "/api/v1" });
+  await app.register(workspaceMembershipRoutes, { prefix: "/api/v1" });
   await app.register(projectRoutes, { prefix: "/api/v1" });
   await app.register(runRoutes, { prefix: "/api/v1" });
   await app.register(metricRoutes, { prefix: "/api/v1" });
