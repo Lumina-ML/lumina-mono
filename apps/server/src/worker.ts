@@ -1,6 +1,7 @@
 import fastify from "fastify";
 import { configPlugin } from "./plugins/config.js";
 import { prismaPlugin } from "./plugins/prisma.js";
+import { clickhousePlugin } from "./plugins/clickhouse.js";
 import { storagePlugin } from "./plugins/storage.js";
 import { telemetryPlugin } from "./plugins/telemetry.js";
 import { busPlugin } from "./plugins/bus.js";
@@ -14,6 +15,7 @@ async function buildWorker() {
 
   await app.register(configPlugin);
   await app.register(prismaPlugin);
+  await app.register(clickhousePlugin);
   await app.register(storagePlugin);
   await app.register(telemetryPlugin);
   await app.register(busPlugin);

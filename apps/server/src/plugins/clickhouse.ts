@@ -21,7 +21,7 @@ declare module "fastify" {
 }
 
 export const clickhousePlugin = fp(async (app: FastifyInstance) => {
-  const { clickhouseUrl } = app.config;
+  const { clickhouseUrl, clickhouseUser, clickhousePassword, clickhouseDatabase } = app.config;
 
   if (!clickhouseUrl) {
     app.log.info("CLICKHOUSE_URL not configured; using Prisma for metrics and time series data");
@@ -31,8 +31,14 @@ export const clickhousePlugin = fp(async (app: FastifyInstance) => {
   }
 
   app.log.info({ clickhouseUrl }, "initializing ClickHouse client");
-  const clickhouse = createClickHouseClient({ url: clickhouseUrl });
-  await setupClickHouseSchema(clickhouse);
+  const clickhouseConfig = {
+    url: clickhouseUrl,
+    username: clickhouseUser,
+    password: clickhousePassword,
+    database: clickhouseDatabase,
+  };
+  const clickhouse = createClickHouseClient(clickhouseConfig);
+  await setupClickHouseSchema(clickhouseConfig, clickhouse);
 
   app.decorate("clickhouse", clickhouse);
   app.decorate("metricStorage", new ClickHouseMetricStorage(clickhouse));

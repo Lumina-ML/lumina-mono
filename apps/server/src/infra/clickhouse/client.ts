@@ -18,7 +18,15 @@ export function createClickHouseClient(config: ClickHouseConfig): ClickHouseClie
   });
 }
 
-export async function setupClickHouseSchema(client: ClickHouseClient): Promise<void> {
+export async function setupClickHouseSchema(config: ClickHouseConfig, client: ClickHouseClient): Promise<void> {
+  if (config.database && config.database !== "default") {
+    const adminClient = createClickHouseClient({ ...config, database: "default" });
+    await adminClient.exec({
+      query: `CREATE DATABASE IF NOT EXISTS ${config.database}`,
+    });
+    await adminClient.close();
+  }
+
   await client.exec({
     query: `
       CREATE TABLE IF NOT EXISTS metrics (

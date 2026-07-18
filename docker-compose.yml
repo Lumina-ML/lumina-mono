@@ -34,6 +34,24 @@ services:
       timeout: 5s
       retries: 5
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: lumina-clickhouse
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: lumina
+      CLICKHOUSE_DB: lumina
+    ports:
+      - "8123:8123"
+      - "9009:9009"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   server:
     build:
       context: .
@@ -52,12 +70,18 @@ services:
       S3_ACCESS_KEY_ID: minioadmin
       S3_SECRET_ACCESS_KEY: minioadmin
       S3_FORCE_PATH_STYLE: "true"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: lumina
+      CLICKHOUSE_DB: lumina
     ports:
       - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
 
   dashboard:
@@ -73,3 +97,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  clickhouse_data:

@@ -20,6 +20,9 @@ const serverConfigSchema = z.object({
   // Optional future infra
   redisUrl: z.string().optional(),
   clickhouseUrl: z.string().optional(),
+  clickhouseUser: z.string().optional(),
+  clickhousePassword: z.string().optional(),
+  clickhouseDatabase: z.string().default("default"),
 
   // Object storage
   storageType: storageTypeSchema.default("local"),
@@ -48,6 +51,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     databaseUrl: env.DATABASE_URL,
     redisUrl: env.REDIS_URL,
     clickhouseUrl: env.CLICKHOUSE_URL,
+    clickhouseUser: env.CLICKHOUSE_USER,
+    clickhousePassword: env.CLICKHOUSE_PASSWORD,
+    clickhouseDatabase: env.CLICKHOUSE_DB,
     storageType: env.STORAGE_TYPE,
     localStorageBaseUrl: env.LOCAL_STORAGE_BASE_URL,
     localStoragePath: env.LOCAL_STORAGE_PATH,
