@@ -2,7 +2,7 @@
 import { NTag, NEmpty } from "naive-ui";
 import type { Tag } from "@/types/tag";
 
-const props = defineProps<{
+defineProps<{
   tags: Tag[];
   loading?: boolean;
 }>();
