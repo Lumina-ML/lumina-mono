@@ -44,3 +44,5 @@ def unset_globals():
     lumina.use_artifact = preinit.PreInitCallable('wandb.use_artifact', lumina.Run.use_artifact)
     lumina.log_artifact = preinit.PreInitCallable('wandb.log_artifact', lumina.Run.log_artifact)
     lumina.define_metric = preinit.PreInitCallable('wandb.define_metric', lumina.Run.define_metric)
+    lumina.alert = preinit.PreInitCallable('wandb.alert', lumina.Run.alert)
+    lumina.mark_preempting = preinit.PreInitCallable('wandb.mark_preempting', lumina.Run.mark_preempting)

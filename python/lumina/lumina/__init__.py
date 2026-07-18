@@ -17,12 +17,12 @@ _wb_logging.configure_wandb_logger()
 from lumina import sdk as wandb_sdk
 import lumina
 import os as _os
-from typing import Any
+from typing import Any, Optional
 lumina.wandb_lib = wandb_sdk.lib
 
 # Lumina backend integration: if LUMINA_API_URL is set, use the simplified
 # backend path for init/log/finish. Otherwise fall back to WandB behavior.
-from lumina.backend import LuminaClient, get_run_context, reset_run_context
+from lumina.backend import LuminaClient, LuminaRun, get_run_context, reset_run_context
 from lumina.backend.client import set_api_key
 from lumina.backend.artifact import LuminaArtifact, use_lumina_artifact
 from lumina.backend.model_registry import log_model as _lumina_log_model
@@ -53,7 +53,7 @@ def init(
     config: dict | None = None,
     sweep: str | None = None,
     **kwargs,
-):
+) -> LuminaRun | Any:
     """Start a Lumina run."""
     if _os.getenv("LUMINA_API_URL") or project:
         ctx = get_run_context()
@@ -63,9 +63,38 @@ def init(
         ctx.config = config or {}
         ctx.sweep_id = sweep
         client = LuminaClient()
-        run = client.create_run(ctx.project, ctx.name, ctx.config, sweep_id=sweep)
-        ctx.run_id = run["runId"]
+        run_data = client.create_run(ctx.project, ctx.name, ctx.config, sweep_id=sweep)
+        run_id = run_data["runId"]
+        ctx.run_id = run_id
+        run = LuminaRun(
+            run_id=run_id,
+            project=ctx.project,
+            name=ctx.name,
+            config=ctx.config,
+            sweep_id=ctx.sweep_id,
+            client=client,
+        )
         get_run_context().__dict__.update(ctx.__dict__)
+        # Rebind top-level helpers to the active run, matching wandb semantics.
+        from lumina.sdk.lib import module as _module
+
+        _module.set_global(
+            run=run,
+            config=run.config,
+            log=run.log,
+            summary=run.summary,
+            save=run.save,
+            use_artifact=run.use_artifact,
+            log_artifact=run.log_artifact,
+            define_metric=run.define_metric,
+            alert=run.alert,
+            watch=run.watch,
+            unwatch=run.unwatch,
+            mark_preempting=run.mark_preempting,
+            log_model=run.log_model,
+            use_model=run.use_model,
+            link_model=run.link_model,
+        )
         return run
     return _WANDB_INIT(project=project, name=name, config=config, **kwargs)
 
@@ -102,6 +131,8 @@ def log(metrics: dict, step: int | None = None, **kwargs):
 
 def log_system(metrics: dict, step: int | None = None, **kwargs):
     """Log system metrics for the current Lumina run."""
+    if isinstance(lumina.run, LuminaRun):
+        return lumina.run.log_system(metrics, step)
     ctx = get_run_context()
     if ctx.run_id:
         client = LuminaClient()
@@ -112,6 +143,8 @@ def log_system(metrics: dict, step: int | None = None, **kwargs):
 
 def log_line(message: str, level: str = "INFO", step: int | None = None, **kwargs):
     """Log a line of console output for the current Lumina run."""
+    if isinstance(lumina.run, LuminaRun):
+        return lumina.run.log_line(message, level, step)
     ctx = get_run_context()
     if ctx.run_id:
         client = LuminaClient()
@@ -122,6 +155,8 @@ def log_line(message: str, level: str = "INFO", step: int | None = None, **kwarg
 
 def add_tag(name: str, color: str | None = None, **kwargs):
     """Attach a tag to the current Lumina run."""
+    if isinstance(lumina.run, LuminaRun):
+        return lumina.run.add_tag(name, color)
     ctx = get_run_context()
     if ctx.run_id:
         client = LuminaClient()
@@ -132,6 +167,10 @@ def add_tag(name: str, color: str | None = None, **kwargs):
 
 def finish(**kwargs):
     """Finish the current Lumina run."""
+    if isinstance(lumina.run, LuminaRun):
+        lumina.run.finish(**kwargs)
+        reset_run_context()
+        return
     ctx = get_run_context()
     if ctx.run_id:
         client = LuminaClient()
@@ -183,7 +222,7 @@ _WANDB_LOG = Run.log
 from lumina.sdk.artifacts.artifact_ttl import ArtifactTTL
 Api = PublicApi
 api = InternalApi()
-run: Run | None = None
+run: Run | LuminaRun | None = None
 config = _preinit.PreInitObject('wandb.config', wandb_sdk.wandb_config.Config)
 summary = _preinit.PreInitObject('wandb.summary', wandb_sdk.wandb_summary.Summary)
 # log is overridden by the Lumina backend path; do not wrap with PreInitCallable
@@ -328,4 +367,4 @@ if 'dev' in __version__:
     import lumina.env
     import os
     os.environ[lumina.env.ERROR_REPORTING] = os.environ.get(lumina.env.ERROR_REPORTING, 'false')
-__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'log_media', 'login', 'launch', 'launch_agent', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')
+__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'LuminaRun', 'log_media', 'login', 'launch', 'launch_agent', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')
