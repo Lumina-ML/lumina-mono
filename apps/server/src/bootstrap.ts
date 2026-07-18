@@ -6,6 +6,7 @@ import { artifactRoutes } from "./modules/artifact/routes.js";
 import { logLineRoutes } from "./modules/log-line/routes.js";
 import { metricRoutes } from "./modules/metric/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
+import { registryModelRoutes } from "./modules/registry-model/routes.js";
 import { runRoutes } from "./modules/run/routes.js";
 import { sweepRoutes } from "./modules/sweep/routes.js";
 import { systemMetricRoutes } from "./modules/system-metric/routes.js";
@@ -48,6 +49,7 @@ export async function buildApp() {
   await app.register(tagRoutes, { prefix: "/api/v1" });
   await app.register(sweepRoutes, { prefix: "/api/v1" });
   await app.register(artifactRoutes, { prefix: "/api/v1" });
+  await app.register(registryModelRoutes, { prefix: "/api/v1" });
   await app.register(storageLocalRoutes, { prefix: "/api/v1" });
 
   app.get("/health", async () => ({ status: "ok" }));
