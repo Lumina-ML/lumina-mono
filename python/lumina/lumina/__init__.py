@@ -22,6 +22,7 @@ lumina.wandb_lib = wandb_sdk.lib
 # Lumina backend integration: if LUMINA_API_URL is set, use the simplified
 # backend path for init/log/finish. Otherwise fall back to WandB behavior.
 from lumina.backend import LuminaClient, get_run_context, reset_run_context
+from lumina.backend.artifact import LuminaArtifact, use_lumina_artifact
 
 _WANDB_INIT = wandb_sdk.init
 _WANDB_FINISH = wandb_sdk.finish
