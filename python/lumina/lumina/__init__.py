@@ -29,6 +29,12 @@ from lumina.backend.model_registry import link_model as _lumina_link_model
 from lumina.backend.evaluation import init_eval as _lumina_init_eval
 from lumina.backend.evaluation import log_eval_result as _lumina_log_eval_result
 from lumina.backend.evaluation import finish_eval as _lumina_finish_eval
+from lumina.backend.trace import trace as _lumina_trace
+from lumina.backend.trace import span as _lumina_span
+from lumina.backend.trace import start_trace as _lumina_start_trace
+from lumina.backend.trace import finish_trace as _lumina_finish_trace
+from lumina.backend.trace import start_span as _lumina_start_span
+from lumina.backend.trace import finish_span as _lumina_finish_span
 
 _WANDB_INIT = wandb_sdk.init
 _WANDB_FINISH = wandb_sdk.finish
@@ -218,6 +224,44 @@ def finish_eval(status="completed"):
     return _lumina_finish_eval(status)
 
 
+def trace(name, *, trace_id=None, project=None, metadata=None):
+    return _lumina_trace(name, trace_id=trace_id, project=project, metadata=metadata)
+
+
+def span(name, *, span_id=None, trace_id=None, parent_span_id=None, kind="internal", input_data=None):
+    return _lumina_span(
+        name,
+        span_id=span_id,
+        trace_id=trace_id,
+        parent_span_id=parent_span_id,
+        kind=kind,
+        input_data=input_data,
+    )
+
+
+def start_trace(name, *, trace_id=None, project=None, metadata=None):
+    return _lumina_start_trace(name, trace_id=trace_id, project=project, metadata=metadata)
+
+
+def finish_trace(trace_id=None, status="ok", latency_ms=None):
+    return _lumina_finish_trace(trace_id, status=status, latency_ms=latency_ms)
+
+
+def start_span(name, *, span_id=None, trace_id=None, parent_span_id=None, kind="internal", input_data=None):
+    return _lumina_start_span(
+        name,
+        span_id=span_id,
+        trace_id=trace_id,
+        parent_span_id=parent_span_id,
+        kind=kind,
+        input_data=input_data,
+    )
+
+
+def finish_span(span_id=None, status="ok", output_data=None, latency_ms=None):
+    return _lumina_finish_span(span_id, status=status, output_data=output_data, latency_ms=latency_ms)
+
+
 define_metric = _preinit.PreInitCallable('wandb.define_metric', Run.define_metric)
 mark_preempting = _preinit.PreInitCallable('wandb.mark_preempting', Run.mark_preempting)
 alert = _preinit.PreInitCallable('wandb.alert', Run.alert)
@@ -248,4 +292,4 @@ if 'dev' in __version__:
     import lumina.env
     import os
     os.environ[lumina.env.ERROR_REPORTING] = os.environ.get(lumina.env.ERROR_REPORTING, 'false')
-__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')
+__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')

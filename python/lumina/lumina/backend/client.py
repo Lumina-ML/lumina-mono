@@ -262,6 +262,95 @@ class LuminaClient:
             payload["metadata"] = metadata
         return self._request("POST", f"/api/v1/evaluations/{evaluation_id}/results", payload)
 
+    def create_trace(
+        self,
+        project_id: str,
+        name: str,
+        trace_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name}
+        if trace_id:
+            payload["traceId"] = trace_id
+        if run_id:
+            payload["runId"] = run_id
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", f"/api/v1/projects/{project_id}/traces", payload)
+
+    def list_traces(self, project_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/projects/{project_id}/traces")
+
+    def get_trace(self, trace_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/traces/{trace_id}")
+
+    def patch_trace(
+        self,
+        trace_id: str,
+        status: Optional[str] = None,
+        latency_ms: Optional[int] = None,
+        metadata: Optional[dict[str, Any]] = None,
+        finished_at: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if status:
+            payload["status"] = status
+        if latency_ms is not None:
+            payload["latencyMs"] = latency_ms
+        if metadata:
+            payload["metadata"] = metadata
+        if finished_at:
+            payload["finishedAt"] = finished_at
+        return self._request("PATCH", f"/api/v1/traces/{trace_id}", payload)
+
+    def create_span(
+        self,
+        trace_id: str,
+        name: str,
+        span_id: Optional[str] = None,
+        parent_span_id: Optional[str] = None,
+        kind: str = "internal",
+        input_data: Optional[dict[str, Any]] = None,
+        output_data: Optional[dict[str, Any]] = None,
+        latency_ms: Optional[int] = None,
+        status: str = "ok",
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name, "kind": kind, "status": status}
+        if span_id:
+            payload["spanId"] = span_id
+        if parent_span_id:
+            payload["parentSpanId"] = parent_span_id
+        if input_data:
+            payload["input"] = input_data
+        if output_data:
+            payload["output"] = output_data
+        if latency_ms is not None:
+            payload["latencyMs"] = latency_ms
+        return self._request("POST", f"/api/v1/traces/{trace_id}/spans", payload)
+
+    def get_span(self, span_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/spans/{span_id}")
+
+    def patch_span(
+        self,
+        span_id: str,
+        status: Optional[str] = None,
+        output_data: Optional[dict[str, Any]] = None,
+        latency_ms: Optional[int] = None,
+        finished_at: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if status:
+            payload["status"] = status
+        if output_data:
+            payload["output"] = output_data
+        if latency_ms is not None:
+            payload["latencyMs"] = latency_ms
+        if finished_at:
+            payload["finishedAt"] = finished_at
+        return self._request("PATCH", f"/api/v1/spans/{span_id}", payload)
+
     def upload_file_to_url(self, url: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         req = Request(url, data=data, headers={"Content-Type": content_type}, method="PUT")
         try:

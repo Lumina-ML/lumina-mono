@@ -52,7 +52,21 @@ export class TraceRepository {
     });
   }
 
-  async createSpan(traceId: string, data: CreateSpanInput & { spanId: string }) {
+  async findInternalIdByTraceId(traceId: string) {
+    return this.prisma.trace.findUnique({
+      where: { traceId },
+      select: { id: true },
+    });
+  }
+
+  async findInternalIdBySpanId(spanId: string) {
+    return this.prisma.span.findUnique({
+      where: { spanId },
+      select: { id: true },
+    });
+  }
+
+  async createSpan(traceId: string, data: CreateSpanInput & { spanId: string; parentSpanId?: string }) {
     return this.prisma.span.create({
       data: {
         traceId,

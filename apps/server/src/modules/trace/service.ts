@@ -41,8 +41,20 @@ export class TraceService {
   }
 
   async createSpan(traceId: string, data: CreateSpanInput) {
+    const trace = await this.repository.findInternalIdByTraceId(traceId);
+    if (!trace) {
+      throw new Error(`Trace not found: ${traceId}`);
+    }
     const spanId = data.spanId ?? crypto.randomUUID();
-    return this.repository.createSpan(traceId, { ...data, spanId });
+    let parentSpanId: string | undefined;
+    if (data.parentSpanId) {
+      const parent = await this.repository.findInternalIdBySpanId(data.parentSpanId);
+      if (!parent) {
+        throw new Error(`Parent span not found: ${data.parentSpanId}`);
+      }
+      parentSpanId = parent.id;
+    }
+    return this.repository.createSpan(trace.id, { ...data, spanId, parentSpanId });
   }
 
   async findSpanById(spanId: string) {
