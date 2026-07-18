@@ -58,7 +58,22 @@ const buttonProps = computed<ButtonProps>(() => ({
 </script>
 
 <template>
-  <NButton v-bind="buttonProps">
+  <NButton v-bind="buttonProps" class="l-button">
     <slot />
   </NButton>
 </template>
+
+<style scoped>
+.l-button {
+  /* 确保触摸设备上的可点击区域至少 44x44 */
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@media (pointer: fine) {
+  .l-button {
+    min-height: auto;
+    min-width: auto;
+  }
+}
+</style>

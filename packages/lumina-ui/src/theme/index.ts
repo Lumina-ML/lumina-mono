@@ -5,3 +5,4 @@ export * from './tokens/shadow';
 export * from './tokens/motion';
 export * from './tokens/typography';
 export * from './tokens/icon';
+export * from './tokens/breakpoints';
