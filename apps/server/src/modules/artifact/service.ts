@@ -67,15 +67,17 @@ export class ArtifactService {
     }
 
     const storageKey = this.generateStorageKey(version.artifactId, versionId, data.path);
-    const file = await this.repository.createFile(versionId, storageKey, data);
+    const created = await this.repository.createFile(versionId, storageKey, data);
+    const file = { ...created, size: created.size.toString() };
     const uploadUrl = await this.storage.getUploadUrl(storageKey);
     return { file, uploadUrl };
   }
 
-  private async enrichFilesWithUrls(files: Array<{ storageKey: string } & Record<string, unknown>>) {
+  private async enrichFilesWithUrls(files: Array<{ storageKey: string; size: bigint } & Record<string, unknown>>) {
     return Promise.all(
       files.map(async (file) => ({
         ...file,
+        size: file.size.toString(),
         downloadUrl: await this.storage.getDownloadUrl(file.storageKey),
       })),
     );
