@@ -1,0 +1,356 @@
+syntax = "proto3";
+
+package wandb_internal;
+
+import "wandb/proto/wandb_internal.proto";
+import "wandb/proto/wandb_settings.proto";
+
+option go_package = "core/pkg/service_go_proto";
+
+// Initialize an API instance for the given settings.
+//
+// ServerApiCleanupRequest should be used once the instance is no longer needed.
+message ServerApiInitRequest {
+  Settings settings = 1;
+}
+
+message ServerApiInitResponse {
+  string error_message = 1;
+
+  // An ID to use in ApiRequests to this API instance.
+  string api_id = 2;
+}
+
+// Make a request to an initialized API instance.
+message ApiRequest {
+  // The ID of the API instance from the init response.
+  string api_id = 1;
+
+  oneof request {
+    ReadRunHistoryRequest read_run_history_request = 2;
+    FeaturesRequest features_request = 3;
+    GraphQLRequest graphql_request = 4;
+    DownloadFileRequest download_file_request = 5;
+    UploadFileRequest upload_file_request = 6;
+    MarkRunFilesUploadedRequest mark_run_files_uploaded_request = 7;
+    StopRunRequest stop_run_request = 8;
+  }
+}
+
+message ApiResponse {
+  oneof response {
+    ReadRunHistoryResponse read_run_history_response = 1;
+    FeaturesResponse features_response = 3;
+    GraphQLResponse graphql_response = 4;
+    DownloadFileResponse download_file_response = 5;
+    UploadFileResponse upload_file_response = 6;
+    MarkRunFilesUploadedResponse mark_run_files_uploaded_response = 7;
+    StopRunResponse stop_run_response = 8;
+
+    ApiErrorResponse api_error_response = 2;
+  }
+}
+
+message ApiErrorResponse {
+  string message = 1;
+  optional ErrorType error_type = 2;
+
+  // HTTP status code from the upstream W&B backend, if the failure originated
+  // from an HTTP response. 0 if the failure had no HTTP status (transport
+  // error, GraphQL `errors` without an associated HTTP error, etc.).
+  int32 http_status = 3;
+}
+
+enum ErrorType {
+  UNKNOWN_ERROR = 0;
+  INCOMPLETE_RUN_HISTORY_ERROR = 1;
+}
+
+// Remove the API instance identified by an ID.
+//
+// This requests receives no response.
+message ServerApiCleanupRequest {
+  string api_id = 1;
+}
+
+// Retrieves feature flags.
+//
+// The response to this request contains the state of feature flags
+// at some point in the past. It is not guaranteed that the most current
+// values are returned because features can change at runtime (like after
+// a server update). However, the requester may assume that any feature
+// changes are backward compatible: for example, features that represent
+// the existence of a GraphQL field are never disabled after being enabled.
+// To be precise, backward incompatible changes are possible, but only
+// minimal effort should be spent handling them. Such changes should be rare
+// and can be expected to break running programs.
+//
+// Concretely:
+//
+// - DO query features before every network request that depends on them
+//   (it's relatively fast)
+// - AVOID special handling for schema-related errors
+//
+// Features may be specific to the API instance, for example if they depend
+// on the entity. Keep this in mind if caching the response.
+message FeaturesRequest {
+  // Names of features to check.
+  //
+  // Features not in this list are not included in the response
+  // even if they are enabled.
+  //
+  // Due to backward compatibility, it is difficult to remove features
+  // on the server, and the list may grow large. Clients should request
+  // just the features they know about.
+  repeated ServerFeature features = 1;
+}
+
+message FeaturesResponse {
+  // Names of enabled boolean features.
+  repeated ServerFeature enabled = 1;
+}
+
+// Execute a raw GraphQL document.
+//
+// A successful request returns GraphQLResponse with the JSON-encoded `data`
+// field from the GraphQL response. Invalid input, transport failures, and
+// non-successful HTTP status codes return ApiErrorResponse. For HTTP responses
+// that include GraphQL `errors`, ApiErrorResponse.message is derived from
+// those error messages.
+//
+// The optional omit_* and rename_fields fields rewrite the query
+// before it is sent upstream. They strip parts of generated queries that are
+// not supported by the deployed W&B server (decided client-side based on
+// feature flags) without reproducing a GraphQL parser in Python.
+message GraphQLRequest {
+  string query = 1;
+  string variables_json = 2;
+
+  // Variable names ($var) to remove from variable definitions and usages.
+  repeated string omit_variables = 3;
+  // Fragment names to remove (both definitions and `...spreads`).
+  repeated string omit_fragments = 4;
+  // Field names to remove from selection sets.
+  repeated string omit_fields = 5;
+  // Field renames applied to selection sets: { old_name: new_name }.
+  map<string, string> rename_fields = 6;
+}
+
+message GraphQLResponse {
+  string data_json = 1;
+}
+
+// Download a file from a URL to a local path.
+//
+// wandb-core performs the download using its file transfer subsystem,
+// whose retries and timeouts are governed by the file transfer settings.
+// A successful request returns DownloadFileResponse; failures, including
+// non-successful HTTP status codes, return ApiErrorResponse.
+message DownloadFileRequest {
+  // The local path to write the file to.
+  string path = 1;
+
+  // The URL to download the file from.
+  string url = 2;
+
+  // The expected file size in bytes if known, used for progress reporting.
+  int64 size = 3;
+}
+
+message DownloadFileResponse {}
+
+// Upload a local file to a URL with an HTTP PUT request.
+//
+// wandb-core performs the upload using its file transfer subsystem,
+// whose retries and timeouts are governed by the file transfer settings.
+// A successful request returns UploadFileResponse; failures, including
+// non-successful HTTP status codes, return ApiErrorResponse.
+message UploadFileRequest {
+  // The absolute local path of the file to upload.
+  string path = 1;
+
+  // The URL to upload the file to.
+  string url = 2;
+
+  // Extra HTTP headers to send with the PUT request.
+  map<string, string> headers = 3;
+}
+
+message UploadFileResponse {}
+
+// Notify the W&B backend that run files have finished uploading.
+//
+// Uploading a file to its (presigned) destination URL only writes the bytes to
+// the object store; the backend must still be told the file is committed before
+// it appears on the run. During a live run, wandb-core sends this signal via the
+// filestream "uploaded" field. This request performs the same notification for
+// files uploaded outside a live run, such as `wandb.Api().run(...).upload_file()`,
+// without disturbing the run's state.
+//
+// A successful request returns MarkRunFilesUploadedResponse;
+// failures return ApiErrorResponse.
+message MarkRunFilesUploadedRequest {
+  // The entity that owns the run.
+  string entity = 1;
+
+  // The project that the run belongs to.
+  string project = 2;
+
+  // The ID of the run.
+  string run_id = 3;
+
+  // The save-names of the files that finished uploading.
+  repeated string files = 4;
+}
+
+message MarkRunFilesUploadedResponse {}
+
+// Flag a run to stop on the W&B backend.
+//
+// This is the same signal sent by the "Stop run" button in the W&B UI: the
+// backend sets the run's stopped flag, which the process running the run
+// polls during its heartbeat to shut itself down gracefully.
+//
+// A successful request returns StopRunResponse; failures return
+// ApiErrorResponse.
+message StopRunRequest {
+  // The run's storage ID (its GraphQL node ID), not the run name.
+  string storage_id = 1;
+}
+
+message StopRunResponse {}
+
+// Start of Scan run history
+
+message ReadRunHistoryRequest {
+  oneof request {
+    ScanRunHistoryInit scan_run_history_init = 1;
+    ScanRunHistory scan_run_history = 2;
+    ScanRunHistoryCleanup scan_run_history_cleanup = 3;
+
+    DownloadRunHistoryInit download_run_history_init = 4;
+    DownloadRunHistory download_run_history = 5;
+    DownloadRunHistoryStatus download_run_history_status = 6;
+  }
+}
+
+message ReadRunHistoryResponse {
+  oneof response {
+    ScanRunHistoryInitResponse scan_run_history_init = 1;
+    RunHistoryResponse run_history = 2;
+    ScanRunHistoryCleanupResponse scan_run_history_cleanup = 3;
+
+    DownloadRunHistoryInitResponse download_run_history_init = 4;
+    DownloadRunHistoryResponse download_run_history = 5;
+    DownloadRunHistoryStatusResponse download_run_history_status = 6;
+  }
+}
+
+// ScanRunHistoryInit is a request to initialize
+// a scan over a run's history.
+//
+// Because scan history request will be made over a series of requests,
+// We want to keep initialize and keep track of the resources
+// associated with the scan request.
+message ScanRunHistoryInit {
+  string entity = 1;
+  string project = 2;
+  string run_id = 3;
+  repeated string keys = 4;
+  bool use_cache = 5;
+}
+
+message ScanRunHistoryInitResponse {
+  int32 request_id = 1;
+}
+
+// ScanRunHistory is a request to scan
+// over a portion of a run's history.
+message ScanRunHistory {
+  int64 min_step = 1;
+  int64 max_step = 2;
+  int32 request_id = 3;
+}
+
+message RunHistoryResponse {
+  repeated HistoryRow history_rows = 1;
+}
+
+message HistoryRow {
+  repeated ParquetHistoryItem history_items = 1;
+}
+
+message ParquetHistoryItem {
+  string key = 1;
+  string value_json = 16;
+}
+
+// ScanRunHistoryCleanup is a request to cleanup
+// any resources associated with a scan request.
+message ScanRunHistoryCleanup {
+  int32 request_id = 1;
+}
+
+message ScanRunHistoryCleanupResponse {}
+
+// End of Scan run history
+
+// Download run history
+
+message DownloadRunHistoryInit {
+  // The entity who owns the run.
+  string entity = 1;
+  // The project that the run belongs to.
+  string project = 2;
+  // The ID of the run.
+  string run_id = 3;
+
+  // The directory to store the downloaded history files within.
+  string download_dir = 4;
+
+  // Whether to require the complete history to be downloaded.
+  // If the run contains data that has not been exported to parquet files yet,
+  // the run history will be considered incomplete.
+  bool require_complete_history = 5;
+}
+
+message DownloadRunHistoryInitResponse {
+  // The request id of the download operation.
+  //
+  // This is used to identify the download operation,
+  // and request status updates of the download operation.
+  int32 request_id = 1;
+
+  // Whether the run contains live data not yet exported to parquet.
+  bool contains_live_data = 2;
+}
+
+// A request to start a download operation for a run's history exports.
+message DownloadRunHistory {
+  // The request id of the download operation.
+  int32 request_id = 1;
+}
+
+// A response to a DownloadRunHistoryStart request.
+message DownloadRunHistoryResponse {
+  // Files that have been successfully downloaded.
+  repeated string downloaded_files = 1;
+
+  // Map of file paths to error messages for failed downloads.
+  map<string, string> errors = 2;
+}
+
+// IncompleteRunHistoryError is an error that is returned when the run history
+// has live data that has not been exported to parquet files yet.
+message IncompleteRunHistoryError {}
+
+// DownloadRunHistoryStatus requests the status of an ongoing download operation.
+message DownloadRunHistoryStatus {
+  // The request id of an ongoing download operation.
+  int32 request_id = 1;
+}
+
+message DownloadRunHistoryStatusResponse {
+  // Operation stats for progress display.
+  wandb_internal.OperationStats operation_stats = 1;
+}
