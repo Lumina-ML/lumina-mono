@@ -40,6 +40,8 @@ from lumina.backend.trace import finish_span as _lumina_finish_span
 from lumina.backend.report import LuminaReport
 from lumina.backend.media import LuminaTable, log_media as _log_media
 from lumina.backend.media import _is_media_value
+from lumina.backend.launch import launch as _lumina_launch
+from lumina.backend.launch import launch_agent as _lumina_launch_agent
 
 _WANDB_INIT = wandb_sdk.init
 _WANDB_FINISH = wandb_sdk.finish
@@ -288,6 +290,14 @@ def log_media(key, value, *, type="file", project=None, run_id=None, metadata=No
     return _log_media(key, value, type=type, project=project, run_id=run_id, metadata=metadata)
 
 
+def launch(queue, job, *, project=None, run_id=None, metadata=None):
+    return _lumina_launch(queue, job, project=project, run_id=run_id, metadata=metadata)
+
+
+def launch_agent(queue, *, project=None, poll_interval=2.0, max_runs=None, dry_run=False):
+    return _lumina_launch_agent(queue, project=project, poll_interval=poll_interval, max_runs=max_runs, dry_run=dry_run)
+
+
 define_metric = _preinit.PreInitCallable('wandb.define_metric', Run.define_metric)
 mark_preempting = _preinit.PreInitCallable('wandb.mark_preempting', Run.mark_preempting)
 alert = _preinit.PreInitCallable('wandb.alert', Run.alert)
@@ -318,4 +328,4 @@ if 'dev' in __version__:
     import lumina.env
     import os
     os.environ[lumina.env.ERROR_REPORTING] = os.environ.get(lumina.env.ERROR_REPORTING, 'false')
-__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'log_media', 'login', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')
+__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'log_media', 'login', 'launch', 'launch_agent', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')
