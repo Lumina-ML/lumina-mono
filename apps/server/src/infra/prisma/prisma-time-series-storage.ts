@@ -82,7 +82,7 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
     if (options.runId) where.runId = options.runId;
     if (options.projectId) where.projectId = options.projectId;
 
-    const timestampColumn = table === "span" ? "startedAt" : "timestamp";
+    const timestampColumn = this.timestampColumnFor(table);
     const timeFilter: Record<string, Date> = {};
     if (options.start) timeFilter.gte = options.start;
     if (options.end) timeFilter.lte = options.end;
@@ -111,6 +111,19 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
         return this.prisma.span;
       default:
         throw new Error(`Unsupported time series table: ${table}`);
+    }
+  }
+
+  private timestampColumnFor(table: TimeSeriesTable): string {
+    switch (table) {
+      case "system_metric":
+        return "loggedAt";
+      case "span":
+      case "trace":
+        return "startedAt";
+      case "log_line":
+      default:
+        return "timestamp";
     }
   }
 }
