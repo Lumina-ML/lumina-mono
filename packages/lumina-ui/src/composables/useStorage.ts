@@ -1,4 +1,4 @@
-import { computed, type Ref } from "vue";
+import { ref, watch, type Ref } from "vue";
 
 function getStorage(type: "local" | "session") {
   return type === "local" ? localStorage : sessionStorage;
@@ -39,29 +39,30 @@ export function useStorage<T>(
     return serializer ? serializer.write(value) : JSON.stringify(value);
   };
 
-  const stored = computed<T | undefined>({
-    get: () => read(storage.getItem(key)),
-    set: (value) => {
+  const stored = ref<T | undefined>(read(storage.getItem(key))) as Ref<T | undefined>;
+
+  watch(
+    stored,
+    (value) => {
       if (value === undefined) {
         storage.removeItem(key);
       } else {
         storage.setItem(key, write(value));
       }
     },
-  });
+    { deep: true },
+  );
 
   if (type === "local" && typeof window !== "undefined") {
     const handler = (event: StorageEvent) => {
-      if (event.key === key) {
-        // 触发 getter 重新读取
-        // eslint-disable-next-line no-unused-expressions
-        stored.value;
+      if (event.key === key && event.storageArea === storage) {
+        stored.value = read(event.newValue);
       }
     };
     window.addEventListener("storage", handler);
   }
 
-  return stored as Ref<T | undefined>;
+  return stored;
 }
 
 export function useLocalStorage<T>(key: string, options?: Omit<UseStorageOptions<T>, "type">) {

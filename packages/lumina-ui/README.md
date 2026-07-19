@@ -112,6 +112,7 @@ import {
   useClipboard,
   useCountdown,
   useDebounce,
+  useDateFormat,
 } from "@lumina/ui";
 
 const { isDark, toggleDark } = useTheme();
@@ -123,6 +124,7 @@ const { value: open, toggle } = useToggle();
 const { copy, copied } = useClipboard();
 const { formatted } = useCountdown({ duration: 60, immediate: true });
 const search = useDebounce(rawQuery, 300);
+const createdAt = useDateFormat(run.createdAt, { preset: "datetime" });
 ```
 
 ## 目录结构
@@ -137,7 +139,8 @@ src/
 ├── chart/              # ChartRenderer + Lumina Chart Language
 ├── widgets/            # Widget Registry + Grid Layout
 ├── composables/        # useTheme, usePagination, useWidgetData, useBreakpoint, useDebounce,
-│                       # useLocalStorage, useSessionStorage, useToggle, useClipboard, useCountdown
+│                       # useLocalStorage, useSessionStorage, useToggle, useClipboard,
+│                       # useCountdown, useDateFormat
 └── hoc/                # LAsync, LErrorBoundary, LList
 ```
 

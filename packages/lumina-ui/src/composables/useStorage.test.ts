@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { nextTick } from "vue";
 import { useLocalStorage, useSessionStorage } from "./useStorage";
 
 class MockStorage implements Storage {
@@ -34,6 +35,11 @@ beforeEach(() => {
   Object.defineProperty(globalThis, "sessionStorage", { value: new MockStorage(), writable: true });
 });
 
+async function flush() {
+  await nextTick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe("useLocalStorage", () => {
   it("reads existing value", () => {
     localStorage.setItem("foo", JSON.stringify("bar"));
@@ -46,25 +52,28 @@ describe("useLocalStorage", () => {
     expect(value.value).toBe(42);
   });
 
-  it("writes value back to storage", () => {
+  it("writes value back to storage", async () => {
     const value = useLocalStorage<string>("key");
     value.value = "hello";
+    await flush();
     expect(localStorage.getItem("key")).toBe('"hello"');
   });
 
-  it("removes item when set to undefined", () => {
+  it("removes item when set to undefined", async () => {
     localStorage.setItem("key", "123");
     const value = useLocalStorage<string>("key");
     value.value = undefined;
+    await flush();
     expect(localStorage.getItem("key")).toBeNull();
   });
 });
 
 describe("useSessionStorage", () => {
-  it("uses session storage", () => {
+  it("uses session storage", async () => {
     const value = useSessionStorage("session-key", { defaultValue: true });
     expect(value.value).toBe(true);
     value.value = false;
+    await flush();
     expect(sessionStorage.getItem("session-key")).toBe("false");
   });
 });
