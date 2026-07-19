@@ -3,6 +3,7 @@ import type {
   Trace,
   Span,
   CreateTraceInput,
+  CreateSpanInput,
   PatchTraceInput,
   PatchSpanInput,
   ListTracesQuery,
@@ -38,6 +39,14 @@ export const TraceService = {
 
   listSpans(traceId: string): Promise<Span[]> {
     return fetchApi(`/api/v1/traces/${traceId}/spans`);
+  },
+
+  /** Create a span under an existing trace (Roadmap §M3-3). */
+  createSpan(traceId: string, data: CreateSpanInput): Promise<Span> {
+    return fetchApi(`/api/v1/traces/${traceId}/spans`, {
+      method: "POST",
+      body: data,
+    });
   },
 
   getSpan(spanId: string): Promise<Span> {

@@ -39,6 +39,16 @@ export interface CreateTraceInput {
   metadata?: Record<string, unknown>;
 }
 
+export interface CreateSpanInput {
+  name: string;
+  kind?: SpanKind;
+  parentSpanId?: string;
+  input?: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  status?: SpanStatus;
+  latencyMs?: number;
+}
+
 export interface PatchTraceInput {
   status?: "ok" | "error";
   latencyMs?: number;

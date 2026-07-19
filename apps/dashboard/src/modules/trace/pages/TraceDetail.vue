@@ -1,28 +1,36 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, RouterLink } from "vue-router";
-import { useQuery } from "@tanstack/vue-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
   LSkeleton,
   LCard,
   LTag,
   LEmpty,
   LSwitch,
+  LButton,
+  LDialog,
+  LInput,
+  LSelect,
 } from "@lumina/ui";
 import {
   ArrowLeft,
   Clock,
   Hash,
   MessageSquare,
+  Plus,
+  StopCircle,
 } from "lucide-vue-next";
 import { useTrace } from "@/modules/trace/composables/useTraces";
 import { TraceService } from "@/services/trace.service";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useToast } from "@/composables/useToast";
 import {
   buildSpanTree,
   findSpan,
   type SpanNode,
 } from "@/widgets/trace/types";
+import type { SpanKind, CreateSpanInput } from "@/types/trace";
 import SpanTree from "@/widgets/trace/SpanTree.vue";
 import SpanTimeline from "@/widgets/trace/SpanTimeline.vue";
 import SpanDetail from "@/widgets/trace/SpanDetail.vue";
@@ -31,6 +39,8 @@ const route = useRoute();
 const projectId = computed(() => route.params.projectId as string);
 const traceId = computed(() => route.params.traceId as string);
 const { formatDate, formatDurationMs } = useDateFormat();
+const queryClient = useQueryClient();
+const toast = useToast();
 
 const { data: trace, isLoading } = useTrace(traceId);
 
@@ -72,7 +82,90 @@ const spanCount = computed(() => {
   return walk(spanTree.value);
 });
 
-import { watch } from "vue";
+// ── Manual span creation (Roadmap §M3-3) ────────────────────────────
+const spanDialogOpen = ref(false);
+const spanName = ref("");
+const spanKind = ref<SpanKind>("internal");
+const spanParentId = ref<string | null>(null);
+const spanLatencyText = ref("");
+const spanError = ref<string | null>(null);
+
+const spanKindOptions: Array<{ value: SpanKind; label: string }> = [
+  { value: "llm", label: "LLM" },
+  { value: "tool", label: "Tool" },
+  { value: "retriever", label: "Retriever" },
+  { value: "chain", label: "Chain" },
+  { value: "agent", label: "Agent" },
+  { value: "internal", label: "Internal" },
+];
+
+const spanParentOptions = computed(() => {
+  const flat: Array<{ value: string; label: string }> = [
+    { value: "", label: "(root span)" },
+  ];
+  const walk = (nodes: SpanNode[], depth: number) => {
+    for (const n of nodes) {
+      flat.push({
+        value: n.id,
+        label: `${"  ".repeat(depth)}${n.name}`,
+      });
+      walk(n.children, depth + 1);
+    }
+  };
+  walk(spanTree.value, 0);
+  return flat;
+});
+
+function openSpanDialog() {
+  spanName.value = "";
+  spanKind.value = "internal";
+  spanParentId.value = selectedSpanId.value ?? null;
+  spanLatencyText.value = "";
+  spanError.value = null;
+  spanDialogOpen.value = true;
+}
+
+const createSpanMutation = useMutation({
+  mutationFn: () => {
+    const input: CreateSpanInput = {
+      name: spanName.value.trim(),
+      kind: spanKind.value,
+      ...(spanParentId.value ? { parentSpanId: spanParentId.value } : {}),
+      ...(spanLatencyText.value.trim()
+        ? { latencyMs: Number(spanLatencyText.value) }
+        : {}),
+    };
+    if (input.latencyMs !== undefined && Number.isNaN(input.latencyMs)) {
+      throw new Error("Latency must be a number (milliseconds).");
+    }
+    return TraceService.createSpan(traceId.value, input);
+  },
+  onSuccess: (span) => {
+    toast.success(`Span "${span.name}" created.`);
+    spanDialogOpen.value = false;
+    queryClient.invalidateQueries({ queryKey: ["trace-spans", traceId.value] });
+    selectedSpanId.value = span.id;
+  },
+  onError: (e) => {
+    spanError.value = (e as Error).message ?? "Unknown error";
+  },
+});
+
+// ── Finish trace ──────────────────────────────────────────────────────
+const traceFinished = computed(
+  () => !!trace.value?.endTime || trace.value?.status === "ok" || trace.value?.status === "error",
+);
+const finishMutation = useMutation({
+  mutationFn: () =>
+    TraceService.patchTrace(traceId.value, {
+      status: "ok",
+      finishedAt: new Date().toISOString(),
+    }),
+  onSuccess: () => {
+    toast.success("Trace marked as finished.");
+    queryClient.invalidateQueries({ queryKey: ["trace", traceId.value] });
+  },
+});
 </script>
 
 <template>
@@ -115,6 +208,20 @@ import { watch } from "vue";
           <LTag size="small" type="default">
             {{ spanCount }} spans
           </LTag>
+          <LButton size="sm" @click="openSpanDialog">
+            <Plus class="mr-1 h-3 w-3" />
+            New span
+          </LButton>
+          <LButton
+            v-if="!traceFinished"
+            size="sm"
+            quaternary
+            :loading="finishMutation.isPending.value"
+            @click="finishMutation.mutate()"
+          >
+            <StopCircle class="mr-1 h-3 w-3" />
+            Finish trace
+          </LButton>
         </div>
       </div>
 
@@ -182,5 +289,78 @@ import { watch } from "vue";
     <LCard v-else class="p-8 text-center text-fg-tertiary">
       Trace not found.
     </LCard>
+
+    <!-- New-span dialog (Roadmap §M3-3). -->
+    <LDialog
+      v-model:show="spanDialogOpen"
+      title="New span"
+      width="480px"
+      @close="spanError = null"
+    >
+      <form class="space-y-3" @submit.prevent="createSpanMutation.mutate()">
+        <div>
+          <label for="span-name" class="mb-1 block text-xs font-medium text-fg-secondary">
+            Name <span class="text-accent-danger">*</span>
+          </label>
+          <LInput
+            id="span-name"
+            v-model:value="spanName"
+            placeholder="e.g. retrieve-context"
+            autofocus
+          />
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label for="span-kind" class="mb-1 block text-xs font-medium text-fg-secondary">
+              Kind
+            </label>
+            <LSelect
+              id="span-kind"
+              v-model:value="spanKind"
+              :options="spanKindOptions"
+            />
+          </div>
+          <div>
+            <label for="span-latency" class="mb-1 block text-xs font-medium text-fg-secondary">
+              Latency (ms, optional)
+            </label>
+            <LInput
+              id="span-latency"
+              v-model:value="spanLatencyText"
+              placeholder="e.g. 250"
+            />
+          </div>
+        </div>
+        <div>
+          <label for="span-parent" class="mb-1 block text-xs font-medium text-fg-secondary">
+            Parent span
+          </label>
+          <LSelect
+            id="span-parent"
+            v-model:value="spanParentId"
+            :options="spanParentOptions"
+            placeholder="(root span)"
+          />
+        </div>
+        <div
+          v-if="spanError"
+          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+        >
+          {{ spanError }}
+        </div>
+      </form>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton quaternary @click="spanDialogOpen = false">Cancel</LButton>
+          <LButton
+            :loading="createSpanMutation.isPending.value"
+            :disabled="!spanName.trim()"
+            @click="createSpanMutation.mutate()"
+          >
+            Create span
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
   </div>
 </template>

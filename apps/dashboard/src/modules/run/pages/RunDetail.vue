@@ -288,6 +288,43 @@ const { data: artifactsForRun } = useQuery({
   enabled: computed(() => !!run.value?.projectId),
 });
 
+// ── Run media (tables, images, plotly HTML, …) logged via SDK ────────
+// Implements Roadmap §M3-2: the run_media API has shipped for a while
+// but had no UI surface. We list each entry, show its key + type +
+// metadata, and deep-link to the artifact version that holds the
+// actual bytes so the user can download / preview.
+import { RunMediaService } from "@/services/run-media.service";
+import type { RunMedia } from "@/types/run-media";
+const { data: runMedia } = useQuery({
+  queryKey: computed(() => ["run-media", "by-run", runId.value]),
+  queryFn: () => {
+    if (!run.value?.projectId) return Promise.resolve({ items: [], total: 0 });
+    return RunMediaService.list({
+      projectId: run.value.projectId,
+      runId: runId.value,
+      limit: 100,
+    });
+  },
+  enabled: computed(() => !!run.value?.projectId),
+});
+const mediaItems = computed<RunMedia[]>(() => runMedia.value?.items ?? []);
+
+const mediaTypeBadgeType: Record<string, "default" | "primary" | "info" | "success"> = {
+  table: "primary",
+  image: "info",
+  plotly: "success",
+  html: "info",
+  video: "info",
+  audio: "info",
+  file: "default",
+};
+
+function mediaFilename(m: RunMedia): string {
+  const md = m.metadata ?? {};
+  const fn = typeof md.filename === "string" ? md.filename : undefined;
+  return fn ?? `${m.key}.${m.type}`;
+}
+
 // ── Metadata helpers ───────────────────────────────────────────────────
 const metadataEntries = computed(() => {
   const md = (run.value?.metadata ?? {}) as Record<string, unknown>;
@@ -704,6 +741,52 @@ const canDelete = computed(
           <LEmpty
             title="No artifacts yet"
             description="Artifacts produced by this run will appear here."
+          />
+        </LCard>
+      </LTabPane>
+
+      <!-- ── Media (Roadmap §M3-2) ───────────────────────────────────── -->
+      <LTabPane name="media" tab="Media">
+        <LCard v-if="mediaItems.length > 0" class="p-0">
+          <ul class="divide-y divide-border">
+            <li
+              v-for="m in mediaItems"
+              :key="m.id"
+              class="flex items-start gap-3 px-4 py-3 text-sm hover:bg-canvas"
+            >
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium">{{ m.key }}</span>
+                  <LTag size="small" :type="mediaTypeBadgeType[m.type] ?? 'default'">
+                    {{ m.type }}
+                  </LTag>
+                  <span class="font-mono text-[11px] text-fg-tertiary">
+                    {{ mediaFilename(m) }}
+                  </span>
+                </div>
+                <div class="mt-1 truncate text-xs text-fg-tertiary">
+                  Logged {{ formatDate(m.createdAt) }}
+                </div>
+                <div
+                  v-if="Object.keys(m.metadata ?? {}).length > 0"
+                  class="mt-2"
+                >
+                  <LJsonView :data="m.metadata" :deep="2" />
+                </div>
+              </div>
+              <RouterLink
+                :to="`/projects/${run.projectId}/artifacts?artifactVersionId=${m.artifactVersionId}`"
+                class="shrink-0 text-xs text-accent-primary hover:underline"
+              >
+                View artifact →
+              </RouterLink>
+            </li>
+          </ul>
+        </LCard>
+        <LCard v-else class="p-8">
+          <LEmpty
+            title="No media yet"
+            description="Tables, images, and other media logged via lumina.log() or lumina.log_media() will appear here."
           />
         </LCard>
       </LTabPane>

@@ -70,6 +70,11 @@ const router = createRouter({
               component: () => import("@/modules/workspace/pages/SettingsApiKeys.vue"),
             },
             {
+              path: "alerts",
+              name: "SettingsAlerts",
+              component: () => import("@/modules/workspace/pages/SettingsAlerts.vue"),
+            },
+            {
               path: "billing",
               name: "SettingsBilling",
               component: () => import("@/modules/workspace/pages/SettingsBilling.vue"),
