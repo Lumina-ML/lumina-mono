@@ -30,6 +30,7 @@ function startEdit() {
   draftTitle.value = report.value.title;
   editing.value = true;
 }
+void startEdit;
 
 function cancelEdit() {
   editing.value = false;
@@ -108,10 +109,12 @@ const blockEntries = computed(() => {
             </LButton>
           </template>
           <template v-else>
-            <LButton size="sm" @click="startEdit">
-              <Edit3 class="mr-1 h-3 w-3" />
-              Edit
-            </LButton>
+            <RouterLink :to="`/projects/${projectId}/reports/${reportId}/edit`">
+              <LButton size="sm">
+                <Edit3 class="mr-1 h-3 w-3" />
+                Edit
+              </LButton>
+            </RouterLink>
             <LButton size="sm" quaternary>
               <Share2 class="mr-1 h-3 w-3" />
               Share

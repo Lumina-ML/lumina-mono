@@ -124,6 +124,12 @@ const router = createRouter({
               props: true,
             },
             {
+              path: "reports/:reportId/edit",
+              name: "ReportEditor",
+              component: () => import("@/modules/report/pages/ReportEditor.vue"),
+              props: true,
+            },
+            {
               path: "evaluations",
               name: "ProjectEvaluations",
               component: () => import("@/modules/evaluation/pages/ProjectEvaluations.vue"),
