@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import fastify from "fastify";
+import { ZodError } from "zod";
 import { configPlugin } from "./plugins/config.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { clickhousePlugin } from "./plugins/clickhouse.js";
@@ -52,6 +53,28 @@ export async function buildApp() {
   await app.register(cors, {
     origin: true,
     credentials: true,
+  });
+
+  // Convert Zod validation failures into structured 400s instead of
+  // Fastify's default 500. Every handler calls `SomeSchema.parse(...)`
+  // on its inputs; without this hook a typo in the request body leaks
+  // as a generic "Internal Server Error" to clients, which is
+  // indistinguishable from a real server bug. This makes the contract
+  // explicit: invalid input → 400 with field-level issues.
+  app.setErrorHandler((err, _req, reply) => {
+    if (err instanceof ZodError) {
+      reply.status(400).send({
+        error: "ValidationError",
+        message: "Request body or params failed schema validation.",
+        issues: err.issues.map((i) => ({
+          path: i.path.join("."),
+          code: i.code,
+          message: i.message,
+        })),
+      });
+      return;
+    }
+    reply.send(err);
   });
 
   // 1. Configuration
