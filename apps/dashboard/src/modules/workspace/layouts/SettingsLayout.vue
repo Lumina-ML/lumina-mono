@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { useRoute, RouterView, RouterLink } from "vue-router";
-import { Users, Key, CreditCard, Settings as SettingsIcon } from "lucide-vue-next";
+import {
+  Users,
+  Key,
+  CreditCard,
+  Settings as SettingsIcon,
+  Bell,
+} from "lucide-vue-next";
 
 const route = useRoute();
 
@@ -15,6 +21,7 @@ const tabs: SettingsTab[] = [
   { key: "general", label: "General", to: "/settings", icon: SettingsIcon },
   { key: "members", label: "Members", to: "/settings/members", icon: Users },
   { key: "api-keys", label: "API keys", to: "/settings/api-keys", icon: Key },
+  { key: "alerts", label: "Alerts", to: "/settings/alerts", icon: Bell },
   { key: "billing", label: "Billing", to: "/settings/billing", icon: CreditCard },
 ];
 

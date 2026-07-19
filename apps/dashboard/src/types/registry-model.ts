@@ -1,5 +1,9 @@
 export interface RegistryModel {
   id: string;
+  /** Server-side the model row carries a projectId; surfaced here so the UI
+   * can deep-link to project-scoped resources (e.g. the runs list when
+   * letting the user pick a run to link). Older payloads may omit it. */
+  projectId?: string;
   name: string;
   description: string | null;
   createdAt: string;

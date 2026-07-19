@@ -1,7 +1,22 @@
 import { z } from "zod";
 
+/**
+ * Project name validator. Names prefixed with `__` are reserved for
+ * server-side seeds (currently `__demo__` — see
+ * `apps/server/src/core/seed/demo-seed.ts`) and cannot be created by
+ * SDK or dashboard callers. This prevents users from impersonating the
+ * demo project to scrape its id from URL hints.
+ */
+const projectNameSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .refine((n) => !n.startsWith("__"), {
+    message: "Project names starting with '__' are reserved.",
+  });
+
 export const CreateProjectSchema = z.object({
-  name: z.string().min(1).max(128),
+  name: projectNameSchema,
   displayName: z.string().max(256).optional(),
   description: z.string().max(2048).optional(),
   settings: z.record(z.unknown()).optional(),

@@ -5,9 +5,14 @@ export class PrometheusTelemetry implements Telemetry {
   private readonly histograms = new Map<string, promClient.Histogram<string>>();
   private readonly counters = new Map<string, promClient.Counter<string>>();
   private readonly gauges = new Map<string, promClient.Gauge<string>>();
+  /** Owns the per-instance registry; default metrics + custom metrics
+   *  live here so multiple `buildApp()` calls in the same process (e.g.
+   *  E2E test files) don't trip over the global `promClient.register`. */
+  readonly registry: promClient.Registry;
 
-  constructor(register: promClient.Registry = promClient.register) {
-    promClient.collectDefaultMetrics({ register });
+  constructor(register?: promClient.Registry) {
+    this.registry = register ?? new promClient.Registry();
+    promClient.collectDefaultMetrics({ register: this.registry });
   }
 
   histogram(name: string, value: number, labels?: Labels): void {

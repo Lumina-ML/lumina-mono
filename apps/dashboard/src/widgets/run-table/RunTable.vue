@@ -54,8 +54,69 @@ const filterFields = [
 // Apply filters client-side (server-side filtering is the next iteration;
 // the backend already supports `status` so that one could move to the wire).
 const filteredRuns = computed(() => {
-  return props.runs;
+  const chips = filterChips.value;
+  const q = quickSearch.value.trim().toLowerCase();
+  if (chips.length === 0 && !q) return props.runs;
+
+  return props.runs.filter((run) => {
+    // Every chip must match (AND semantics); quickSearch is a separate
+    // contains-on-name check.
+    for (const chip of chips) {
+      const fieldVal = getNestedValue(run, chip.field);
+      if (!matchesChip(fieldVal, chip)) return false;
+    }
+    if (q && !run.name.toLowerCase().includes(q)) return false;
+    return true;
+  });
 });
+
+/**
+ * Resolve `a.b.c`-style field paths against a Run. Returns `undefined`
+ * for missing segments so the chip matcher can treat absent values as
+ * a non-match (chips want *equality*, not "field is empty").
+ */
+function getNestedValue(obj: unknown, path: string): unknown {
+  if (!path) return undefined;
+  const parts = path.split(".");
+  let cur: unknown = obj;
+  for (const part of parts) {
+    if (cur == null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string, unknown>)[part];
+  }
+  return cur;
+}
+
+function matchesChip(value: unknown, chip: FilterChip): boolean {
+  const target = chip.value;
+  switch (chip.operator) {
+    case "contains":
+      return (
+        value != null && String(value).toLowerCase().includes(target.toLowerCase())
+      );
+    case "equals":
+      if (value == null) return target === "" || target === "null";
+      // Try numeric equality first so "5" matches config.batch_size=5.
+      const asNum = Number(target);
+      if (!Number.isNaN(asNum) && typeof value === "number") {
+        return value === asNum;
+      }
+      return String(value) === target;
+    case ">":
+      return Number(value) > Number(target);
+    case ">=":
+      return Number(value) >= Number(target);
+    case "<":
+      return Number(value) < Number(target);
+    case "<=":
+      return Number(value) <= Number(target);
+    case "between": {
+      const [lo, hi] = target.split(",").map((s) => Number(s.trim()));
+      if (Number.isNaN(lo) || Number.isNaN(hi)) return false;
+      const n = Number(value);
+      return n >= lo && n <= hi;
+    }
+  }
+}
 
 const chipStatus = computed(() => {
   const statusChip = filterChips.value.find((c) => c.field === "status");
@@ -212,7 +273,6 @@ const statusFilter = computed<RunStatus | null>(() => {
 });
 
 // Suppress unused-var warnings for things only consumed by template.
-void filteredRuns;
 void statusFilter;
 </script>
 
@@ -277,7 +337,7 @@ void statusFilter;
     </div>
 
     <LDataTable
-      :data="runs"
+      :data="filteredRuns"
       :columns="columns"
       :loading="loading"
       v-model:page="page"

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import fastify from "fastify";
+import { ZodError } from "zod";
+import { Prisma } from "./generated/prisma/index.js";
 import { configPlugin } from "./plugins/config.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { clickhousePlugin } from "./plugins/clickhouse.js";
@@ -24,6 +26,7 @@ import { reportRoutes } from "./modules/report/routes.js";
 import { runMediaRoutes } from "./modules/run-media/routes.js";
 import { launchRoutes } from "./modules/launch/routes.js";
 import { publicRoutes } from "./modules/public/routes.js";
+import { sandboxRoutes } from "./modules/sandbox/routes.js";
 import { metricRoutes } from "./modules/metric/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
 import { registryModelRoutes } from "./modules/registry-model/routes.js";
@@ -51,6 +54,44 @@ export async function buildApp() {
   await app.register(cors, {
     origin: true,
     credentials: true,
+  });
+
+  // Convert Zod validation failures into structured 400s instead of
+  // Fastify's default 500. Every handler calls `SomeSchema.parse(...)`
+  // on its inputs; without this hook a typo in the request body leaks
+  // as a generic "Internal Server Error" to clients, which is
+  // indistinguishable from a real server bug. This makes the contract
+  // explicit: invalid input → 400 with field-level issues.
+  //
+  // Also map Prisma's P2002 (unique constraint) to 409 so that a
+  // duplicate-signup or duplicate-artifact returns "Conflict" instead
+  // of leaking as 500. Without this, every handler would need its own
+  // catch block (user.ts already has one for its own P2002 — leave it,
+  // it just becomes a no-op fast-path).
+  app.setErrorHandler((err, _req, reply) => {
+    if (err instanceof ZodError) {
+      reply.status(400).send({
+        error: "ValidationError",
+        message: "Request body or params failed schema validation.",
+        issues: err.issues.map((i) => ({
+          path: i.path.join("."),
+          code: i.code,
+          message: i.message,
+        })),
+      });
+      return;
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const target = (err.meta?.target as string[] | undefined) ?? [];
+      const field = target[0] ?? "field";
+      reply.status(409).send({
+        error: "Conflict",
+        message: `A record with this ${field} already exists.`,
+        field,
+      });
+      return;
+    }
+    reply.send(err);
   });
 
   // 1. Configuration
@@ -108,6 +149,11 @@ export async function buildApp() {
   // the rest of /api/v1 but bypasses the internal handlers so the shape
   // stays stable for external consumers.
   await app.register(publicRoutes, { prefix: "/api/v1" });
+  // Sandbox endpoints back the dashboard's "Try it" demo cards
+  // (Roadmap §MVP-2 / M1-1). Authenticated like the rest of /api/v1;
+  // does not require a project in the URL — the demo project is resolved
+  // by name inside the active workspace.
+  await app.register(sandboxRoutes, { prefix: "/api/v1" });
 
   // 5. Default workspace seed. Single-tenant deployments keep the
   // workspace id pinned via `LUMINA_DEFAULT_WORKSPACE_ID` (default
@@ -123,6 +169,25 @@ export async function buildApp() {
     },
     update: {},
   });
+
+  // 6. Demo project seed. Always ensure the `__demo__` project exists
+  // in the default workspace so the dashboard's "Try it" cards have a
+  // stable target and new users land on something other than a blank
+  // page. See `apps/server/src/core/seed/demo-seed.ts`. Errors here are
+  // logged but non-fatal — a freshly-installed DB with permission
+  // issues shouldn't prevent the server from starting.
+  try {
+    const { ensureDemoProject } = await import("./core/seed/demo-seed.js");
+    const seeded = await ensureDemoProject(app.prisma, defaultWorkspaceId);
+    if (seeded.created) {
+      app.log.info(
+        { projectId: seeded.projectId },
+        "Seeded __demo__ project in default workspace",
+      );
+    }
+  } catch (err) {
+    app.log.warn({ err }, "Demo project seed failed; continuing without it");
+  }
 
   return app;
 }

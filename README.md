@@ -2,6 +2,31 @@
 
 > Open-source MLOps platform. Rebased from WandB, built for self-hosting.
 
+## Try the demo
+
+A pre-seeded `__demo__` project ships with every Lumina install. Open
+the dashboard, click any **Try it** card on the workspace overview, and
+you'll land on a fully-populated detail page within seconds:
+
+- **Basic experiment** → 3 runs with loss/accuracy curves
+- **Hyperparameter sweep** → 1 sweep + 4 trial runs
+- **Model evaluation** → 1 evaluation + dataset/model artifacts + 5 metrics
+- **LLM trace** → 1 trace with 5 spans (retriever / llm / tool / …)
+- **Artifact versions** → 1 artifact with 2 versions + 2 files
+
+From your terminal, the same scenarios run via `lumina demo <scenario>`:
+
+```bash
+lumina demo basic        # populate the __demo__ project
+lumina demo sweep
+lumina demo evaluation
+lumina demo trace
+lumina demo artifacts
+
+lumina demo --list        # show available scenarios
+lumina demo --reset       # wipe everything under __demo__
+```
+
 ## Status
 
 MVP V1 in progress. Current end-to-end flow works:
@@ -21,6 +46,15 @@ lumina.finish()
 # Open dashboard
 open http://localhost:3000
 ```
+
+## Screenshots
+
+> 📸 Screenshot capture recipe + demo video specs live in
+> [`SCREENSHOTS.md`](./SCREENSHOTS.md). Drop the actual files into
+> `docs/screenshots/` once captured.
+>
+> Until they're captured, the most direct way to see Lumina in action is
+> the **Try the demo** section above.
 
 ## Architecture
 

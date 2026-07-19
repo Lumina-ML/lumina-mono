@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import {
   useQuery,
@@ -155,6 +155,108 @@ const lineageQuery = useQuery({
   enabled: computed(() => !!latestVersion.value),
 });
 const lineage = computed(() => lineageQuery.data.value ?? { parents: [], children: [] });
+
+// Resolve every edge's version → artifactId + version label so the
+// lineage tab can deep-link to the right artifact detail page. Without
+// this, the existing implementation links to the artifact list which
+// is the bug called out in Roadmap §M3-1.
+interface ResolvedEdge {
+  edge: typeof lineage.value.parents[number];
+  versionId: string;
+  artifactId: string | null;
+  versionLabel: string;
+}
+const resolvedParentVersions = ref<Map<string, ResolvedEdge>>(new Map());
+const resolvedChildVersions = ref<Map<string, ResolvedEdge>>(new Map());
+
+async function resolveEdges(edges: typeof lineage.value.parents, target: typeof resolvedParentVersions) {
+  const next = new Map<string, ResolvedEdge>();
+  await Promise.all(
+    edges.map(async (edge) => {
+      try {
+        const v = await ArtifactService.getVersion(edge.parentVersionId);
+        next.set(edge.id, {
+          edge,
+          versionId: edge.parentVersionId,
+          artifactId: v.artifactId,
+          versionLabel: v.version,
+        });
+      } catch {
+        next.set(edge.id, {
+          edge,
+          versionId: edge.parentVersionId,
+          artifactId: null,
+          versionLabel: edge.parentVersionId.slice(0, 12),
+        });
+      }
+    }),
+  );
+  target.value = next;
+}
+async function resolveChildEdges(edges: typeof lineage.value.children) {
+  const next = new Map<string, ResolvedEdge>();
+  await Promise.all(
+    edges.map(async (edge) => {
+      try {
+        const v = await ArtifactService.getVersion(edge.childVersionId);
+        next.set(edge.id, {
+          edge,
+          versionId: edge.childVersionId,
+          artifactId: v.artifactId,
+          versionLabel: v.version,
+        });
+      } catch {
+        next.set(edge.id, {
+          edge,
+          versionId: edge.childVersionId,
+          artifactId: null,
+          versionLabel: edge.childVersionId.slice(0, 12),
+        });
+      }
+    }),
+  );
+  resolvedChildVersions.value = next;
+}
+watch(
+  () => lineage.value.parents,
+  (edges) => {
+    if (edges.length > 0) resolveEdges(edges, resolvedParentVersions);
+    else resolvedParentVersions.value = new Map();
+  },
+  { immediate: true },
+);
+watch(
+  () => lineage.value.children,
+  (edges) => {
+    if (edges.length > 0) resolveChildEdges(edges);
+    else resolvedChildVersions.value = new Map();
+  },
+  { immediate: true },
+);
+
+const lineageTypeLabel: Record<string, string> = {
+  derived_from: "Derived from",
+  used: "Used",
+  produced: "Produced",
+  forked: "Forked from",
+};
+function lineageTypeBadgeType(t: string): "default" | "primary" | "info" | "success" {
+  switch (t) {
+    case "derived_from":
+      return "primary";
+    case "produced":
+      return "success";
+    case "forked":
+      return "info";
+    default:
+      return "default";
+  }
+}
+
+function artifactLink(artifactId: string | null): { to: string } | null {
+  if (!artifactId) return null;
+  return { to: `/projects/${projectId.value}/artifacts/${artifactId}` };
+}
 
 // ── Aliases editor ───────────────────────────────────────────────────
 const aliasesOpen = ref(false);
@@ -491,13 +593,24 @@ function formatSize(bytes?: number): string {
                   :key="edge.id"
                   class="flex items-center gap-2 rounded-md border border-border bg-canvas px-3 py-2"
                 >
-                  <span class="font-mono text-xs">{{ edge.type }}</span>
-                  <RouterLink
-                    :to="`/projects/${projectId}/artifacts`"
-                    class="font-mono text-xs hover:underline"
+                  <LTag size="small" :type="lineageTypeBadgeType(edge.type)">
+                    {{ lineageTypeLabel[edge.type] ?? edge.type }}
+                  </LTag>
+                  <template v-if="artifactLink(resolvedParentVersions.get(edge.id)?.artifactId ?? null)">
+                    <RouterLink
+                      :to="artifactLink(resolvedParentVersions.get(edge.id)?.artifactId ?? null)!.to"
+                      class="font-mono text-xs hover:underline"
+                    >
+                      v{{ resolvedParentVersions.get(edge.id)?.versionLabel }}
+                    </RouterLink>
+                  </template>
+                  <span
+                    v-else
+                    class="font-mono text-xs text-fg-tertiary"
+                    :title="edge.parentVersionId"
                   >
-                    {{ edge.parentVersionId.slice(0, 12) }}…
-                  </RouterLink>
+                    {{ (resolvedParentVersions.get(edge.id)?.versionLabel ?? edge.parentVersionId.slice(0, 12)) }}…
+                  </span>
                 </li>
               </ul>
             </LCard>
@@ -514,13 +627,24 @@ function formatSize(bytes?: number): string {
                   :key="edge.id"
                   class="flex items-center gap-2 rounded-md border border-border bg-canvas px-3 py-2"
                 >
-                  <span class="font-mono text-xs">{{ edge.type }}</span>
-                  <RouterLink
-                    :to="`/projects/${projectId}/artifacts`"
-                    class="font-mono text-xs hover:underline"
+                  <LTag size="small" :type="lineageTypeBadgeType(edge.type)">
+                    {{ lineageTypeLabel[edge.type] ?? edge.type }}
+                  </LTag>
+                  <template v-if="artifactLink(resolvedChildVersions.get(edge.id)?.artifactId ?? null)">
+                    <RouterLink
+                      :to="artifactLink(resolvedChildVersions.get(edge.id)?.artifactId ?? null)!.to"
+                      class="font-mono text-xs hover:underline"
+                    >
+                      v{{ resolvedChildVersions.get(edge.id)?.versionLabel }}
+                    </RouterLink>
+                  </template>
+                  <span
+                    v-else
+                    class="font-mono text-xs text-fg-tertiary"
+                    :title="edge.childVersionId"
                   >
-                    {{ edge.childVersionId.slice(0, 12) }}…
-                  </RouterLink>
+                    {{ (resolvedChildVersions.get(edge.id)?.versionLabel ?? edge.childVersionId.slice(0, 12)) }}…
+                  </span>
                 </li>
               </ul>
             </LCard>
