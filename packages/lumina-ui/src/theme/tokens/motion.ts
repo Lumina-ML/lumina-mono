@@ -1,21 +1,20 @@
 /**
  * Lumina Design Language — Motion Tokens
- *
  * 所有动画统一使用三档时长 + 标准缓动，避免每个组件自行发挥。
  */
 
 export const duration = {
-  /** 100ms：Hover、Opacity、Scale 等即时反馈 */
-  fast: '100ms',
-  /** 180ms：菜单、Dropdown、Tooltip、Sidebar 展开 */
-  normal: '180ms',
-  /** 240ms：Dialog、Panel、Modal 进入退出 */
-  slow: '240ms',
+  /** 80ms：Hover、Opacity、Scale 等即时反馈 */
+  fast: '80ms',
+  /** 150ms：菜单、Dropdown、Tooltip、Sidebar 展开 */
+  normal: '150ms',
+  /** 220ms：Dialog、Panel、Modal 进入退出 */
+  slow: '220ms',
 } as const;
 
 export const easing = {
-  /** 默认 ease，适合大多数过渡 */
-  default: 'cubic-bezier(0.4, 0, 0.2, 1)',
+  /** 默认 ease-out，收尾利落 */
+  default: 'cubic-bezier(0, 0, 0.2, 1)',
   /** 进入 */
   in: 'cubic-bezier(0.4, 0, 1, 1)',
   /** 退出 */
