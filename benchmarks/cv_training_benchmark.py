@@ -13,6 +13,7 @@ NumPy is optional: image logging is skipped cleanly if it is missing.
 
 import os
 import tempfile
+import uuid
 
 import lumina
 from _common import Timer, check_server, ensure_auth, loss_curve, synthetic_image
@@ -52,7 +53,7 @@ def main() -> None:
         dataset_path = f.name
     dataset = lumina.LuminaArtifact(name="cv-dataset", type="dataset")
     dataset.add_file(dataset_path)
-    dataset_version_id = dataset.save(project=PROJECT, version="v1")["version"]["id"]
+    dataset_version_id = dataset.save(project=PROJECT, version=f"v-{uuid.uuid4().hex[:8]}")["version"]["id"]
 
     train_losses = loss_curve(config["epochs"], start=1.6, floor=0.15)
     best_acc = 0.0

@@ -14,6 +14,7 @@ anywhere the Lumina backend is reachable.
 import math
 import os
 import tempfile
+import uuid
 
 import lumina
 from _common import Timer, check_server, ensure_auth, loss_curve
@@ -59,7 +60,7 @@ def main() -> None:
         dataset_path = f.name
     dataset = lumina.LuminaArtifact(name="llm-sft-dataset", type="dataset")
     dataset.add_file(dataset_path)
-    dataset.save(project=PROJECT, version="v1")
+    dataset.save(project=PROJECT, version=f"v-{uuid.uuid4().hex[:8]}")
 
     total_steps = config["epochs"] * config["steps_per_epoch"]
     global_step = 0

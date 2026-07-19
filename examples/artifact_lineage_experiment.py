@@ -7,6 +7,7 @@ data produced which model.
 
 import os
 import tempfile
+import uuid
 
 import lumina
 
@@ -20,17 +21,20 @@ def _write(content: str, suffix: str) -> str:
 def main():
     os.environ.setdefault("LUMINA_API_URL", "http://localhost:8000")
 
+    # Unique version per run so the example is re-runnable against a persistent DB.
+    version = f"v-{uuid.uuid4().hex[:8]}"
+
     # 1. Upload a dataset artifact.
     dataset = lumina.LuminaArtifact(name="lineage-dataset", type="dataset")
     dataset.add_file(_write("id,label\n1,cat\n2,dog\n", ".csv"))
-    dataset_result = dataset.save(project="demo", version="v1")
+    dataset_result = dataset.save(project="demo", version=version)
     dataset_version_id = dataset_result["version"]["id"]
     print(f"Dataset version: {dataset_version_id}")
 
     # 2. Upload a model artifact trained on that dataset.
     model = lumina.LuminaArtifact(name="lineage-model", type="model")
     model.add_file(_write("fake model weights", ".pt"))
-    model_result = model.save(project="demo", version="v1")
+    model_result = model.save(project="demo", version=version)
     model_version_id = model_result["version"]["id"]
     print(f"Model version: {model_version_id}")
 
