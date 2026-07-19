@@ -21,7 +21,7 @@ function getRootElement(): HTMLElement | null {
   return typeof document === "undefined" ? null : document.documentElement;
 }
 
-function resolveHsl(name: string, alpha?: number): string {
+export function resolveHsl(name: string, alpha?: number): string {
   const root = getRootElement();
   if (!root) return "transparent";
   const raw = getComputedStyle(root).getPropertyValue(name).trim();

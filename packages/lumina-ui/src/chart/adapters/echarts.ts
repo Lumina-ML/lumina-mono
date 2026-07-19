@@ -11,7 +11,7 @@ import type {
   ChartTooltip,
 } from "../types";
 import type { ChartThemeColors } from "../theme";
-import { getChartThemeColors } from "../theme";
+import { getChartThemeColors, resolveHsl } from "../theme";
 
 const DEFAULT_SAMPLING_THRESHOLD = 2_000;
 const DEFAULT_LARGE_THRESHOLD = 20_000;
@@ -179,8 +179,8 @@ function buildDataZoom(dz: ChartDataZoom, theme: ChartThemeColors): DataZoomComp
       bottom: 0,
       height: 20,
       borderColor: "transparent",
-      fillerColor: theme.palette[0] ? `${theme.palette[0]}33` : undefined,
-      handleStyle: { color: theme.palette[0] },
+      fillerColor: resolveHsl("--primary", 0.2),
+      handleStyle: { color: resolveHsl("--primary") },
       textStyle: { color: theme.mutedTextColor },
     } as DataZoomComponentOption;
   }
