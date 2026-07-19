@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "jsx": "react-jsx",
+    "jsx": "preserve",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
@@ -12,14 +12,14 @@
     "isolatedModules": true,
     "noEmit": true,
     "allowSyntheticDefaultImports": true,
-    "baseUrl": ".",
+    "types": ["node"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@vuepress/client": ["./node_modules/@vuepress/client/index.d.ts"],
+      "@/*": ["./docs/.vuepress/*"]
     }
   },
   "include": [
-    "rspress.config.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx"
+    "docs/.vuepress/**/*.ts",
+    "docs/.vuepress/**/*.vue"
   ]
 }

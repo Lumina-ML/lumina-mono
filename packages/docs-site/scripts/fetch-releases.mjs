@@ -1,22 +1,25 @@
 #!/usr/bin/env node
 /**
  * Fetch the latest GitHub releases for Lumina and write them to
- * `docs/.releases.json` so the docs build is fully reproducible offline
- * once the JSON has been generated.
+ * `docs/.vuepress/public/releases.json` so the docs build is fully
+ * reproducible offline once the JSON has been generated.
  *
  * Usage:
  *   node scripts/fetch-releases.mjs                # default 6 releases
  *   LUMINA_REPO=other-org/lumina node scripts/fetch-releases.mjs
  *   LUMINA_RELEASES=20 node scripts/fetch-releases.mjs
  */
-import { writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir, copyFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = process.env.LUMINA_REPO ?? "Lumina-ML/lumina";
 const COUNT = Number.parseInt(process.env.LUMINA_RELEASES ?? "6", 10);
-const OUTPUT = path.resolve(__dirname, "../docs/.releases.json");
+const PUBLIC_DIR = path.resolve(__dirname, "../docs/.vuepress/public");
+const OUTPUT = path.join(PUBLIC_DIR, "releases.json");
+const ICON_SRC = path.resolve(__dirname, "../../../apps/dashboard/public/Lumina-Ml.png");
+const ICON_DEST = path.join(PUBLIC_DIR, "Lumina-Ml.png");
 
 const FALLBACK = {
   repo: REPO,
@@ -82,13 +85,29 @@ async function fetchReleases() {
   }
 }
 
+async function copyIcon() {
+  try {
+    await copyFile(ICON_SRC, ICON_DEST);
+    console.log(`[releases] copied Lumina-Ml.png into public/`);
+  } catch (err) {
+    if ((err).code === "ENOENT") {
+      console.warn(`[releases] icon source missing at ${ICON_SRC}; skipping copy`);
+    } else {
+      throw err;
+    }
+  }
+}
+
 async function main() {
+  await mkdir(PUBLIC_DIR, { recursive: true });
+
   const payload = await fetchReleases();
-  await mkdir(path.dirname(OUTPUT), { recursive: true });
   await writeFile(OUTPUT, JSON.stringify(payload, null, 2) + "\n", "utf-8");
   console.log(
     `[releases] wrote ${payload.releases.length} entries to ${path.relative(process.cwd(), OUTPUT)}`,
   );
+
+  await copyIcon();
 }
 
 main().catch((err) => {

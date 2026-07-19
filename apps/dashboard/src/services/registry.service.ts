@@ -11,12 +11,13 @@ import type { PaginatedResponse } from "@/types/project";
 export const RegistryService = {
   list(params?: ListRegistryModelsQuery): Promise<PaginatedResponse<RegistryModel>> {
     // Server mounts `GET /api/v1/projects/:projectId/registry-models` for
-    // project-scoped listing; falls back to `/registry-models` when no
-    // projectId is supplied (no global list route today, see gap report).
+    // project-scoped listing. When a projectId is supplied we route
+    // there; otherwise we fall back to the (not-yet-shipped) global
+    // endpoint. Today this 404s — flagged in docs/SDK-Server-FE-Gap.md.
     const { projectId, ...rest } = params ?? {};
     const path = projectId
       ? `/api/v1/projects/${projectId}/registry-models`
-      : `/api/v1/projects/_/registry-models`;
+      : `/api/v1/registry-models`;
     return fetchApi(path, { params: rest });
   },
 
