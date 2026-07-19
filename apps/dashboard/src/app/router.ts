@@ -2,10 +2,18 @@ import { createRouter, createWebHistory } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import ProjectWorkspaceLayout from "@/modules/project/layouts/ProjectWorkspaceLayout.vue";
 import SettingsLayout from "@/modules/workspace/layouts/SettingsLayout.vue";
+import { useAuthStore } from "@/stores/auth";
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    // Auth — outside AppLayout so logged-out users never see the chrome.
+    {
+      path: "/login",
+      name: "Login",
+      component: () => import("@/modules/auth/pages/LoginPage.vue"),
+      meta: { public: true },
+    },
     {
       path: "/",
       component: AppLayout,
@@ -204,8 +212,25 @@ const router = createRouter({
       path: "/:pathMatch(.*)*",
       name: "NotFound",
       component: () => import("@/components/NotFound.vue"),
+      meta: { public: true },
     },
   ],
+});
+
+/**
+ * Global guard. Routes marked `meta.public = true` (login, 404) skip
+ * the check. Everything else requires an API key; missing key redirects
+ * to /login with a `?redirect=…` hint so the user lands back where they
+ * were after sign-in.
+ */
+router.beforeEach((to) => {
+  if (to.meta.public) return true;
+  const auth = useAuthStore();
+  if (auth.isAuthenticated) return true;
+  return {
+    name: "Login",
+    query: { redirect: to.fullPath },
+  };
 });
 
 export { router };

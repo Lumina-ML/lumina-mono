@@ -31,8 +31,8 @@ defineProps<Props>();
   /* Mobile-first：小屏更紧凑 */
   --n-padding-left: 16px;
   --n-padding-right: 16px;
-  --n-padding-top: 16px;
-  --n-padding-bottom: 16px;
+  --n-padding-top: 8px;
+  --n-padding-bottom: 8px;
 }
 
 @media (min-width: 768px) {
