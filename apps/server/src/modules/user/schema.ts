@@ -15,6 +15,10 @@ export const GenerateApiKeySchema = z.object({
   apiKey: z.string().min(8).max(256),
 });
 
+export const RotateKeyByEmailParamsSchema = z.object({
+  email: z.string().email(),
+});
+
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 export type UpdateUserInput = z.infer<typeof UpdateUserSchema>;
 export type GenerateApiKeyInput = z.infer<typeof GenerateApiKeySchema>;

@@ -47,10 +47,35 @@ const serverConfigSchema = z.object({
   // via `LUMINA_DASHBOARD_URL` when the dashboard sits behind a reverse
   // proxy or runs on a different port.
   dashboardUrl: z.string().url().optional(),
+
+  // Self-service API-key recovery ("Forgot key?"). This is the ONLY
+  // unauthenticated endpoint that hands out a live key, so it's gated by
+  // an explicit allowlist: only emails listed here can rotate their key
+  // without a bearer token. Empty (the default) disables the endpoint
+  // entirely — every request 404s. Set via a comma-separated
+  // `LUMINA_ROTATE_KEY_EMAILS` (e.g. "admin@acme.com,ops@acme.com").
+  rotateKeyEmails: z
+    .array(z.string().email())
+    .default([]),
 });
 
 export type ServerConfig = z.infer<typeof serverConfigSchema>;
 export type StorageType = z.infer<typeof storageTypeSchema>;
+
+/**
+ * Split a comma-separated env value into a normalized (trimmed, lowercased,
+ * de-duplicated, blank-filtered) list of emails. Lowercasing here means the
+ * allowlist check downstream is case-insensitive.
+ */
+function parseEmailList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  const seen = new Set<string>();
+  for (const part of raw.split(",")) {
+    const email = part.trim().toLowerCase();
+    if (email) seen.add(email);
+  }
+  return [...seen];
+}
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): ServerConfig {
   const parsed = serverConfigSchema.safeParse({
@@ -78,6 +103,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     s3ForcePathStyle: env.S3_FORCE_PATH_STYLE,
     defaultWorkspaceId: env.LUMINA_DEFAULT_WORKSPACE_ID,
     dashboardUrl: env.LUMINA_DASHBOARD_URL,
+    rotateKeyEmails: parseEmailList(env.LUMINA_ROTATE_KEY_EMAILS),
   });
 
   if (!parsed.success) {
