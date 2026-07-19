@@ -33,6 +33,11 @@ import { useDateFormat } from "@/composables/useDateFormat";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
 import QueueRow from "@/modules/launch/pages/QueueRow.vue";
 
+// When `projectId` is passed (e.g. from ProjectLaunch), the monitor locks to
+// that project and hides the project picker. Standalone at /launch it's
+// undefined and the picker drives `effectiveProjectId`.
+const props = defineProps<{ projectId?: string }>();
+
 const toast = useToast();
 const queryClient = useQueryClient();
 const { formatDate } = useDateFormat();
@@ -56,6 +61,7 @@ useRealtimeSubscription(
 );
 
 const effectiveProjectId = computed(() => {
+  if (props.projectId) return props.projectId;
   if (selectedProjectId.value) return selectedProjectId.value;
   return projects.value?.items?.[0]?.id;
 });
@@ -276,6 +282,7 @@ function submitEnqueue() {
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <LSelect
+          v-if="!projectId"
           v-model:value="selectedProjectId"
           :options="projectOptions"
           placeholder="Pick a project"
