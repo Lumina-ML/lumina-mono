@@ -1,19 +1,46 @@
-import type { PrismaClient } from "../../generated/prisma/index.js";
+import type { TimeSeriesStorage } from "../../core/storage/time-series-storage.js";
 import type { LogSystemMetricsInput } from "./schema.js";
-import { SystemMetricRepository } from "./repository.js";
 
 export class SystemMetricService {
-  private readonly repository: SystemMetricRepository;
-
-  constructor(prisma: PrismaClient) {
-    this.repository = new SystemMetricRepository(prisma);
-  }
+  constructor(private readonly storage: TimeSeriesStorage) {}
 
   async log(runId: string, projectId: string, data: LogSystemMetricsInput) {
-    return this.repository.createMany(runId, projectId, data);
+    const now = new Date();
+    const rows = data.metrics.map((m) => ({
+      runId,
+      projectId,
+      key: m.key,
+      step: m.step,
+      value: m.value,
+      loggedAt: now,
+    }));
+    await this.storage.insertBatch("system_metric", rows);
   }
 
   async list(runId: string, params: { keys?: string[]; limit: number }) {
-    return this.repository.list(runId, params);
+    const rows = await this.storage.query("system_metric", {
+      runId,
+      limit: params.limit,
+    });
+
+    const allowed = params.keys && params.keys.length > 0 ? new Set(params.keys) : null;
+    const grouped: Record<
+      string,
+      Array<{ step: number; value: number; loggedAt: string }>
+    > = {};
+    for (const row of rows) {
+      const key = String(row.key);
+      if (allowed && !allowed.has(key)) continue;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push({
+        step: Number(row.step ?? 0),
+        value: Number(row.value),
+        loggedAt: (row.loggedAt instanceof Date ? row.loggedAt : new Date(row.loggedAt as string)).toISOString(),
+      });
+    }
+    for (const arr of Object.values(grouped)) {
+      arr.sort((a, b) => a.step - b.step);
+    }
+    return { runId, metrics: grouped };
   }
 }

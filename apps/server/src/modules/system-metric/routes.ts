@@ -4,7 +4,7 @@ import { SystemMetricHandler } from "./handler.js";
 import { RunService } from "../run/service.js";
 
 export async function systemMetricRoutes(app: FastifyInstance) {
-  const systemMetricService = new SystemMetricService(app.prisma);
+  const systemMetricService = new SystemMetricService(app.timeSeriesStorage);
   const runService = new RunService(app.prisma);
   const handler = new SystemMetricHandler(systemMetricService, runService);
 
