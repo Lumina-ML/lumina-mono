@@ -84,6 +84,61 @@ export class ClickHouseTraceStorage implements TraceStorage {
     return rows.map((r) => this.parseTraceRow(r));
   }
 
+  async listTracesPaginated(
+    options: TraceQueryOptions,
+  ): Promise<{ items: TraceRow[]; total: number }> {
+    const conditions: string[] = [];
+    const params: Record<string, unknown> = {
+      limit: options.limit ?? 100,
+      offset: options.offset ?? 0,
+    };
+    if (options.projectId !== undefined) {
+      conditions.push(`projectId = {projectId:String}`);
+      params.projectId = options.projectId;
+    }
+    if (options.runId !== undefined) {
+      conditions.push(`runId = {runId:String}`);
+      params.runId = options.runId;
+    }
+    if (options.traceId !== undefined) {
+      conditions.push(`traceId = {traceId:String}`);
+      params.traceId = options.traceId;
+    }
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const dir = (options.orderByStartedAt ?? "desc").toUpperCase();
+    // Run the page + the count in parallel. ClickHouse's `count()` over the
+    // same predicate returns the unfiltered total, which is what the
+    // dashboard needs to render pagination controls.
+    const [pageResult, countResult] = await Promise.all([
+      this.client.query({
+        query: `
+          SELECT *
+          FROM traces
+          ${where}
+          ORDER BY startedAt ${dir}
+          LIMIT {limit:UInt32}
+          OFFSET {offset:UInt32}
+        `,
+        query_params: params,
+        format: "JSONEachRow",
+      }),
+      this.client.query({
+        query: `SELECT count() AS total FROM traces ${where}`,
+        query_params: params,
+        format: "JSONEachRow",
+      }),
+    ]);
+    const [rows, counts] = await Promise.all([
+      pageResult.json<TraceRowJson>(),
+      countResult.json<{ total: string | number }>(),
+    ]);
+    const total = Number(counts[0]?.total ?? 0);
+    return {
+      items: rows.map((r) => this.parseTraceRow(r)),
+      total,
+    };
+  }
+
   async updateTrace(traceId: string, updates: Partial<TraceRow>): Promise<TraceRow | null> {
     const sets: string[] = [];
     const params: Record<string, unknown> = { traceId };

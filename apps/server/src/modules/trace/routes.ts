@@ -10,6 +10,8 @@ export async function traceRoutes(app: FastifyInstance) {
 
   app.post("/projects/:projectId/traces", handler.createTrace.bind(handler));
   app.get("/projects/:projectId/traces", handler.listTraces.bind(handler));
+  // Workspace-wide list. Accepts `projectId` / `limit` / `offset`.
+  app.get("/traces", handler.listAllTraces.bind(handler));
   app.get("/traces/:traceId", handler.getTrace.bind(handler));
   app.patch("/traces/:traceId", handler.patchTrace.bind(handler));
   app.post("/traces/:traceId/spans", handler.createSpan.bind(handler));

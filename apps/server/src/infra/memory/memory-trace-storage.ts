@@ -40,6 +40,28 @@ export class MemoryTraceStorage implements TraceStorage {
     return filtered.slice(0, options.limit ?? 100).map(cloneTrace);
   }
 
+  async listTracesPaginated(
+    options: TraceQueryOptions,
+  ): Promise<{ items: TraceRow[]; total: number }> {
+    const dir = options.orderByStartedAt ?? "desc";
+    const filtered = this.traces.filter((t) => {
+      if (options.projectId !== undefined && t.projectId !== options.projectId) return false;
+      if (options.runId !== undefined && t.runId !== options.runId) return false;
+      if (options.traceId !== undefined && t.traceId !== options.traceId) return false;
+      return true;
+    });
+    filtered.sort((a, b) =>
+      dir === "asc" ? this.startedAtMs(a) - this.startedAtMs(b) : this.startedAtMs(b) - this.startedAtMs(a),
+    );
+    const total = filtered.length;
+    const offset = options.offset ?? 0;
+    const take = options.limit ?? 100;
+    return {
+      items: filtered.slice(offset, offset + take).map(cloneTrace),
+      total,
+    };
+  }
+
   async updateTrace(traceId: string, updates: Partial<TraceRow>): Promise<TraceRow | null> {
     const idx = this.traces.findIndex((t) => t.traceId === traceId);
     if (idx < 0) return null;

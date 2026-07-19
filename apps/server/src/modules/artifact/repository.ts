@@ -1,9 +1,10 @@
-import type { PrismaClient } from "../../generated/prisma/index.js";
+import type { PrismaClient, Prisma } from "../../generated/prisma/index.js";
 import type {
   CreateArtifactInput,
   CreateArtifactVersionInput,
   CreateArtifactFileInput,
   PatchArtifactVersionInput,
+  ListArtifactsQuery,
 } from "./schema.js";
 import type { Manifest } from "./schema.js";
 
@@ -39,6 +40,30 @@ export class ArtifactRepository {
       where: { projectId },
       orderBy: { createdAt: "desc" },
     });
+  }
+
+  /**
+   * Workspace-wide artifact list with optional projectId / type filters and
+   * paginated `{ items, total }` response. Used by the dashboard's top-level
+   * `/artifacts` (and `/datasets`, when `type="dataset"`) views.
+   *
+   * `where` is built dynamically; mirrors the pattern in
+   * `run/repository.ts:list()`.
+   */
+  async list(params: ListArtifactsQuery) {
+    const where: Prisma.ArtifactWhereInput = {};
+    if (params.projectId) where.projectId = params.projectId;
+    if (params.type) where.type = params.type;
+    const [items, total] = await Promise.all([
+      this.prisma.artifact.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: params.limit,
+        skip: params.offset,
+      }),
+      this.prisma.artifact.count({ where }),
+    ]);
+    return { items, total };
   }
 
   async createVersion(artifactId: string, data: CreateArtifactVersionInput) {

@@ -10,6 +10,8 @@ export async function evaluationRoutes(app: FastifyInstance) {
 
   app.post("/projects/:projectId/evaluations", handler.createEvaluation.bind(handler));
   app.get("/projects/:projectId/evaluations", handler.listEvaluations.bind(handler));
+  // Workspace-wide list. Accepts `projectId` / `limit` / `offset`.
+  app.get("/evaluations", handler.listAllEvaluations.bind(handler));
   app.get("/evaluations/:evaluationId", handler.getEvaluation.bind(handler));
   app.patch("/evaluations/:evaluationId", handler.patchEvaluation.bind(handler));
   app.post("/evaluations/:evaluationId/results", handler.createResult.bind(handler));

@@ -3,6 +3,7 @@ import type {
   CreateEvaluationInput,
   CreateEvaluationResultInput,
   PatchEvaluationInput,
+  ListEvaluationsQuery,
 } from "./schema.js";
 import { EvaluationRepository } from "./repository.js";
 
@@ -23,6 +24,10 @@ export class EvaluationService {
 
   async listByProject(projectId: string) {
     return this.repository.listByProject(projectId);
+  }
+
+  async list(params: ListEvaluationsQuery) {
+    return this.repository.list(params);
   }
 
   async updateEvaluation(id: string, data: PatchEvaluationInput) {

@@ -51,6 +51,29 @@ export class PrismaTraceStorage implements TraceStorage {
     return traces.map((t) => this.toTraceRow(t));
   }
 
+  async listTracesPaginated(
+    options: TraceQueryOptions,
+  ): Promise<{ items: TraceRow[]; total: number }> {
+    const where: Record<string, unknown> = {};
+    if (options.projectId !== undefined) where.projectId = options.projectId;
+    if (options.runId !== undefined) where.runId = options.runId;
+    const take = options.limit ?? 100;
+    const skip = options.offset ?? 0;
+    const [traces, total] = await Promise.all([
+      this.prisma.trace.findMany({
+        where,
+        orderBy: { startedAt: options.orderByStartedAt ?? "desc" },
+        take,
+        skip,
+      }),
+      this.prisma.trace.count({ where }),
+    ]);
+    return {
+      items: traces.map((t) => this.toTraceRow(t)),
+      total,
+    };
+  }
+
   async updateTrace(traceId: string, updates: Partial<TraceRow>): Promise<TraceRow | null> {
     const data: Record<string, unknown> = {};
     if (updates.status !== undefined) data.status = updates.status;

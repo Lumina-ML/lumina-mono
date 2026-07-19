@@ -1,5 +1,9 @@
-import type { PrismaClient } from "../../generated/prisma/index.js";
-import type { CreateSweepInput, UpdateSweepInput } from "./schema.js";
+import type { PrismaClient, Prisma } from "../../generated/prisma/index.js";
+import type {
+  CreateSweepInput,
+  UpdateSweepInput,
+  ListSweepsQuery,
+} from "./schema.js";
 
 export class SweepRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -27,6 +31,26 @@ export class SweepRepository {
       where: { projectId },
       orderBy: { createdAt: "desc" },
     });
+  }
+
+  /**
+   * Workspace-wide sweep list with optional `projectId` filter and paginated
+   * `{ items, total }` response. Mirrors `run/repository.ts:list()` and is
+   * consumed by the dashboard's `/sweeps` top-level view.
+   */
+  async list(params: ListSweepsQuery) {
+    const where: Prisma.SweepWhereInput = {};
+    if (params.projectId) where.projectId = params.projectId;
+    const [items, total] = await Promise.all([
+      this.prisma.sweep.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: params.limit,
+        skip: params.offset,
+      }),
+      this.prisma.sweep.count({ where }),
+    ]);
+    return { items, total };
   }
 
   async update(id: string, data: UpdateSweepInput) {

@@ -47,6 +47,11 @@ export interface TraceQueryOptions {
   traceId?: string;
   runId?: string;
   limit?: number;
+  /**
+   * Page offset for paginated lists. Only honoured by
+   * `listTracesPaginated`; the older `listTraces` path is single-shot.
+   */
+  offset?: number;
   orderByStartedAt?: "asc" | "desc";
 }
 
@@ -63,6 +68,12 @@ export interface TraceStorage {
   insertTrace(row: TraceRow): Promise<void>;
   findTrace(traceId: string): Promise<TraceRow | null>;
   listTraces(options: TraceQueryOptions): Promise<TraceRow[]>;
+  /**
+   * Paginated trace list. Returns `{ items, total }` so the workspace-wide
+   * `/traces` endpoint can paginate without an extra count round trip.
+   * When `projectId` is omitted, returns across every project.
+   */
+  listTracesPaginated(options: TraceQueryOptions): Promise<{ items: TraceRow[]; total: number }>;
   updateTrace(traceId: string, updates: Partial<TraceRow>): Promise<TraceRow | null>;
 
   // Span operations

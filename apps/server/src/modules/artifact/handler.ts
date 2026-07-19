@@ -7,6 +7,7 @@ import {
   PatchArtifactVersionSchema,
   CreateArtifactFileSchema,
   AttachLineageSchema,
+  ListArtifactsQuerySchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
 
@@ -40,6 +41,17 @@ export class ArtifactHandler {
     const { projectId } = ProjectParamsSchema.parse(req.params);
     const artifacts = await this.artifactService.listArtifactsByProject(projectId);
     reply.send({ items: artifacts });
+  }
+
+  /**
+   * Workspace-wide artifact list. Backed by `GET /artifacts`. Mirrors the
+   * pagination shape of `/runs` (`{ items, total }`) so the dashboard's
+   * top-level Artifacts / Datasets views share the same wire contract.
+   */
+  async listAllArtifacts(req: FastifyRequest, reply: FastifyReply) {
+    const query = ListArtifactsQuerySchema.parse(req.query);
+    const result = await this.artifactService.listArtifacts(query);
+    reply.send(result);
   }
 
   async getArtifact(req: FastifyRequest, reply: FastifyReply) {

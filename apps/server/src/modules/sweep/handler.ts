@@ -6,6 +6,7 @@ import {
   UpdateSweepSchema,
   SuggestRequestSchema,
   ShouldTerminateRequestSchema,
+  ListSweepsQuerySchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
 import { RunService } from "../run/service.js";
@@ -36,6 +37,17 @@ export class SweepHandler {
     const { projectId } = ProjectParamsSchema.parse(req.params);
     const sweeps = await this.sweepService.listByProject(projectId);
     reply.send({ items: sweeps });
+  }
+
+  /**
+   * Workspace-wide sweep list. Backed by `GET /sweeps`. Same wire shape as
+   * `/runs` (`{ items, total }`) so the dashboard's top-level Sweeps view
+   * can paginate without extra plumbing.
+   */
+  async listAll(req: FastifyRequest, reply: FastifyReply) {
+    const query = ListSweepsQuerySchema.parse(req.query);
+    const result = await this.sweepService.list(query);
+    reply.send(result);
   }
 
   async getById(req: FastifyRequest, reply: FastifyReply) {

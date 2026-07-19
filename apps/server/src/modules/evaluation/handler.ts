@@ -5,6 +5,7 @@ import {
   CreateEvaluationSchema,
   CreateEvaluationResultSchema,
   PatchEvaluationSchema,
+  ListEvaluationsQuerySchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
 
@@ -33,6 +34,18 @@ export class EvaluationHandler {
     const { projectId } = ProjectParamsSchema.parse(req.params);
     const evaluations = await this.evaluationService.listByProject(projectId);
     reply.send({ items: evaluations });
+  }
+
+  /**
+   * Workspace-wide evaluation list. Backed by `GET /evaluations`. Returns
+   * the same `{ items, total }` shape used by `/runs` and `/projects`, but
+   * without the heavy nested `include` from `listByProject` (detail routes
+   * still return that).
+   */
+  async listAllEvaluations(req: FastifyRequest, reply: FastifyReply) {
+    const query = ListEvaluationsQuerySchema.parse(req.query);
+    const result = await this.evaluationService.list(query);
+    reply.send(result);
   }
 
   async getEvaluation(req: FastifyRequest, reply: FastifyReply) {

@@ -10,6 +10,8 @@ export async function reportRoutes(app: FastifyInstance) {
 
   app.post("/projects/:projectId/reports", handler.createReport.bind(handler));
   app.get("/projects/:projectId/reports", handler.listReports.bind(handler));
+  // Workspace-wide list. Accepts `projectId` / `limit` / `offset`.
+  app.get("/reports", handler.listAllReports.bind(handler));
   app.get("/reports/:reportId", handler.getReport.bind(handler));
   app.patch("/reports/:reportId", handler.patchReport.bind(handler));
   app.delete("/reports/:reportId", handler.deleteReport.bind(handler));
