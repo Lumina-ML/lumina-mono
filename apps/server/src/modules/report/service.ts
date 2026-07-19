@@ -1,5 +1,9 @@
 import type { PrismaClient } from "../../generated/prisma/index.js";
-import type { CreateReportInput, PatchReportInput } from "./schema.js";
+import type {
+  CreateReportInput,
+  PatchReportInput,
+  ListReportsQuery,
+} from "./schema.js";
 import { ReportRepository } from "./repository.js";
 
 export class ReportService {
@@ -19,6 +23,10 @@ export class ReportService {
 
   async listByProject(projectId: string) {
     return this.repository.listByProject(projectId);
+  }
+
+  async list(params: ListReportsQuery) {
+    return this.repository.list(params);
   }
 
   async updateReport(id: string, data: PatchReportInput) {

@@ -8,7 +8,10 @@ export const WorkspaceRoleSchema = z.enum([
 ]);
 
 export const CreateWorkspaceMembershipSchema = z.object({
-  workspaceId: z.string().uuid(),
+  // Workspace.id is a String (not a UUID) — the bootstrap seed uses the
+  // literal id "default", and future custom workspaces may use slug ids
+  // too. Accept any non-empty identifier up to 64 chars.
+  workspaceId: z.string().min(1).max(64),
   userId: z.string().uuid(),
   role: WorkspaceRoleSchema.default("member"),
 });

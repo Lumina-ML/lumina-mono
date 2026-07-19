@@ -5,6 +5,7 @@ import {
   CreateEvaluationSchema,
   CreateEvaluationResultSchema,
   PatchEvaluationSchema,
+  ListEvaluationsQuerySchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
 
@@ -35,6 +36,18 @@ export class EvaluationHandler {
     reply.send({ items: evaluations });
   }
 
+  /**
+   * Workspace-wide evaluation list. Backed by `GET /evaluations`. Returns
+   * the same `{ items, total }` shape used by `/runs` and `/projects`, but
+   * without the heavy nested `include` from `listByProject` (detail routes
+   * still return that).
+   */
+  async listAllEvaluations(req: FastifyRequest, reply: FastifyReply) {
+    const query = ListEvaluationsQuerySchema.parse(req.query);
+    const result = await this.evaluationService.list(query);
+    reply.send(result);
+  }
+
   async getEvaluation(req: FastifyRequest, reply: FastifyReply) {
     const { evaluationId } = EvaluationParamsSchema.parse(req.params);
     const evaluation = await this.evaluationService.findById(evaluationId);
@@ -57,5 +70,15 @@ export class EvaluationHandler {
     const data = CreateEvaluationResultSchema.parse(req.body);
     const result = await this.evaluationService.createResult(evaluationId, data);
     reply.status(201).send(result);
+  }
+
+  async listResults(req: FastifyRequest, reply: FastifyReply) {
+    const { evaluationId } = EvaluationParamsSchema.parse(req.params);
+    const results = await this.evaluationService.listResults(evaluationId);
+    if (results === null) {
+      reply.status(404).send({ error: "Evaluation not found" });
+      return;
+    }
+    reply.send({ items: results });
   }
 }

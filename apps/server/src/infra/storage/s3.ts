@@ -28,6 +28,17 @@ export class S3ObjectStorage implements ObjectStorage {
         accessKeyId: config.accessKeyId,
         secretAccessKey: config.secretAccessKey,
       },
+      // Fail fast on a wrong/unreachable endpoint (e.g. an override that
+      // points at a host LAN IP the container can't see). The SDK's
+      // default 30s request timeout otherwise cascades into Fastify's
+      // 10s plugin timeout and produces an opaque
+      // `Plugin did not start in time: 'storage-auto-3'` error. Five
+      // seconds is generous for MinIO/real-S3 in-cluster; bump if you
+      // ever point this across a slow link.
+      requestHandler: {
+        requestTimeout: 5_000,
+        connectionTimeout: 2_000,
+      },
     };
     if (config.endpoint) {
       clientConfig.endpoint = config.endpoint;

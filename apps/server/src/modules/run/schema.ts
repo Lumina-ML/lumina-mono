@@ -12,7 +12,10 @@ export const RunStatusSchema = z.enum([
 
 export const CreateRunSchema = z.object({
   project: z.string().min(1).max(128),
-  name: z.string().min(1).max(256),
+  // Name is optional so SDK calls like `lumina.init(project="foo")` (no
+  // explicit name) succeed. The repository assigns a generated slug when
+  // the field is missing or empty.
+  name: z.string().min(1).max(256).optional(),
   sweepId: z.string().uuid().optional(),
   config: z.record(z.unknown()).default({}),
   metadata: z.record(z.unknown()).default({}),
@@ -22,7 +25,10 @@ export const UpdateRunSchema = z.object({
   status: RunStatusSchema.optional(),
   config: z.record(z.unknown()).optional(),
   summary: z.record(z.unknown()).optional(),
-  notes: z.string().optional(),
+  // `null` is accepted so the dashboard can clear existing notes via PATCH.
+  // The repository treats `undefined` as "leave unchanged" and any other
+  // value (including `null` / `""`) as an explicit write.
+  notes: z.string().nullable().optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 

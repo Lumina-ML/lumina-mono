@@ -6,6 +6,7 @@ import {
   PatchTraceSchema,
   CreateSpanSchema,
   PatchSpanSchema,
+  ListTracesQuerySchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
 
@@ -35,6 +36,18 @@ export class TraceHandler {
     const { projectId } = ProjectParamsSchema.parse(req.params);
     const traces = await this.traceService.listByProject(projectId);
     reply.send({ items: traces });
+  }
+
+  /**
+   * Workspace-wide paginated trace list. Backed by `GET /traces`. Mirrors
+   * the `{ items, total }` shape used by `/runs` and `/projects`. Pagination
+   * happens in the underlying `TraceStorage` so both Postgres and
+   * ClickHouse backends can honour `limit` / `offset` consistently.
+   */
+  async listAllTraces(req: FastifyRequest, reply: FastifyReply) {
+    const query = ListTracesQuerySchema.parse(req.query);
+    const result = await this.traceService.list(query);
+    reply.send(result);
   }
 
   async getTrace(req: FastifyRequest, reply: FastifyReply) {
@@ -69,6 +82,21 @@ export class TraceHandler {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.startsWith("Trace not found") || msg.startsWith("Parent span not found")) {
+        reply.status(404).send({ error: msg });
+        return;
+      }
+      throw err;
+    }
+  }
+
+  async listSpans(req: FastifyRequest, reply: FastifyReply) {
+    const { traceId } = TraceParamsSchema.parse(req.params);
+    try {
+      const spans = await this.traceService.listSpansByTrace(traceId);
+      reply.send({ items: spans });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.startsWith("Trace not found")) {
         reply.status(404).send({ error: msg });
         return;
       }

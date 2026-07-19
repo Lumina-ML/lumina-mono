@@ -5,6 +5,7 @@ import type {
   PatchTraceInput,
   CreateSpanInput,
   PatchSpanInput,
+  ListTracesQuery,
 } from "./schema.js";
 import { TraceRepository } from "./repository.js";
 
@@ -26,6 +27,10 @@ export class TraceService {
 
   async listByProject(projectId: string): Promise<TraceRow[]> {
     return this.repository.listByProject(projectId);
+  }
+
+  async list(params: ListTracesQuery) {
+    return this.repository.list(params);
   }
 
   async updateTrace(traceId: string, data: PatchTraceInput): Promise<TraceRow | null> {
@@ -53,6 +58,14 @@ export class TraceService {
       }
     }
     return this.repository.createSpan(traceId, { ...data, spanId, parentSpanId: data.parentSpanId });
+  }
+
+  async listSpansByTrace(traceId: string): Promise<SpanRow[]> {
+    const trace = await this.repository.findByTraceId(traceId);
+    if (!trace) {
+      throw new Error(`Trace not found: ${traceId}`);
+    }
+    return trace.spans;
   }
 
   async findSpanById(spanId: string): Promise<SpanRow | null> {

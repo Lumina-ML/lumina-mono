@@ -3,6 +3,7 @@ import type {
   CreateEvaluationInput,
   CreateEvaluationResultInput,
   PatchEvaluationInput,
+  ListEvaluationsQuery,
 } from "./schema.js";
 import { EvaluationRepository } from "./repository.js";
 
@@ -25,11 +26,23 @@ export class EvaluationService {
     return this.repository.listByProject(projectId);
   }
 
+  async list(params: ListEvaluationsQuery) {
+    return this.repository.list(params);
+  }
+
   async updateEvaluation(id: string, data: PatchEvaluationInput) {
     return this.repository.updateEvaluation(id, data);
   }
 
   async createResult(evaluationId: string, data: CreateEvaluationResultInput) {
     return this.repository.createResult(evaluationId, data);
+  }
+
+  async listResults(evaluationId: string) {
+    const evaluation = await this.repository.findById(evaluationId);
+    if (!evaluation) {
+      return null;
+    }
+    return evaluation.results ?? [];
   }
 }

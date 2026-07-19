@@ -82,3 +82,18 @@ export type CreateArtifactFileInput = z.infer<typeof CreateArtifactFileSchema>;
 export type AttachLineageInput = z.infer<typeof AttachLineageSchema>;
 export type Manifest = z.infer<typeof ManifestSchema>;
 export type ManifestEntry = z.infer<typeof ManifestEntrySchema>;
+
+/**
+ * Workspace-wide (cross-project) artifact list. Mirrors the shape used by
+ * `/projects/:projectId/artifacts` but accepts an optional `projectId` /
+ * `type` filter so the dashboard's top-level Artifacts/Datasets views can
+ * page through everything in one request.
+ */
+export const ListArtifactsQuerySchema = z.object({
+  projectId: z.string().uuid().optional(),
+  type: ArtifactTypeSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type ListArtifactsQuery = z.infer<typeof ListArtifactsQuerySchema>;

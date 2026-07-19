@@ -2,10 +2,18 @@ import { createRouter, createWebHistory } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import ProjectWorkspaceLayout from "@/modules/project/layouts/ProjectWorkspaceLayout.vue";
 import SettingsLayout from "@/modules/workspace/layouts/SettingsLayout.vue";
+import { useAuthStore } from "@/stores/auth";
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    // Auth — outside AppLayout so logged-out users never see the chrome.
+    {
+      path: "/login",
+      name: "Login",
+      component: () => import("@/modules/auth/pages/LoginPage.vue"),
+      meta: { public: true },
+    },
     {
       path: "/",
       component: AppLayout,
@@ -164,15 +172,24 @@ const router = createRouter({
           ],
         },
 
-        // ─── Backward-compatible aliases ────────────────────────────────
-        // Old global list paths collapse to projects (ProjectList shows all).
+        // ─── Workspace-wide (cross-project) views ─────────────────────
+        // Top-level sweeps/artifacts/traces/etc. routes show a "coming
+        // soon" stub pointing users to the project-scoped versions,
+        // which are fully implemented under `/projects/:projectId/...`.
+        {
+          path: "datasets",
+          name: "GlobalDatasets",
+          component: () => import("@/pages/GlobalDatasets.vue"),
+        },
         {
           path: "sweeps",
-          redirect: "/projects",
+          name: "GlobalSweeps",
+          component: () => import("@/pages/GlobalSweeps.vue"),
         },
         {
           path: "artifacts",
-          redirect: "/projects",
+          name: "GlobalArtifacts",
+          component: () => import("@/pages/GlobalArtifacts.vue"),
         },
         {
           path: "registry",
@@ -180,15 +197,18 @@ const router = createRouter({
         },
         {
           path: "evaluations",
-          redirect: "/projects",
+          name: "GlobalEvaluations",
+          component: () => import("@/pages/GlobalEvaluations.vue"),
         },
         {
           path: "traces",
-          redirect: "/projects",
+          name: "GlobalTraces",
+          component: () => import("@/pages/GlobalTraces.vue"),
         },
         {
           path: "reports",
-          redirect: "/projects",
+          name: "GlobalReports",
+          component: () => import("@/pages/GlobalReports.vue"),
         },
         // Legacy run detail: fetch the run to learn its projectId, then
         // redirect to the canonical /projects/:id/runs/:runId URL.
@@ -204,8 +224,25 @@ const router = createRouter({
       path: "/:pathMatch(.*)*",
       name: "NotFound",
       component: () => import("@/components/NotFound.vue"),
+      meta: { public: true },
     },
   ],
+});
+
+/**
+ * Global guard. Routes marked `meta.public = true` (login, 404) skip
+ * the check. Everything else requires an API key; missing key redirects
+ * to /login with a `?redirect=…` hint so the user lands back where they
+ * were after sign-in.
+ */
+router.beforeEach((to) => {
+  if (to.meta.public) return true;
+  const auth = useAuthStore();
+  if (auth.isAuthenticated) return true;
+  return {
+    name: "Login",
+    query: { redirect: to.fullPath },
+  };
 });
 
 export { router };

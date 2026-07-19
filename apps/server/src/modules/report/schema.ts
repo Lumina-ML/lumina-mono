@@ -16,3 +16,16 @@ export const PatchReportSchema = z.object({
 
 export type CreateReportInput = z.infer<typeof CreateReportSchema>;
 export type PatchReportInput = z.infer<typeof PatchReportSchema>;
+
+/**
+ * Workspace-wide (cross-project) report list. Mirrors the shape used by
+ * `/projects/:projectId/reports` but accepts an optional `projectId` filter
+ * so the dashboard's top-level Reports view can page through everything.
+ */
+export const ListReportsQuerySchema = z.object({
+  projectId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type ListReportsQuery = z.infer<typeof ListReportsQuerySchema>;

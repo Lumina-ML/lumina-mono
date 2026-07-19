@@ -2,6 +2,19 @@ import { fetchApi } from "./api";
 import type { Sweep, CreateSweepInput, UpdateSweepInput, ListSweepsQuery } from "@/types/sweep";
 import type { PaginatedResponse } from "@/types/project";
 
+export interface SweepObservation {
+  runId: string;
+  params: Record<string, unknown>;
+  metric: number | null;
+  status: string;
+  createdAt: string;
+}
+
+export interface SweepSuggestResponse {
+  /** Server returns `{ candidates: [{...param}, ...] }`. */
+  candidates: Array<Record<string, unknown>>;
+}
+
 export const SweepService = {
   list(params?: ListSweepsQuery): Promise<PaginatedResponse<Sweep>> {
     const { projectId, ...rest } = params ?? {};
@@ -28,5 +41,36 @@ export const SweepService = {
 
   delete(sweepId: string): Promise<void> {
     return fetchApi(`/api/v1/sweeps/${sweepId}`, { method: "DELETE" });
+  },
+
+  listObservations(sweepId: string): Promise<SweepObservation[]> {
+    return fetchApi(`/api/v1/sweeps/${sweepId}/observations`);
+  },
+
+  suggest(sweepId: string): Promise<SweepSuggestResponse> {
+    return fetchApi(`/api/v1/sweeps/${sweepId}/suggest`, {
+      method: "POST",
+      body: {},
+    });
+  },
+
+  shouldTerminate(
+    sweepId: string,
+    payload: { runId: string; step: number; metric: number },
+  ): Promise<{ shouldTerminate: boolean; reason?: string }> {
+    return fetchApi(`/api/v1/sweeps/${sweepId}/should-terminate`, {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  recordBestRun(
+    sweepId: string,
+    payload: { runId: string; metric: number; goal?: string },
+  ): Promise<{ bestRunId: string }> {
+    return fetchApi(`/api/v1/sweeps/${sweepId}/record-best`, {
+      method: "POST",
+      body: payload,
+    });
   },
 };

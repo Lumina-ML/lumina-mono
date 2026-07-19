@@ -8,6 +8,7 @@ import type {
   CreateArtifactVersionInput,
   CreateArtifactFileInput,
   PatchArtifactVersionInput,
+  ListArtifactsQuery,
   Manifest,
   ManifestEntry,
 } from "./schema.js";
@@ -37,6 +38,10 @@ export class ArtifactService {
 
   async listArtifactsByProject(projectId: string) {
     return this.repository.listArtifactsByProject(projectId);
+  }
+
+  async listArtifacts(params: ListArtifactsQuery) {
+    return this.repository.list(params);
   }
 
   async createVersion(artifactId: string, data: CreateArtifactVersionInput) {

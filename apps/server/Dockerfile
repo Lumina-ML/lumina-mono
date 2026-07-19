@@ -15,6 +15,11 @@ COPY apps/server ./apps/server
 COPY packages/shared ./packages/shared
 
 RUN pnpm --filter @lumina/server db:generate
+# Wipe any prior dist so the container only ships the freshly compiled
+# output. Without this, stale `dist/index.js` from an earlier build
+# (different tsconfig/rootDir) can shadow the new `dist/src/index.js`
+# the CMD actually points at.
+RUN rm -rf apps/server/dist
 RUN pnpm --filter @lumina/server build
 
 # Production stage
@@ -37,7 +42,10 @@ COPY --from=builder /app/turbo.json ./
 COPY --from=builder /app/apps/server/package.json ./apps/server/
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/apps/server/prisma ./apps/server/prisma
-COPY --from=builder /app/apps/server/src/generated ./apps/server/dist/generated
+# tsc emits the build under `dist/src/...` (rootDir: "./" in tsconfig),
+# so the generated Prisma client lives next to the compiled code, not
+# at the dist root.
+COPY --from=builder /app/apps/server/src/generated ./apps/server/dist/src/generated
 COPY --from=builder /app/packages/shared ./packages/shared
 
 RUN pnpm install --prod --frozen-lockfile
@@ -46,4 +54,4 @@ WORKDIR /app/apps/server
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/src/index.js"]

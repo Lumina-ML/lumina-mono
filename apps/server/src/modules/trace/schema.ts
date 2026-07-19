@@ -49,3 +49,16 @@ export type CreateTraceInput = z.infer<typeof CreateTraceSchema>;
 export type PatchTraceInput = z.infer<typeof PatchTraceSchema>;
 export type CreateSpanInput = z.infer<typeof CreateSpanSchema>;
 export type PatchSpanInput = z.infer<typeof PatchSpanSchema>;
+
+/**
+ * Workspace-wide (cross-project) trace list. Mirrors the shape used by
+ * `/projects/:projectId/traces` but accepts an optional `projectId` filter
+ * so the dashboard's top-level Traces view can page through everything.
+ */
+export const ListTracesQuerySchema = z.object({
+  projectId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type ListTracesQuery = z.infer<typeof ListTracesQuerySchema>;

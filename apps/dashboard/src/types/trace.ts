@@ -22,11 +22,35 @@ export interface Span {
   attributes: Record<string, unknown>;
 }
 
+export type SpanKind =
+  | "llm"
+  | "tool"
+  | "retriever"
+  | "chain"
+  | "agent"
+  | "internal";
+
+export type SpanStatus = "ok" | "error";
+
 export interface CreateTraceInput {
   name: string;
-  startTime?: string;
-  endTime?: string;
+  runId?: string;
+  traceId?: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface PatchTraceInput {
+  status?: "ok" | "error";
+  latencyMs?: number;
+  metadata?: Record<string, unknown>;
+  finishedAt?: string;
+}
+
+export interface PatchSpanInput {
+  status?: SpanStatus;
+  output?: Record<string, unknown>;
+  latencyMs?: number;
+  finishedAt?: string;
 }
 
 export interface ListTracesQuery {

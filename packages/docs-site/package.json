@@ -1,0 +1,29 @@
+{
+  "name": "@lumina/docs-site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lumina documentation site, built with VuePress 2.",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run fetch:releases && vuepress dev docs",
+    "build": "npm run fetch:releases && vuepress build docs",
+    "preview": "vuepress preview docs",
+    "fetch:releases": "node scripts/fetch-releases.mjs",
+    "lint": "echo \"(no lint configured)\"",
+    "typecheck": "vuepress typecheck docs",
+    "clean": "rm -rf docs/.vuepress/{cache,dist,public/Lumina-Ml.png,public/releases.json}"
+  },
+  "dependencies": {
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "@vuepress/bundler-vite": "^2.0.0-rc.24",
+    "@vuepress/client": "^2.0.0-rc.24",
+    "@vuepress/plugin-back-to-top": "^2.0.0-rc.24",
+    "@vuepress/plugin-medium-zoom": "^2.0.0-rc.24",
+    "@vuepress/theme-default": "^2.0.0-rc.24",
+    "typescript": "^5.5.0",
+    "vuepress": "^2.0.0-rc.24"
+  }
+}

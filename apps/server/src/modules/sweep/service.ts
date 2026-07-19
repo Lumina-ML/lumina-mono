@@ -1,5 +1,11 @@
 import type { PrismaClient } from "../../generated/prisma/index.js";
-import type { CreateSweepInput, UpdateSweepInput, SweepConfig, Observation } from "./schema.js";
+import type {
+  CreateSweepInput,
+  UpdateSweepInput,
+  SweepConfig,
+  Observation,
+  ListSweepsQuery,
+} from "./schema.js";
 import { SweepRepository } from "./repository.js";
 import { suggestNext, shouldEarlyTerminate } from "./optimizer.js";
 import type { Prisma } from "../../generated/prisma/index.js";
@@ -24,6 +30,10 @@ export class SweepService {
 
   async listByProject(projectId: string) {
     return this.repository.listByProject(projectId);
+  }
+
+  async list(params: ListSweepsQuery) {
+    return this.repository.list(params);
   }
 
   async update(id: string, data: UpdateSweepInput) {

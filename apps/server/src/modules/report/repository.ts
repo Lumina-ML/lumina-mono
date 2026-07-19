@@ -1,5 +1,9 @@
-import type { PrismaClient } from "../../generated/prisma/index.js";
-import type { CreateReportInput, PatchReportInput } from "./schema.js";
+import type { PrismaClient, Prisma } from "../../generated/prisma/index.js";
+import type {
+  CreateReportInput,
+  PatchReportInput,
+  ListReportsQuery,
+} from "./schema.js";
 
 export class ReportRepository {
   constructor(private readonly prisma: PrismaClient) { }
@@ -26,6 +30,26 @@ export class ReportRepository {
       where: { projectId },
       orderBy: { createdAt: "desc" },
     });
+  }
+
+  /**
+   * Workspace-wide report list with optional `projectId` filter and paginated
+   * `{ items, total }` response. Mirrors `run/repository.ts:list()` and is
+   * consumed by the dashboard's `/reports` top-level view.
+   */
+  async list(params: ListReportsQuery) {
+    const where: Prisma.ReportWhereInput = {};
+    if (params.projectId) where.projectId = params.projectId;
+    const [items, total] = await Promise.all([
+      this.prisma.report.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: params.limit,
+        skip: params.offset,
+      }),
+      this.prisma.report.count({ where }),
+    ]);
+    return { items, total };
   }
 
   async updateReport(id: string, data: PatchReportInput) {

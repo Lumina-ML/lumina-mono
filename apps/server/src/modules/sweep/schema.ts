@@ -86,3 +86,16 @@ export type Parameter = z.infer<typeof ParameterSchema>;
 export type Observation = z.infer<typeof ObservationSchema>;
 export type SuggestRequest = z.infer<typeof SuggestRequestSchema>;
 export type ShouldTerminateRequest = z.infer<typeof ShouldTerminateRequestSchema>;
+
+/**
+ * Workspace-wide (cross-project) sweep list. Mirrors the shape used by
+ * `/projects/:projectId/sweeps` but accepts an optional `projectId` filter
+ * so the dashboard's top-level Sweeps view can page through everything.
+ */
+export const ListSweepsQuerySchema = z.object({
+  projectId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type ListSweepsQuery = z.infer<typeof ListSweepsQuerySchema>;

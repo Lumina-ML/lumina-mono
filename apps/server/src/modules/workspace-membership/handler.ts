@@ -8,7 +8,9 @@ import {
 import { requireAuth } from "../../plugins/auth.js";
 
 const MembershipParamsSchema = z.object({ membershipId: z.string().uuid() });
-const WorkspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
+// Same rationale as CreateWorkspaceMembershipSchema: a path segment may
+// carry the literal "default" or a future slug.
+const WorkspaceParamsSchema = z.object({ workspaceId: z.string().min(1).max(64) });
 const UserParamsSchema = z.object({ userId: z.string().uuid() });
 
 export class WorkspaceMembershipHandler {

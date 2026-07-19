@@ -5,6 +5,7 @@ import type {
   PatchTraceInput,
   CreateSpanInput,
   PatchSpanInput,
+  ListTracesQuery,
 } from "./schema.js";
 
 /**
@@ -39,6 +40,20 @@ export class TraceRepository {
 
   async listByProject(projectId: string): Promise<TraceRow[]> {
     return this.storage.listTraces({ projectId, orderByStartedAt: "desc" });
+  }
+
+  /**
+   * Workspace-wide paginated trace list. Delegates to the storage layer's
+   * `listTracesPaginated` so both Postgres and ClickHouse backends can
+   * honour `limit` / `offset` consistently.
+   */
+  async list(params: ListTracesQuery): Promise<{ items: TraceRow[]; total: number }> {
+    return this.storage.listTracesPaginated({
+      ...(params.projectId ? { projectId: params.projectId } : {}),
+      limit: params.limit,
+      offset: params.offset,
+      orderByStartedAt: "desc",
+    });
   }
 
   async updateTrace(traceId: string, data: PatchTraceInput): Promise<TraceRow | null> {

@@ -1,7 +1,11 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { ReportService } from "./service.js";
-import { CreateReportSchema, PatchReportSchema } from "./schema.js";
+import {
+  CreateReportSchema,
+  PatchReportSchema,
+  ListReportsQuerySchema,
+} from "./schema.js";
 import { ProjectService } from "../project/service.js";
 
 const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
@@ -29,6 +33,17 @@ export class ReportHandler {
     const { projectId } = ProjectParamsSchema.parse(req.params);
     const reports = await this.reportService.listByProject(projectId);
     reply.send({ items: reports });
+  }
+
+  /**
+   * Workspace-wide report list. Backed by `GET /reports`. Same wire shape as
+   * `/runs` (`{ items, total }`) so the dashboard's top-level Reports view
+   * can paginate without extra plumbing.
+   */
+  async listAllReports(req: FastifyRequest, reply: FastifyReply) {
+    const query = ListReportsQuerySchema.parse(req.query);
+    const result = await this.reportService.list(query);
+    reply.send(result);
   }
 
   async getReport(req: FastifyRequest, reply: FastifyReply) {

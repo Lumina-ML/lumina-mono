@@ -12,6 +12,8 @@ export async function sweepRoutes(app: FastifyInstance) {
 
   app.post("/projects/:projectId/sweeps", handler.create.bind(handler));
   app.get("/projects/:projectId/sweeps", handler.list.bind(handler));
+  // Workspace-wide list. Accepts `projectId` / `limit` / `offset`.
+  app.get("/sweeps", handler.listAll.bind(handler));
   app.get("/sweeps/:sweepId", handler.getById.bind(handler));
   app.patch("/sweeps/:sweepId", handler.update.bind(handler));
   app.delete("/sweeps/:sweepId", handler.delete.bind(handler));

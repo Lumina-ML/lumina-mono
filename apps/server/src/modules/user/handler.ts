@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { Prisma } from "../../generated/prisma/index.js";
 import { UserService } from "./service.js";
 import { CreateUserSchema, UpdateUserSchema, GenerateApiKeySchema } from "./schema.js";
 import { requireAuth } from "../../plugins/auth.js";
@@ -11,8 +12,32 @@ export class UserHandler {
 
   async createUser(req: FastifyRequest, reply: FastifyReply) {
     const data = CreateUserSchema.parse(req.body);
-    const user = await this.userService.createUser(data);
-    reply.status(201).send(user);
+    try {
+      const { user, apiKey } = await this.userService.createUser(data);
+      // Return both so the open-source onboarding flow can sign the
+      // user in immediately. The SDK still receives a usable user
+      // record (apiKey is an additional field, not a breaking change).
+      reply.status(201).send({ ...user, apiKey });
+    } catch (err) {
+      // Email / apiKey uniqueness races (two tabs hitting bootstrap at
+      // the same time, or a stale "first-run" view on an already-seeded
+      // server) otherwise surface as opaque 500s with Prisma internals.
+      // Map them to 409 with a structured body the client can branch on.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        const target = (err.meta?.target as string[] | undefined) ?? [];
+        const field = target[0] ?? "field";
+        reply.status(409).send({
+          error: "Conflict",
+          message: `A user with this ${field} already exists.`,
+          field,
+        });
+        return;
+      }
+      throw err;
+    }
   }
 
   async listUsers(req: FastifyRequest, reply: FastifyReply) {

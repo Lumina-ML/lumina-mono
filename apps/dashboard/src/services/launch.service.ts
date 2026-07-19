@@ -49,12 +49,38 @@ export interface CreateLaunchQueueInput {
   config?: Record<string, unknown>;
 }
 
+export interface CreateLaunchJobInput {
+  name: string;
+  image?: string;
+  command?: string[];
+  args?: string[];
+  env?: Record<string, string>;
+  config?: Record<string, unknown>;
+}
+
+export interface CreateLaunchRunInput {
+  queueId: string;
+  jobId: string;
+  runId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface PatchLaunchRunInput {
+  status?: LaunchRunStatus;
+  runId?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export const LaunchService = {
   listQueues(
     projectId: string,
     params?: { limit?: number; offset?: number },
   ): Promise<PaginatedResponse<LaunchQueue>> {
     return fetchApi(`/api/v1/projects/${projectId}/launch-queues`, { params });
+  },
+
+  getQueue(queueId: string): Promise<LaunchQueue> {
+    return fetchApi(`/api/v1/launch-queues/${queueId}`);
   },
 
   createQueue(
@@ -74,6 +100,30 @@ export const LaunchService = {
     return fetchApi(`/api/v1/projects/${projectId}/launch-jobs`, { params });
   },
 
+  getJob(jobId: string): Promise<LaunchJob> {
+    return fetchApi(`/api/v1/launch-jobs/${jobId}`);
+  },
+
+  createJob(
+    projectId: string,
+    data: CreateLaunchJobInput,
+  ): Promise<LaunchJob> {
+    return fetchApi(`/api/v1/projects/${projectId}/launch-jobs`, {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  createRun(
+    projectId: string,
+    data: CreateLaunchRunInput,
+  ): Promise<LaunchRun> {
+    return fetchApi(`/api/v1/projects/${projectId}/launch-runs`, {
+      method: "POST",
+      body: data,
+    });
+  },
+
   listRunsByQueue(
     queueId: string,
     params?: { limit?: number; offset?: number },
@@ -81,10 +131,24 @@ export const LaunchService = {
     return fetchApi(`/api/v1/launch-queues/${queueId}/runs`, { params });
   },
 
-  patchRun(runId: string, data: { status?: LaunchRunStatus }): Promise<LaunchRun> {
+  getLaunchRun(runId: string): Promise<LaunchRun> {
+    return fetchApi(`/api/v1/launch-runs/${runId}`);
+  },
+
+  patchRun(runId: string, data: PatchLaunchRunInput): Promise<LaunchRun> {
     return fetchApi(`/api/v1/launch-runs/${runId}`, {
       method: "PATCH",
       body: data,
+    });
+  },
+
+  /**
+   * Atomic claim of the next pending run for a queue. Returns null when the
+   * queue is empty (server replies 204 with no body).
+   */
+  dequeueRun(queueId: string): Promise<LaunchRun | null> {
+    return fetchApi(`/api/v1/launch-queues/${queueId}/dequeue`, {
+      method: "POST",
     });
   },
 };

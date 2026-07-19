@@ -15,6 +15,8 @@ export async function artifactRoutes(app: FastifyInstance) {
 
   app.post("/projects/:projectId/artifacts", handler.createArtifact.bind(handler));
   app.get("/projects/:projectId/artifacts", handler.listArtifacts.bind(handler));
+  // Workspace-wide list. Accepts `projectId` / `type` / `limit` / `offset`.
+  app.get("/artifacts", handler.listAllArtifacts.bind(handler));
   app.get("/artifacts/:artifactId", handler.getArtifact.bind(handler));
   app.post("/artifacts/:artifactId/versions", handler.createVersion.bind(handler));
   app.get("/artifacts/:artifactId/versions", handler.listVersions.bind(handler));

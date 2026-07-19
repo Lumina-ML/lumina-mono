@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useRoute, RouterView } from "vue-router";
+import { computed, ref, watch } from "vue";
+import { useRoute, useRouter, RouterView } from "vue-router";
 import {
   Menu,
   Moon,
@@ -9,6 +9,11 @@ import {
   Pin,
   PinOff,
   ChevronLeft,
+  KeyRound,
+  LogOut,
+  RefreshCw,
+  Copy,
+  Check,
 } from "lucide-vue-next";
 import {
   LSidebar,
@@ -19,15 +24,69 @@ import {
   LTooltip,
   LButton,
   LTag,
+  LPopover,
+  LAvatar,
 } from "@lumina/ui";
 import { useThemeStore } from "@/stores/theme";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useCommandStore } from "@/stores/command";
+import { useAuthStore } from "@/stores/auth";
+import { useWorkspaceStore } from "@/stores/workspace";
+import { useToast } from "@/composables/useToast";
+import { ProjectService } from "@/services/project.service";
+import { useGlobalRealtime } from "@/composables/useGlobalRealtime";
+import NotificationBell from "@/components/Notifications/NotificationBell.vue";
+import BrandMark from "@/components/BrandMark.vue";
 
 const route = useRoute();
+const router = useRouter();
 const themeStore = useThemeStore();
 const sidebarStore = useSidebarStore();
+const workspaceStore = useWorkspaceStore();
 const commandStore = useCommandStore();
+const authStore = useAuthStore();
+const toast = useToast();
+
+const userMenuOpen = ref(false);
+const copiedKey = ref(false);
+
+// Wire the global WebSocket → notifications pipeline for the lifetime
+// of the app shell.
+useGlobalRealtime();
+
+const userInitial = computed(() => {
+  const u = authStore.user;
+  if (!u) return "U";
+  const src = u.name?.trim() || u.email || "U";
+  return src.charAt(0).toUpperCase();
+});
+
+async function onRotateKey() {
+  const newKey = await authStore.rotateKey();
+  userMenuOpen.value = false;
+  if (newKey) {
+    toast.success("New API key generated. The old one is now invalid.");
+  } else {
+    toast.error(`Failed to rotate key: ${authStore.error ?? "unknown error"}`);
+  }
+}
+
+async function onCopyKey() {
+  if (!authStore.apiKey) return;
+  try {
+    await navigator.clipboard.writeText(authStore.apiKey);
+    copiedKey.value = true;
+    setTimeout(() => (copiedKey.value = false), 1500);
+  } catch {
+    toast.error("Could not copy key to clipboard.");
+  }
+}
+
+function onLogout() {
+  authStore.logout();
+  userMenuOpen.value = false;
+  router.replace({ name: "Login" });
+}
 
 const activeKey = computed(() => route.path);
 
@@ -49,6 +108,18 @@ const breadcrumbs = computed(() => {
     crumbs.push({
       label: `${route.params.name}@${route.params.version}`,
     });
+  } else if (name === "GlobalDatasets") {
+    crumbs.push({ label: "Datasets" });
+  } else if (name === "GlobalSweeps") {
+    crumbs.push({ label: "Sweeps" });
+  } else if (name === "GlobalReports") {
+    crumbs.push({ label: "Reports" });
+  } else if (name === "GlobalTraces") {
+    crumbs.push({ label: "Traces" });
+  } else if (name === "GlobalArtifacts") {
+    crumbs.push({ label: "Artifacts" });
+  } else if (name === "GlobalEvaluations") {
+    crumbs.push({ label: "Evaluations" });
   } else if (projectId) {
     // Any project-scoped page
     crumbs.push({ label: "Projects", to: "/projects" });
@@ -88,6 +159,24 @@ const breadcrumbs = computed(() => {
 function onItemClick() {
   if (sidebarStore.mobileOpen) sidebarStore.setMobileOpen(false);
 }
+
+// ── Track recent projects for the sidebar ─────────────────────────────
+// Whenever the user lands on a project page, push that project onto
+// the sidebar's "recent projects" list. Errors are swallowed — a stale
+// project name in the sidebar is harmless.
+watch(
+  () => route.params.projectId,
+  async (id) => {
+    if (typeof id !== "string") return;
+    try {
+      const p = await ProjectService.get(id);
+      sidebarStore.touchProject({ id: p.id, name: p.name, description: p.description });
+    } catch {
+      /* ignore — sidebar recent-projects is best-effort */
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -95,7 +184,12 @@ function onItemClick() {
     <!-- Desktop sidebar -->
     <LSidebar :collapsed="sidebarStore.collapsed">
       <div class="flex h-12 items-center justify-between border-b border-border px-4">
-        <span class="truncate text-lg font-semibold">Lumina</span>
+        <RouterLink to="/" class="flex min-w-0 items-center gap-2">
+          <BrandMark
+            :size="sidebarStore.collapsed ? 24 : 28"
+            :show-wordmark="!sidebarStore.collapsed"
+          />
+        </RouterLink>
         <LIconButton
           v-if="!sidebarStore.collapsed"
           aria-label="Collapse sidebar"
@@ -183,6 +277,73 @@ function onItemClick() {
           </div>
         </div>
       </nav>
+
+      <!-- Workspace footer -->
+      <div
+        class="border-t border-border p-3"
+        :class="sidebarStore.collapsed ? 'flex justify-center' : ''"
+      >
+        <LPopover
+          v-if="!sidebarStore.collapsed"
+          placement="top-start"
+          trigger="click"
+        >
+          <template #trigger>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-canvas"
+              :aria-label="`Workspace: ${workspaceStore.currentId}`"
+            >
+              <LAvatar
+                :name="workspaceStore.currentId"
+                size="xs"
+                shape="square"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="truncate font-medium text-fg-primary">
+                  {{ workspaceStore.currentId }}
+                </div>
+                <div class="truncate text-[10px] text-fg-tertiary">
+                  Workspace · {{ workspaceStore.isDefault ? "default" : "custom" }}
+                </div>
+              </div>
+            </button>
+          </template>
+          <div class="w-56 space-y-1 p-1">
+            <div class="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
+              Workspaces
+            </div>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-canvas"
+              :class="workspaceStore.isDefault ? 'bg-canvas' : ''"
+              disabled
+            >
+              <LAvatar name="default" size="xs" shape="square" />
+              <div class="min-w-0 flex-1">
+                <div class="truncate font-medium">default</div>
+                <div class="truncate text-[10px] text-fg-tertiary">
+                  Seeded on first boot
+                </div>
+              </div>
+            </button>
+            <div class="border-t border-border pt-1">
+              <p class="px-2 py-1 text-[11px] text-fg-tertiary">
+                Multi-workspace support ships with the cluster SKU.
+                Today the server seeds one default workspace.
+              </p>
+            </div>
+          </div>
+        </LPopover>
+        <button
+          v-else
+          type="button"
+          class="flex h-7 w-7 items-center justify-center rounded text-fg-tertiary hover:bg-canvas"
+          :aria-label="`Workspace: ${workspaceStore.currentId}`"
+        >
+          <LAvatar :name="workspaceStore.currentId" size="xs" shape="square" />
+        </button>
+      </div>
     </LSidebar>
 
     <!-- Mobile drawer -->
@@ -192,13 +353,31 @@ function onItemClick() {
         class="fixed left-0 top-0 z-50 flex h-screen w-72 flex-col border-r border-border bg-card md:hidden"
       >
         <div class="flex h-14 items-center justify-between border-b border-border px-4">
-          <span class="text-lg font-semibold">Lumina</span>
+          <BrandMark :size="28" :show-wordmark="true" />
           <LIconButton aria-label="Close menu" @click="sidebarStore.setMobileOpen(false)">
             <span class="text-lg leading-none">×</span>
           </LIconButton>
         </div>
         <nav class="flex-1 space-y-3 overflow-auto p-3">
-          <div v-for="group in sidebarStore.navGroups" :key="group.key" class="space-y-1">
+          <!-- Pinned -->
+          <div v-if="sidebarStore.pinnedItems.length > 0" class="space-y-1">
+            <div class="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
+              Pinned
+            </div>
+            <LSidebarItem
+              v-for="item in sidebarStore.pinnedItems"
+              :key="`pin-${item.to}`"
+              :to="item.to"
+              :active="activeKey === item.to"
+              @click="onItemClick"
+            >
+              <template #icon>
+                <component :is="item.icon" class="h-4 w-4" />
+              </template>
+              {{ item.label }}
+            </LSidebarItem>
+          </div>
+          <div v-for="group in sidebarStore.displayGroups" :key="`m-${group.key}`" class="space-y-1">
             <div
               v-if="group.label"
               class="px-2 pt-2 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary"
@@ -287,12 +466,100 @@ function onItemClick() {
             <Sun v-else class="h-5 w-5" />
           </LIconButton>
 
-          <div
-            class="hidden h-8 w-8 items-center justify-center rounded-full bg-accent-primary/15 text-xs font-semibold text-accent-primary md:flex"
-            aria-label="User avatar"
+          <NotificationBell />
+
+          <LPopover
+            v-model:show="userMenuOpen"
+            placement="bottom-end"
+            :padding="4"
+            trigger="click"
           >
-            U
-          </div>
+            <template #trigger>
+              <button
+                type="button"
+                class="hidden h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-accent-primary/15 text-xs font-semibold text-accent-primary transition-colors hover:bg-accent-primary/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary md:flex"
+                :aria-label="
+                  authStore.user?.name
+                    ? `Account menu for ${authStore.user.name}`
+                    : 'Account menu'
+                "
+              >
+                <img
+                  v-if="authStore.user?.avatar"
+                  :src="authStore.user.avatar"
+                  alt=""
+                  class="h-full w-full object-cover"
+                />
+                <span v-else>{{ userInitial }}</span>
+              </button>
+            </template>
+
+            <div class="w-64 space-y-1">
+              <div class="px-3 pb-2 pt-2">
+                <div class="truncate text-sm font-medium">
+                  {{ authStore.user?.name ?? "—" }}
+                </div>
+                <div class="truncate text-xs text-fg-tertiary">
+                  {{ authStore.user?.email ?? "" }}
+                </div>
+              </div>
+
+              <div class="border-t border-border" />
+
+              <div class="px-2 py-1">
+                <div class="mb-1 flex items-center justify-between px-1">
+                  <span class="text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
+                    API key
+                  </span>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded px-1 text-[10px] text-fg-tertiary hover:text-fg-primary"
+                    @click="onCopyKey"
+                  >
+                    <Check v-if="copiedKey" class="h-3 w-3 text-accent-success" />
+                    <Copy v-else class="h-3 w-3" />
+                    {{ copiedKey ? "Copied" : "Copy" }}
+                  </button>
+                </div>
+                <code
+                  class="block truncate rounded bg-canvas px-2 py-1 font-mono text-[11px] text-fg-secondary"
+                  :title="authStore.apiKey ?? ''"
+                >
+                  {{ authStore.apiKey ?? "—" }}
+                </code>
+              </div>
+
+              <div class="border-t border-border" />
+
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-canvas"
+                @click="onRotateKey"
+              >
+                <RefreshCw class="h-3.5 w-3.5 text-fg-tertiary" />
+                Rotate key
+              </button>
+              <RouterLink
+                to="/settings/api-keys"
+                class="flex items-center gap-2 rounded px-3 py-2 text-sm hover:bg-canvas"
+                @click="userMenuOpen = false"
+              >
+                <KeyRound class="h-3.5 w-3.5 text-fg-tertiary" />
+                Manage keys
+              </RouterLink>
+
+              <div class="border-t border-border" />
+
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-accent-danger hover:bg-canvas"
+                @click="onLogout"
+              >
+                <LogOut class="h-3.5 w-3.5" />
+                Sign out
+              </button>
+            </div>
+          </LPopover>
         </div>
       </header>
 

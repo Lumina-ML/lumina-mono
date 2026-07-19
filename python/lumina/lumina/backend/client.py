@@ -569,12 +569,24 @@ class LuminaClient:
         name: Optional[str] = None,
         avatar: Optional[str] = None,
     ) -> dict[str, Any]:
+        """Create a user. The server returns the user record plus a
+        freshly issued ``apiKey`` so open-source onboarding can sign
+        in the caller immediately. If the server is older and doesn't
+        include ``apiKey``, this method falls back to the previous
+        behaviour of calling ``generate_api_key`` separately."""
         payload: dict[str, Any] = {"email": email}
         if name:
             payload["name"] = name
         if avatar:
             payload["avatar"] = avatar
-        return self._request("POST", "/api/v1/users", payload)
+        result = self._request("POST", "/api/v1/users", payload)
+        # Backward compat: if the server didn't return apiKey, fetch one.
+        if not result.get("apiKey"):
+            user_id = result.get("id")
+            if user_id:
+                key_resp = self.generate_api_key(user_id)
+                result["apiKey"] = key_resp.get("apiKey", key_resp)
+        return result
 
     def list_users(self) -> dict[str, Any]:
         return self._request("GET", "/api/v1/users")

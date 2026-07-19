@@ -1,8 +1,9 @@
-import type { PrismaClient } from "../../generated/prisma/index.js";
+import type { PrismaClient, Prisma } from "../../generated/prisma/index.js";
 import type {
   CreateEvaluationInput,
   CreateEvaluationResultInput,
   PatchEvaluationInput,
+  ListEvaluationsQuery,
 } from "./schema.js";
 
 export class EvaluationRepository {
@@ -43,6 +44,26 @@ export class EvaluationRepository {
         modelArtifactVersion: { include: { artifact: true } },
       },
     });
+  }
+
+  /**
+   * Workspace-wide evaluation list. Returns a paginated `{ items, total }`
+   * response WITHOUT the heavy nested `include` used by `listByProject` — the
+   * detail handler still returns the full shape for individual rows.
+   */
+  async list(params: ListEvaluationsQuery) {
+    const where: Prisma.EvaluationWhereInput = {};
+    if (params.projectId) where.projectId = params.projectId;
+    const [items, total] = await Promise.all([
+      this.prisma.evaluation.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: params.limit,
+        skip: params.offset,
+      }),
+      this.prisma.evaluation.count({ where }),
+    ]);
+    return { items, total };
   }
 
   async updateEvaluation(id: string, data: PatchEvaluationInput) {
