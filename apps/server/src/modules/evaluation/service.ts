@@ -26,7 +26,7 @@ export class EvaluationService {
     return this.repository.listByProject(projectId);
   }
 
-  async list(params: ListEvaluationsQuery) {
+  async list(params: ListEvaluationsQuery & { workspaceId?: string }) {
     return this.repository.list(params);
   }
 

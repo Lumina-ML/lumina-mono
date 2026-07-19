@@ -62,6 +62,19 @@ export class UserService {
     return this.repository.setApiKey(id, data);
   }
 
+  /**
+   * Mint a fresh key for the user with this email and return it. Returns
+   * null when no such user exists so the caller can respond identically to
+   * an allowlist miss (never leak whether an email is registered).
+   */
+  async rotateApiKeyByEmail(email: string): Promise<{ apiKey: string } | null> {
+    const user = await this.repository.findByEmail(email);
+    if (!user) return null;
+    const apiKey = this.repository.generateApiKey();
+    await this.repository.setApiKey(user.id, { apiKey });
+    return { apiKey };
+  }
+
   generateApiKey() {
     return this.repository.generateApiKey();
   }

@@ -11,12 +11,10 @@ declare module "fastify" {
   }
 }
 
-// Mirror DEFAULT_WORKSPACE_ID in bootstrap.ts. Keep them in sync —
-// when multi-workspace lands we'll resolve this through the bootstrap
-// seed and pass it down explicitly.
-const DEFAULT_WORKSPACE_ID = "default";
-
-function channelsForEvent(event: KnownDomainEvent): string[] {
+function channelsForEvent(
+  event: KnownDomainEvent,
+  defaultWorkspaceId: string,
+): string[] {
   const out: string[] = [];
   switch (event.type) {
     case "MetricLogged":
@@ -39,9 +37,13 @@ function channelsForEvent(event: KnownDomainEvent): string[] {
   }
   // Workspace-wide channel so cross-page UI (notifications, sidebar
   // counters) gets a single subscription per browser session instead
-  // of having to subscribe to every project. The dashboard hardcodes
-  // this id; keep it in sync with `useWorkspaceStore.currentId`.
-  out.push(`workspace:${DEFAULT_WORKSPACE_ID}`);
+  // of having to subscribe to every project. Uses the event's own
+  // workspaceId so the same broadcast doesn't leak into other
+  // workspaces' sessions. Falls back to the server default when the
+  // event payload omits it (shouldn't happen post A4, but keeps the
+  // plugin from silently dropping the channel).
+  const wsId = event.payload.workspaceId || defaultWorkspaceId;
+  if (wsId) out.push(`workspace:${wsId}`);
   return out;
 }
 
@@ -51,6 +53,8 @@ export const websocketPlugin = fp(async (app: FastifyInstance) => {
   const realtime = new RealtimeConnectionManager();
   app.decorate("realtime", realtime);
 
+  const defaultWorkspaceId = app.config.defaultWorkspaceId;
+
   app.get("/ws", { websocket: true }, (connection, _req) => {
     realtime.addConnection(connection.socket);
   });
@@ -58,7 +62,7 @@ export const websocketPlugin = fp(async (app: FastifyInstance) => {
   // Subscribe to domain events and broadcast to WebSocket clients.
   // When using RedisEventBus, this also receives events from other instances.
   function fanout(event: KnownDomainEvent) {
-    for (const channel of channelsForEvent(event)) {
+    for (const channel of channelsForEvent(event, defaultWorkspaceId)) {
       realtime.broadcast(channel, event.type, event.payload);
     }
   }

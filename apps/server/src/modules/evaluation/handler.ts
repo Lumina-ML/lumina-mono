@@ -20,12 +20,9 @@ export class EvaluationHandler {
 
   async createEvaluation(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = CreateEvaluationSchema.parse(req.body);
-    const project = await this.projectService.findById(projectId);
-    if (!project) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
-    }
     const evaluation = await this.evaluationService.createEvaluation(projectId, data);
     reply.status(201).send(evaluation);
   }
@@ -40,11 +37,14 @@ export class EvaluationHandler {
    * Workspace-wide evaluation list. Backed by `GET /evaluations`. Returns
    * the same `{ items, total }` shape used by `/runs` and `/projects`, but
    * without the heavy nested `include` from `listByProject` (detail routes
-   * still return that).
+   * still return that). Always scoped to the requestor's workspace.
    */
   async listAllEvaluations(req: FastifyRequest, reply: FastifyReply) {
     const query = ListEvaluationsQuerySchema.parse(req.query);
-    const result = await this.evaluationService.list(query);
+    const result = await this.evaluationService.list({
+      ...query,
+      workspaceId: req.workspaceId,
+    });
     reply.send(result);
   }
 

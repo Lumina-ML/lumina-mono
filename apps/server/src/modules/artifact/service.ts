@@ -40,7 +40,7 @@ export class ArtifactService {
     return this.repository.listArtifactsByProject(projectId);
   }
 
-  async listArtifacts(params: ListArtifactsQuery) {
+  async listArtifacts(params: ListArtifactsQuery & { workspaceId?: string }) {
     return this.repository.list(params);
   }
 
@@ -143,6 +143,9 @@ export class ArtifactService {
     const eventPayload = {
       artifactVersionId: versionId,
       projectId: version.artifactId,
+      // `findVersionById` now reaches into the project's workspace so
+      // the WS fanout can scope this event to the right channel.
+      workspaceId: version.artifact?.project?.workspaceId ?? "",
       fileCount: version.files.length,
       digest,
     };

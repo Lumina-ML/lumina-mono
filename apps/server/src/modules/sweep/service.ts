@@ -32,7 +32,7 @@ export class SweepService {
     return this.repository.listByProject(projectId);
   }
 
-  async list(params: ListSweepsQuery) {
+  async list(params: ListSweepsQuery & { workspaceId?: string }) {
     return this.repository.list(params);
   }
 

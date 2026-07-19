@@ -1,7 +1,8 @@
-import { onScopeDispose } from "vue";
+import { onScopeDispose, watch } from "vue";
 import { realtime } from "@/services/ws";
 import { useNotificationsStore } from "@/stores/notifications";
 import { useToast } from "@/composables/useToast";
+import { useWorkspaceStore } from "@/stores/workspace";
 import type { DomainEvent } from "@/utils/domain-events";
 
 /**
@@ -81,12 +82,21 @@ export function useGlobalRealtime() {
     }
   }
 
-  // The server doesn't yet have a "global" channel; subscribe to a
-  // workspace-wide one so we receive all events. Subscriptions are
-  // idempotent — the RealtimeClient dedupes by channel name.
-  const unsubGlobal = realtime.subscribe("workspace:default", handle);
+  // Subscribe to the current workspace's channel and re-target when the
+  // user switches workspaces (the server fans out events per workspace
+  // channel, so each tab must follow its own selection).
+  const workspaceStore = useWorkspaceStore();
+  let unsub = realtime.subscribe(`workspace:${workspaceStore.currentId}`, handle);
+  const stopWatch = watch(
+    () => workspaceStore.currentId,
+    (next) => {
+      unsub();
+      unsub = realtime.subscribe(`workspace:${next}`, handle);
+    },
+  );
 
   onScopeDispose(() => {
-    unsubGlobal();
+    stopWatch();
+    unsub();
   });
 }

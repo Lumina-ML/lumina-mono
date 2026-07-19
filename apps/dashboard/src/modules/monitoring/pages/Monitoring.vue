@@ -28,6 +28,7 @@ import { useProjects } from "@/modules/project/composables/useProjects";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useCurrentProject } from "@/composables/useCurrentProject";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
+import { useWorkspaceChannel } from "@/composables/useWorkspaceChannel";
 import { useProjectStore } from "@/stores/project";
 import type { Run } from "@/types/run";
 
@@ -101,12 +102,18 @@ const recentRuns = computed<Run[]>(() => runsResp.value?.items ?? []);
 // We listen on workspace:default (the same channel AppLayout subscribes
 // to) and refetch the recent-runs query on any run lifecycle event so
 // the counter / status distribution / noisy list update without a hard
-// refresh.
+// refresh. RunFinished/RunCreated also touch the cross-module tables
+// (evaluations, sweeps, launch queues) — invalidate them so the
+// navigation away from this page doesn't show stale counts.
 const { status: wsStatus } = useRealtimeSubscription(
-  computed(() => "workspace:default"),
+  useWorkspaceChannel(),
   (event) => {
     if (event.type === "RunFinished" || event.type === "RunCreated") {
       queryClient.invalidateQueries({ queryKey: ["monitoring"] });
+      queryClient.invalidateQueries({ queryKey: ["evaluations"] });
+      queryClient.invalidateQueries({ queryKey: ["sweeps"] });
+      queryClient.invalidateQueries({ queryKey: ["launch-queues"] });
+      queryClient.invalidateQueries({ queryKey: ["launch-runs"] });
     }
   },
 );

@@ -30,6 +30,8 @@ import {
   Pencil,
   StopCircle,
   XCircle,
+  Trash2,
+  AlertTriangle,
 } from "lucide-vue-next";
 import { useRun } from "@/modules/run/composables/useRuns";
 import { useMetrics } from "@/modules/metric/composables/useMetrics";
@@ -39,6 +41,7 @@ import { useRunTags } from "@/modules/run/composables/useTags";
 import MetricChart from "@/widgets/metric-chart/MetricChart.vue";
 import LogViewer from "@/widgets/log-viewer/LogViewer.vue";
 import TagList from "@/widgets/tag-list/TagList.vue";
+import QueryBoundary from "@/components/QueryBoundary.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useAutoRefresh } from "@/composables/useAutoRefresh";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
@@ -48,12 +51,14 @@ import { TraceService } from "@/services/trace.service";
 import { ArtifactService } from "@/services/artifact.service";
 import { RunService } from "@/services/run.service";
 import type { LogLevel } from "@/types/log-line";
+import { useRouter } from "vue-router";
 
 const route = useRoute();
+const router = useRouter();
 const queryClient = useQueryClient();
 const runId = computed(() => route.params.runId as string);
 
-const { data: run, isLoading: isRunLoading, refetch: refetchRun } = useRun(runId);
+const { data: run, isLoading: isRunLoading, isError: isRunError, error: runError, refetch: refetchRun } = useRun(runId);
 const { data: metrics, isLoading: isMetricsLoading, refetch: refetchMetrics } = useMetrics(runId);
 const { data: systemMetrics, isLoading: isSystemMetricsLoading, refetch: refetchSystemMetrics } = useSystemMetrics(runId);
 const { data: logLines, isLoading: isLogsLoading, refetch: refetchLogs } = useLogLines(runId);
@@ -110,15 +115,71 @@ const metricKeys = computed(() =>
   metrics.value ? Object.keys(metrics.value.metrics) : [],
 );
 const selectedKeys = ref<string[]>([]);
+
+// Persist the user's metric selection per project/run so reopening a run
+// restores the chart they were looking at.
+const METRIC_KEYS_STORAGE_PREFIX = "lumina:run-metric-keys:";
+const metricStorageKey = computed(() =>
+  run.value
+    ? `${METRIC_KEYS_STORAGE_PREFIX}${run.value.projectId}:${run.value.runId}`
+    : null,
+);
+
+function readPersistedKeys(): string[] | null {
+  if (!metricStorageKey.value) return null;
+  try {
+    const raw = localStorage.getItem(metricStorageKey.value);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((k): k is string => typeof k === "string")
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+// Default selection: keys that appear in the run's summary (the metrics the
+// SDK flagged as "the ones that matter") come first, then the remaining keys
+// alphabetically, capped at 5. Falls back to plain alphabetical when there's
+// no summary.
+function defaultKeys(keys: string[]): string[] {
+  const summary = (run.value?.summary ?? {}) as Record<string, unknown>;
+  const summaryKeys = Object.keys(summary).filter((k) => keys.includes(k));
+  const rest = keys
+    .filter((k) => !summaryKeys.includes(k))
+    .sort((a, b) => a.localeCompare(b));
+  return [...summaryKeys, ...rest].slice(0, 5);
+}
+
+// Initialize the selection once per run, once its metrics have loaded — a
+// persisted choice (filtered to keys that still exist) wins, otherwise the
+// summary-first default. `initializedFor` stops later metric updates for the
+// same run from clobbering the user's toggles.
+const initializedFor = ref<string | null>(null);
 watch(
-  metricKeys,
-  (keys) => {
-    if (selectedKeys.value.length === 0 && keys.length > 0) {
-      selectedKeys.value = keys.slice(0, 5);
-    }
+  [metricKeys, () => run.value?.runId, isMetricsLoading],
+  ([keys, currentRunId, loading]) => {
+    if (!currentRunId || loading || keys.length === 0) return;
+    if (initializedFor.value === currentRunId) return;
+
+    const persisted =
+      readPersistedKeys()?.filter((k) => keys.includes(k)) ?? [];
+    selectedKeys.value = persisted.length > 0 ? persisted : defaultKeys(keys);
+    initializedFor.value = currentRunId;
   },
   { immediate: true },
 );
+
+// Persist toggles (after the initial hydrate) so they survive a refresh.
+watch(selectedKeys, (keys) => {
+  if (!metricStorageKey.value || initializedFor.value === null) return;
+  try {
+    localStorage.setItem(metricStorageKey.value, JSON.stringify(keys));
+  } catch {
+    // storage unavailable / over quota — non-fatal, selection stays in-memory
+  }
+});
 
 const filteredMetrics = computed(() => {
   if (!metrics.value) return {};
@@ -287,20 +348,28 @@ function preempt() {
   updateMutation.mutate({ status: "preempting" });
 }
 
-function cancel() {
-  if (!run.value) return;
-  // Confirm: cancellation flips the status to `killed` and is recorded in
-  // the audit log. Use LDialog instead of window.confirm so the warning
-  // styling matches the rest of the dashboard.
-  if (
-    !window.confirm(
-      `Cancel run "${run.value.name}"? This stops the run, sets status to "killed", and is irreversible.`,
-    )
-  ) {
-    return;
-  }
-  updateMutation.mutate({ status: "killed" });
+// ── Cancel confirmation dialog (replaces window.confirm) ────────────────
+// `cancel()` flips the run's status to `killed`, which is recorded in
+// the audit log and is irreversible. We open an LDialog instead of using
+// `window.confirm` so the warning styling matches the rest of the
+// dashboard and the user has a chance to type-confirm the run name.
+const cancelOpen = ref(false);
+const cancelConfirm = ref("");
+
+function openCancelDialog() {
+  cancelConfirm.value = "";
+  cancelOpen.value = true;
 }
+
+function confirmCancel() {
+  if (!run.value) return;
+  updateMutation.mutate({ status: "killed" });
+  cancelOpen.value = false;
+}
+
+const canConfirmCancel = computed(
+  () => !!run.value && cancelConfirm.value.trim() === run.value.name,
+);
 
 // ── Notes editor dialog ─────────────────────────────────────────────────
 const notesOpen = ref(false);
@@ -325,12 +394,39 @@ function saveNotes() {
     },
   );
 }
+
+// ── Delete run ──────────────────────────────────────────────────────────
+const deleteOpen = ref(false);
+const deleteConfirm = ref("");
+const deleteMutation = useMutation({
+  mutationFn: () => RunService.delete(runId.value),
+  onSuccess: () => {
+    toast.success("Run deleted.");
+    deleteOpen.value = false;
+    queryClient.invalidateQueries({ queryKey: ["runs"] });
+    queryClient.invalidateQueries({ queryKey: ["run", runId.value] });
+    router.replace(`/projects/${run.value?.projectId}/runs`);
+  },
+  onError: (e) => toast.error(`Delete failed: ${(e as Error).message}`),
+});
+
+const canDelete = computed(
+  () => !!run.value && deleteConfirm.value.trim() === run.value.name,
+);
 </script>
 
 <template>
   <div v-if="isRunLoading" class="space-y-6">
     <LSkeleton text :repeat="3" />
   </div>
+
+  <QueryBoundary
+    v-else-if="isRunError"
+    is-error
+    :error="runError"
+    title="Couldn't load this run"
+    @retry="refetchRun()"
+  />
 
   <div v-else-if="!run" class="py-12 text-center">
     <p class="text-muted-foreground">Run not found.</p>
@@ -420,7 +516,7 @@ function saveNotes() {
           size="sm"
           quaternary
           :loading="updateMutation.isPending.value"
-          @click="cancel"
+          @click="openCancelDialog"
         >
           <XCircle class="mr-1 h-3 w-3" />
           Cancel
@@ -428,6 +524,15 @@ function saveNotes() {
         <LButton size="sm" quaternary @click="openNotesEditor">
           <Pencil class="mr-1 h-3 w-3" />
           {{ run.notes ? "Edit notes" : "Add notes" }}
+        </LButton>
+        <LButton
+          size="sm"
+          type="error"
+          quaternary
+          @click="deleteOpen = true"
+        >
+          <Trash2 class="mr-1 h-3 w-3" />
+          Delete
         </LButton>
       </div>
     </div>
@@ -689,6 +794,140 @@ function saveNotes() {
             @click="saveNotes"
           >
             Save notes
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
+
+    <!-- ── Cancel run confirmation ─────────────────────────────────── -->
+    <LDialog
+      v-model:show="cancelOpen"
+      title="Cancel this run?"
+      width="480px"
+      @close="cancelConfirm = ''"
+    >
+      <div class="space-y-3">
+        <div
+          class="flex items-start gap-2 rounded-md border border-accent-warning/30 bg-accent-warning/10 p-3 text-xs"
+        >
+          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-warning" />
+          <div>
+            <div class="font-medium">
+              Cancellation flips the run's status to <code class="font-mono">killed</code>
+              and is recorded in the audit log.
+            </div>
+            <div class="text-fg-tertiary">
+              If you're still inside a training loop, the SDK will pick up the
+              status change on its next heartbeat. Use <em>preempt</em> instead
+              if you want a softer stop.
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <label
+            for="run-cancel-confirm"
+            class="text-xs font-medium text-fg-secondary"
+          >
+            Type the run name
+            <code class="font-mono text-fg-primary">{{ run.name }}</code>
+            to confirm.
+          </label>
+          <LInput
+            id="run-cancel-confirm"
+            v-model:value="cancelConfirm"
+            :placeholder="run.name"
+            autocomplete="off"
+            spellcheck="false"
+            :disabled="updateMutation.isPending.value"
+            @keydown.enter="canConfirmCancel && confirmCancel()"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton
+            quaternary
+            :disabled="updateMutation.isPending.value"
+            @click="cancelOpen = false"
+          >
+            Keep running
+          </LButton>
+          <LButton
+            type="warning"
+            :disabled="!canConfirmCancel"
+            :loading="updateMutation.isPending.value"
+            @click="confirmCancel"
+          >
+            <XCircle class="mr-1 h-3 w-3" />
+            Cancel run
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
+
+    <!-- ── Delete run confirmation ─────────────────────────────────── -->
+    <LDialog
+      v-model:show="deleteOpen"
+      title="Delete this run?"
+      width="480px"
+      @close="deleteConfirm = ''"
+    >
+      <div class="space-y-3">
+        <div
+          class="flex items-start gap-2 rounded-md border border-accent-danger/30 bg-accent-danger/10 p-3 text-xs"
+        >
+          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-danger" />
+          <div>
+            <div class="font-medium">
+              This permanently deletes the run, every metric, log line,
+              system metric, tag, and artifact attached to it.
+            </div>
+            <div class="text-fg-tertiary">
+              There is no undo. Consider preempting or adding notes instead.
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <label
+            for="run-delete-confirm"
+            class="text-xs font-medium text-fg-secondary"
+          >
+            Type the run name
+            <code class="font-mono text-fg-primary">{{ run.name }}</code>
+            to confirm.
+          </label>
+          <LInput
+            id="run-delete-confirm"
+            v-model:value="deleteConfirm"
+            :placeholder="run.name"
+            autocomplete="off"
+            spellcheck="false"
+            :disabled="deleteMutation.isPending.value"
+            @keydown.enter="canDelete && deleteMutation.mutate()"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton
+            quaternary
+            :disabled="deleteMutation.isPending.value"
+            @click="deleteOpen = false"
+          >
+            Cancel
+          </LButton>
+          <LButton
+            type="error"
+            :disabled="!canDelete"
+            :loading="deleteMutation.isPending.value"
+            @click="deleteMutation.mutate()"
+          >
+            <Trash2 class="mr-1 h-3 w-3" />
+            Delete permanently
           </LButton>
         </div>
       </template>

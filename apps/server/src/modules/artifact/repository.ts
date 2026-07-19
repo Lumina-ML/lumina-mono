@@ -43,17 +43,25 @@ export class ArtifactRepository {
   }
 
   /**
-   * Workspace-wide artifact list with optional projectId / type filters and
-   * paginated `{ items, total }` response. Used by the dashboard's top-level
-   * `/artifacts` (and `/datasets`, when `type="dataset"`) views.
+   * Workspace-wide artifact list with optional projectId / type / workspaceId
+   * filters and paginated `{ items, total }` response. Used by the
+   * dashboard's top-level `/artifacts` (and `/datasets`, when `type="dataset"`)
+   * views.
+   *
+   * `workspaceId` is enforced when supplied — it's added as a relation filter
+   * on the owning project so the result is scoped to one tenant. Required for
+   * all authenticated callers; the handler threads `req.workspaceId` here.
    *
    * `where` is built dynamically; mirrors the pattern in
    * `run/repository.ts:list()`.
    */
-  async list(params: ListArtifactsQuery) {
+  async list(params: ListArtifactsQuery & { workspaceId?: string }) {
     const where: Prisma.ArtifactWhereInput = {};
     if (params.projectId) where.projectId = params.projectId;
     if (params.type) where.type = params.type;
+    if (params.workspaceId) {
+      where.project = { workspaceId: params.workspaceId };
+    }
     const [items, total] = await Promise.all([
       this.prisma.artifact.findMany({
         where,
@@ -80,7 +88,12 @@ export class ArtifactRepository {
   async findVersionById(id: string) {
     return this.prisma.artifactVersion.findUnique({
       where: { id },
-      include: { files: true, artifact: true },
+      include: {
+        files: true,
+        artifact: {
+          include: { project: { select: { workspaceId: true } } },
+        },
+      },
     });
   }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import {
   LCard,
@@ -14,12 +14,16 @@ import { Copy, Check, Key, RotateCw, AlertTriangle } from "lucide-vue-next";
 import { WorkspaceService } from "@/services/workspace.service";
 import { useWorkspaceUsers } from "@/modules/workspace/composables/useWorkspaceSettings";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useApiUrl } from "@/composables/useApiUrl";
 
 const queryClient = useQueryClient();
 const toast = useToast();
+const { confirm } = useConfirm();
 const { formatDate } = useDateFormat();
 void formatDate;
+const { baseUrl } = useApiUrl();
 
 const { data: users, isLoading } = useWorkspaceUsers();
 const currentUserId = ref<string | null>(null);
@@ -29,6 +33,15 @@ const currentUserId = ref<string | null>(null);
 const generatedKey = ref<string | null>(null);
 const generatedDialogOpen = ref(false);
 const copied = ref(false);
+const envCopied = ref(false);
+
+const envSnippet = computed(() => {
+  if (!generatedKey.value) return "";
+  const url = baseUrl || "http://localhost:8000";
+  return `# Generated from your Lumina dashboard.\n` +
+    `LUMINA_API_URL=${url}\n` +
+    `LUMINA_API_KEY=${generatedKey.value}\n`;
+});
 
 const generateMutation = useMutation({
   mutationFn: (userId: string) => WorkspaceService.generateApiKey(userId),
@@ -57,15 +70,24 @@ async function copy() {
   setTimeout(() => (copied.value = false), 1500);
 }
 
-function revoke() {
+async function copyEnvSnippet() {
+  if (!envSnippet.value) return;
+  await navigator.clipboard.writeText(envSnippet.value);
+  envCopied.value = true;
+  toast.success(".env snippet copied");
+  setTimeout(() => (envCopied.value = false), 1500);
+}
+
+async function revoke() {
   if (!currentUserId.value) return;
-  if (
-    !window.confirm(
-      "Revoke this API key? Any active clients using it will start receiving 401s immediately.",
-    )
-  ) {
-    return;
-  }
+  const ok = await confirm({
+    title: "Revoke this API key?",
+    message:
+      "Any active clients using it will start receiving 401s immediately.",
+    confirmText: "Revoke key",
+    tone: "danger",
+  });
+  if (!ok) return;
   // Backend has no list/revoke endpoints yet — surface intent + rotate by
   // re-generating.
   toast.warning("Revoke isn't wired yet — generating a new key as a stopgap.");
@@ -75,6 +97,7 @@ function revoke() {
 function dismiss() {
   generatedKey.value = null;
   generatedDialogOpen.value = false;
+  envCopied.value = false;
 }
 
 const apiKeyEnv = import.meta.env.VITE_LUMINA_API_KEY as string | undefined;
@@ -168,6 +191,16 @@ const currentKeyPreview = apiKeyEnv
               <Copy v-else class="h-3.5 w-3.5" />
             </LIconButton>
           </LTooltip>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <LButton size="sm" @click="copyEnvSnippet">
+            <Copy class="mr-1 h-3 w-3" />
+            {{ envCopied ? 'Copied .env snippet' : 'Copy .env snippet' }}
+          </LButton>
+          <span class="text-[11px] text-fg-tertiary">
+            Save it as <code class="font-mono">.env</code> next to your script.
+          </span>
         </div>
       </div>
 

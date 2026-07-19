@@ -30,7 +30,10 @@ import { useSweep } from "@/modules/sweep/composables/useSweeps";
 import { RunService } from "@/services/run.service";
 import { SweepService } from "@/services/sweep.service";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
+import { useWorkspaceChannel } from "@/composables/useWorkspaceChannel";
 import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
 import type { Run } from "@/types/run";
 import type { SweepState } from "@/types/sweep";
@@ -40,9 +43,31 @@ const projectId = computed(() => route.params.projectId as string);
 const sweepId = computed(() => route.params.sweepId as string);
 const { formatDate, formatDurationMs } = useDateFormat();
 const toast = useToast();
+const { confirm } = useConfirm();
 const queryClient = useQueryClient();
 
 const { data: sweep, isLoading } = useSweep(sweepId);
+
+// Workspace-wide realtime: refetch sweep runs + observations when any
+// run in the workspace lifecycle changes. The sweep list filters
+// client-side, so a single invalidation covers both the sweep's
+// `bestRunId` and the table of child runs.
+useRealtimeSubscription(
+  useWorkspaceChannel(),
+  (event) => {
+    if (
+      event.type === "RunCreated" ||
+      event.type === "RunFinished" ||
+      event.type === "MetricLogged"
+    ) {
+      queryClient.invalidateQueries({ queryKey: ["sweep", sweepId.value] });
+      queryClient.invalidateQueries({
+        queryKey: ["sweep-runs", projectId.value, sweepId.value],
+      });
+      queryClient.invalidateQueries({ queryKey: ["sweep-observations"] });
+    }
+  },
+);
 
 // Runs belonging to this sweep. Backend doesn't expose ?sweepId= filter
 // yet, so we fetch the project's runs and filter client-side. Mark as
@@ -91,8 +116,15 @@ const stateMutation = useMutation({
 
 function pause() {
   if (!sweep.value) return;
-  if (!window.confirm("Pause this sweep? Pending runs will keep going but no new trials will start.")) return;
-  stateMutation.mutate("cancelled");
+  void confirm({
+    title: "Pause this sweep?",
+    message:
+      "Pending runs will keep going but no new trials will start.",
+    confirmText: "Pause sweep",
+    tone: "warning",
+  }).then((ok) => {
+    if (ok) stateMutation.mutate("cancelled");
+  });
 }
 function resume() {
   if (!sweep.value) return;
@@ -100,8 +132,14 @@ function resume() {
 }
 function stop() {
   if (!sweep.value) return;
-  if (!window.confirm("Stop this sweep permanently? This sets state to 'cancelled' and is irreversible.")) return;
-  stateMutation.mutate("cancelled");
+  void confirm({
+    title: "Stop this sweep permanently?",
+    message: "This sets state to 'cancelled' and is irreversible.",
+    confirmText: "Stop sweep",
+    tone: "danger",
+  }).then((ok) => {
+    if (ok) stateMutation.mutate("cancelled");
+  });
 }
 
 // ── Suggest next run ─────────────────────────────────────────────────

@@ -44,6 +44,13 @@ export interface SpanRow {
 
 export interface TraceQueryOptions {
   projectId?: string;
+  /**
+   * Filter to a set of project ids. The caller resolves this from
+   * `workspaceId` (the storage backends don't model the workspace relation).
+   * Honoured by `listTraces` / `listTracesPaginated` — when supplied, traces
+   * are limited to those whose `projectId` is in the list.
+   */
+  projectIds?: string[];
   traceId?: string;
   runId?: string;
   limit?: number;

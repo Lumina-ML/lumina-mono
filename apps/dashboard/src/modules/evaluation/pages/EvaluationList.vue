@@ -1,19 +1,40 @@
 <script setup lang="ts">
 import { ref, h } from "vue";
 import { RouterLink } from "vue-router";
+import { useQueryClient } from "@tanstack/vue-query";
 import { LCard, LTag, LDataTable, LButton, LStatusBadge } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { useEvaluations } from "@/modules/evaluation/composables/useEvaluations";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
+import { useWorkspaceChannel } from "@/composables/useWorkspaceChannel";
+import QueryBoundary from "@/components/QueryBoundary.vue";
 import type { Evaluation } from "@/types/evaluation";
 
 const { formatDate } = useDateFormat();
+const queryClient = useQueryClient();
 
 const page = ref(1);
 const pageSize = ref(20);
 
-const { data: evaluations, isLoading } = useEvaluations(
+const { data: evaluations, isLoading, isError, error, refetch } = useEvaluations(
   ref({ limit: pageSize.value, offset: (page.value - 1) * pageSize.value }),
+);
+
+// Workspace-wide realtime: refetch the list when any run lifecycle event
+// arrives (a new run can attach to an evaluation; a run finishing can
+// flip an evaluation's status). MetricLogged is intentionally ignored
+// here — it's noisy and doesn't change the list shape.
+useRealtimeSubscription(
+  useWorkspaceChannel(),
+  (event) => {
+    if (
+      event.type === "RunCreated" ||
+      event.type === "RunFinished"
+    ) {
+      queryClient.invalidateQueries({ queryKey: ["evaluations"] });
+    }
+  },
 );
 
 const columns: ColumnDef<Evaluation>[] = [
@@ -70,14 +91,21 @@ void LTag;
     </div>
 
     <LCard class="p-0">
-      <LDataTable
-        :data="evaluations?.items ?? []"
-        :columns="columns"
-        :loading="isLoading"
-        v-model:page="page"
-        v-model:page-size="pageSize"
-        :total="evaluations?.total ?? 0"
-      />
+      <QueryBoundary
+        :is-error="isError"
+        :error="error"
+        title="Couldn't load evaluations"
+        @retry="refetch()"
+      >
+        <LDataTable
+          :data="evaluations?.items ?? []"
+          :columns="columns"
+          :loading="isLoading"
+          v-model:page="page"
+          v-model:page-size="pageSize"
+          :total="evaluations?.total ?? 0"
+        />
+      </QueryBoundary>
     </LCard>
   </div>
 </template>

@@ -37,10 +37,17 @@ export class SweepRepository {
    * Workspace-wide sweep list with optional `projectId` filter and paginated
    * `{ items, total }` response. Mirrors `run/repository.ts:list()` and is
    * consumed by the dashboard's `/sweeps` top-level view.
+   *
+   * `workspaceId` is enforced when supplied — added as a relation filter on
+   * the owning project so the result is scoped to one tenant. The handler
+   * always threads `req.workspaceId` here.
    */
-  async list(params: ListSweepsQuery) {
+  async list(params: ListSweepsQuery & { workspaceId?: string }) {
     const where: Prisma.SweepWhereInput = {};
     if (params.projectId) where.projectId = params.projectId;
+    if (params.workspaceId) {
+      where.project = { workspaceId: params.workspaceId };
+    }
     const [items, total] = await Promise.all([
       this.prisma.sweep.findMany({
         where,

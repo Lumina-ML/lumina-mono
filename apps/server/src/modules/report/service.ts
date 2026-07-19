@@ -25,7 +25,7 @@ export class ReportService {
     return this.repository.listByProject(projectId);
   }
 
-  async list(params: ListReportsQuery) {
+  async list(params: ListReportsQuery & { workspaceId?: string }) {
     return this.repository.list(params);
   }
 

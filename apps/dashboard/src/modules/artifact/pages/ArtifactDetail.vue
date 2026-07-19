@@ -34,6 +34,8 @@ import { ArtifactService } from "@/services/artifact.service";
 import { RegistryService } from "@/services/registry.service";
 import { useToast } from "@/composables/useToast";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
+import { useWorkspaceChannel } from "@/composables/useWorkspaceChannel";
 import { ApiError } from "@/services/api";
 import type { ArtifactVersion } from "@/types/artifact";
 
@@ -45,6 +47,21 @@ const { formatDate } = useDateFormat();
 
 const projectId = computed(() => route.params.projectId as string);
 const artifactId = computed(() => route.params.artifactId as string);
+
+// Workspace-wide realtime: refetch versions + lineage when another
+// agent uploads a new file or finalizes a version. The artifact body
+// itself rarely changes, but we invalidate it too for consistency with
+// alias edits elsewhere.
+useRealtimeSubscription(
+  useWorkspaceChannel(),
+  (event) => {
+    if (event.type === "ArtifactUploaded") {
+      queryClient.invalidateQueries({ queryKey: ["artifact", artifactId.value] });
+      queryClient.invalidateQueries({ queryKey: ["artifact-versions", artifactId.value] });
+      queryClient.invalidateQueries({ queryKey: ["artifact-lineage"] });
+    }
+  },
+);
 
 // ── Load artifact + versions ──────────────────────────────────────────
 const {

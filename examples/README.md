@@ -55,7 +55,7 @@ pass / skip / fail summary. Exit code is non-zero if any example fails.
 | `artifact_lineage_experiment.py` | `link_artifacts`, `artifact_lineage`, `unlink_artifacts` |
 | `model_registry_experiment.py` | `log_model`, `use_model` (versions + aliases) |
 | `link_model_experiment.py` | `link_model` into the Model Registry |
-| `evaluation_experiment.py` | `init_eval`, `log_eval_result`, `finish_eval` |
+| `evaluation_experiment.py` | `init_eval`, `log_eval_result`, `log_eval_summary`, `finish_eval` |
 | `media_experiment.py` | `LuminaTable`, `log_media` |
 | `wandb_media_experiment.py` | `lumina.Image` / `Histogram` / `Table` via `lumina.log` (needs numpy) |
 | `trace_experiment.py` | `trace()` / `span()` context managers |

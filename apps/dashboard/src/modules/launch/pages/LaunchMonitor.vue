@@ -27,10 +27,17 @@ import {
   useLaunchQueues,
   useLaunchJobs,
 } from "@/modules/launch/composables/useLaunch";
+import { useWorkspaceChannel } from "@/composables/useWorkspaceChannel";
 import { LaunchService } from "@/services/launch.service";
 import { useToast } from "@/composables/useToast";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
 import QueueRow from "@/modules/launch/pages/QueueRow.vue";
+
+// When `projectId` is passed (e.g. from ProjectLaunch), the monitor locks to
+// that project and hides the project picker. Standalone at /launch it's
+// undefined and the picker drives `effectiveProjectId`.
+const props = defineProps<{ projectId?: string }>();
 
 const toast = useToast();
 const queryClient = useQueryClient();
@@ -39,7 +46,23 @@ const { formatDate } = useDateFormat();
 const { data: projects } = useProjects();
 const selectedProjectId = ref<string | null>(null);
 
+// Workspace-wide realtime: refetch queue + job tables when an agent
+// claims or completes a run. MetricLogged is ignored — too chatty for
+// a list that only shows counts and last-activity.
+useRealtimeSubscription(
+  useWorkspaceChannel(),
+  () => {
+    // Any run-lifecycle event can flip queue depth or job activity, so
+    // invalidate both tables together rather than try to model the
+    // exact mapping.
+    queryClient.invalidateQueries({ queryKey: ["launch-queues"] });
+    queryClient.invalidateQueries({ queryKey: ["launch-jobs"] });
+    queryClient.invalidateQueries({ queryKey: ["launch-runs"] });
+  },
+);
+
 const effectiveProjectId = computed(() => {
+  if (props.projectId) return props.projectId;
   if (selectedProjectId.value) return selectedProjectId.value;
   return projects.value?.items?.[0]?.id;
 });
@@ -260,6 +283,7 @@ function submitEnqueue() {
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <LSelect
+          v-if="!projectId"
           v-model:value="selectedProjectId"
           :options="projectOptions"
           placeholder="Pick a project"

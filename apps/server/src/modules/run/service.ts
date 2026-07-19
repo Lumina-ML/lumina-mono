@@ -9,6 +9,14 @@ export class RunService {
   constructor(
     prisma: PrismaClient,
     private readonly eventBus?: EventBus,
+    /**
+     * Fallback workspaceId used when an event payload can't resolve one
+     * from the run's project (e.g. legacy callers or a publish path that
+     * happens before the include is available). Usually
+     * `app.config.defaultWorkspaceId`. Optional so older construction
+     * sites (system-metric / log-line routes) still type-check.
+     */
+    private readonly defaultWorkspaceId?: string,
   ) {
     this.repository = new RunRepository(prisma);
   }
@@ -17,9 +25,13 @@ export class RunService {
     const run = await this.repository.create(projectId, data);
 
     if (this.eventBus) {
+      const workspaceId =
+        (await this.repository.findByRunId(run.runId))?.project?.workspaceId
+        ?? this.defaultWorkspaceId
+        ?? "";
       await this.eventBus.publish({
         type: "RunCreated",
-        payload: { runId: run.runId, projectId },
+        payload: { runId: run.runId, projectId, workspaceId },
         occurredAt: new Date(),
       });
     }
@@ -54,9 +66,15 @@ export class RunService {
     const run = await this.repository.updateByRunId(runId, data);
 
     if (this.eventBus && data.status && ["finished", "failed", "crashed", "killed"].includes(data.status)) {
+      const workspaceId = run.project?.workspaceId ?? this.defaultWorkspaceId ?? "";
       await this.eventBus.publish({
         type: "RunFinished",
-        payload: { runId: run.runId, projectId: run.projectId, status: data.status },
+        payload: {
+          runId: run.runId,
+          projectId: run.projectId,
+          workspaceId,
+          status: data.status,
+        },
         occurredAt: new Date(),
       });
     }
@@ -68,9 +86,15 @@ export class RunService {
     const run = await this.repository.updateByRunId(runId, { status: "finished" });
 
     if (this.eventBus) {
+      const workspaceId = run.project?.workspaceId ?? this.defaultWorkspaceId ?? "";
       await this.eventBus.publish({
         type: "RunFinished",
-        payload: { runId: run.runId, projectId: run.projectId, status: "finished" },
+        payload: {
+          runId: run.runId,
+          projectId: run.projectId,
+          workspaceId,
+          status: "finished",
+        },
         occurredAt: new Date(),
       });
     }

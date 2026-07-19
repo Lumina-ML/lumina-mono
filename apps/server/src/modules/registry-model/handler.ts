@@ -20,12 +20,9 @@ export class RegistryModelHandler {
 
   async createRegistryModel(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = CreateRegistryModelSchema.parse(req.body);
-    const project = await this.projectService.findById(projectId);
-    if (!project) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
-    }
     const model = await this.registryModelService.createRegistryModel(projectId, data);
     reply.status(201).send(model);
   }

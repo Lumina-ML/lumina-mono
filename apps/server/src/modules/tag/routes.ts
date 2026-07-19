@@ -10,9 +10,24 @@ export async function tagRoutes(app: FastifyInstance) {
   const runService = new RunService(app.prisma);
   const handler = new TagHandler(tagService, projectService, runService);
 
-  app.post("/projects/:projectId/tags", handler.create.bind(handler));
-  app.get("/projects/:projectId/tags", handler.listByProject.bind(handler));
-  app.post("/runs/:runId/tags", handler.attachToRun.bind(handler));
-  app.get("/runs/:runId/tags", handler.listByRun.bind(handler));
-  app.delete("/runs/:runId/tags/:tagId", handler.detachFromRun.bind(handler));
+  app.post("/projects/:projectId/tags", {
+    config: { authz: { kind: "project", param: "projectId" } },
+  }, handler.create.bind(handler));
+  app.get("/projects/:projectId/tags", {
+    config: { authz: { kind: "project", param: "projectId" } },
+  }, handler.listByProject.bind(handler));
+  app.post("/runs/:runId/tags", {
+    config: { authz: { kind: "run", param: "runId" } },
+  }, handler.attachToRun.bind(handler));
+  app.get("/runs/:runId/tags", {
+    config: { authz: { kind: "run", param: "runId" } },
+  }, handler.listByRun.bind(handler));
+  app.delete("/runs/:runId/tags/:tagId", {
+    config: {
+      authz: [
+        { kind: "run", param: "runId" },
+        { kind: "tag", param: "tagId" },
+      ],
+    },
+  }, handler.detachFromRun.bind(handler));
 }

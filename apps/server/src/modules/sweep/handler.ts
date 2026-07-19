@@ -23,12 +23,9 @@ export class SweepHandler {
 
   async create(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = CreateSweepSchema.parse(req.body);
-    const project = await this.projectService.findById(projectId);
-    if (!project) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
-    }
     const sweep = await this.sweepService.create(projectId, data);
     reply.status(201).send(sweep);
   }
@@ -42,11 +39,15 @@ export class SweepHandler {
   /**
    * Workspace-wide sweep list. Backed by `GET /sweeps`. Same wire shape as
    * `/runs` (`{ items, total }`) so the dashboard's top-level Sweeps view
-   * can paginate without extra plumbing.
+   * can paginate without extra plumbing. Always scoped to the requestor's
+   * workspace.
    */
   async listAll(req: FastifyRequest, reply: FastifyReply) {
     const query = ListSweepsQuerySchema.parse(req.query);
-    const result = await this.sweepService.list(query);
+    const result = await this.sweepService.list({
+      ...query,
+      workspaceId: req.workspaceId,
+    });
     reply.send(result);
   }
 

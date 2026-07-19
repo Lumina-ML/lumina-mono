@@ -36,10 +36,17 @@ export class ReportRepository {
    * Workspace-wide report list with optional `projectId` filter and paginated
    * `{ items, total }` response. Mirrors `run/repository.ts:list()` and is
    * consumed by the dashboard's `/reports` top-level view.
+   *
+   * `workspaceId` is enforced when supplied — added as a relation filter on
+   * the owning project so the result is scoped to one tenant. The handler
+   * always threads `req.workspaceId` here.
    */
-  async list(params: ListReportsQuery) {
+  async list(params: ListReportsQuery & { workspaceId?: string }) {
     const where: Prisma.ReportWhereInput = {};
     if (params.projectId) where.projectId = params.projectId;
+    if (params.workspaceId) {
+      where.project = { workspaceId: params.workspaceId };
+    }
     const [items, total] = await Promise.all([
       this.prisma.report.findMany({
         where,

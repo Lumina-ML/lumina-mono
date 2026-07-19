@@ -13,13 +13,22 @@ export class MetricHandler {
     req: FastifyRequest<{ Params: { runId: string } }>,
     reply: FastifyReply,
   ) {
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = LogMetricsSchema.parse(req.body);
     const run = await this.runService.getByRunId(req.params.runId);
     if (!run) {
       reply.status(404).send({ error: "Run not found" });
       return;
     }
-    await this.metricService.log(run.runId, run.projectId, data);
+    await this.metricService.log(
+      run.runId,
+      run.projectId,
+      // `findByRunId` now includes the project so the WS fanout can
+      // scope MetricLogged to the right workspace channel.
+      run.project?.workspaceId ?? req.workspaceId,
+      data,
+    );
     reply.status(201).send({ success: true });
   }
 
@@ -33,7 +42,14 @@ export class MetricHandler {
       reply.status(404).send({ error: "Run not found" });
       return;
     }
-    const keys = query.keys ? query.keys.split(",") : undefined;
+    // Accept both `?keys=a,b,c` (comma-separated) and `?keys=a&keys=b&keys=c`
+    // (repeated). Normalise to an array before handing off to the service.
+    let keys: string[] | undefined;
+    if (Array.isArray(query.keys)) {
+      keys = query.keys.flatMap((k) => k.split(",")).map((k) => k.trim()).filter(Boolean);
+    } else if (typeof query.keys === "string" && query.keys.length > 0) {
+      keys = query.keys.split(",").map((k) => k.trim()).filter(Boolean);
+    }
     const result = await this.metricService.list(run.runId, {
       keys,
       limit: query.limit,

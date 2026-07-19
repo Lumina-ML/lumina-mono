@@ -10,6 +10,7 @@ import {
   ListArtifactsQuerySchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
+import { assertOwnsArtifactVersion } from "../../core/authz/assert-workspace.js";
 
 const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
 const ArtifactParamsSchema = z.object({ artifactId: z.string().uuid() });
@@ -27,12 +28,9 @@ export class ArtifactHandler {
 
   async createArtifact(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = CreateArtifactSchema.parse(req.body);
-    const project = await this.projectService.findById(projectId);
-    if (!project) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
-    }
     const artifact = await this.artifactService.createArtifact(projectId, data);
     reply.status(201).send(artifact);
   }
@@ -47,10 +45,14 @@ export class ArtifactHandler {
    * Workspace-wide artifact list. Backed by `GET /artifacts`. Mirrors the
    * pagination shape of `/runs` (`{ items, total }`) so the dashboard's
    * top-level Artifacts / Datasets views share the same wire contract.
+   * Always scoped to the requestor's workspace.
    */
   async listAllArtifacts(req: FastifyRequest, reply: FastifyReply) {
     const query = ListArtifactsQuerySchema.parse(req.query);
-    const result = await this.artifactService.listArtifacts(query);
+    const result = await this.artifactService.listArtifacts({
+      ...query,
+      workspaceId: req.workspaceId,
+    });
     reply.send(result);
   }
 
@@ -131,7 +133,12 @@ export class ArtifactHandler {
 
   async attachLineage(req: FastifyRequest, reply: FastifyReply) {
     const { versionId } = VersionParamsSchema.parse(req.params);
+    // The URL-param versionId guard is enforced by the preHandler hook.
     const data = AttachLineageSchema.parse(req.body);
+    // Body-derived guard: parentVersionId lives in req.body, so the
+    // route config can't cover it. Both endpoints of the lineage edge
+    // must live in the caller's workspace.
+    if (!(await assertOwnsArtifactVersion(req.server.prisma, req, reply, data.parentVersionId))) return;
     try {
       const row = await this.artifactService.attachLineage(versionId, data.parentVersionId, data.type);
       reply.status(201).send(row);
@@ -151,6 +158,8 @@ export class ArtifactHandler {
 
   async detachLineage(req: FastifyRequest, reply: FastifyReply) {
     const { versionId, parentVersionId } = LineageParamsSchema.parse(req.params);
+    // Both endpoint guards are enforced by the preHandler hook (route
+    // declares an array rule covering both params).
     await this.artifactService.detachLineage(versionId, parentVersionId);
     reply.status(204).send();
   }

@@ -22,12 +22,9 @@ export class TraceHandler {
 
   async createTrace(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = CreateTraceSchema.parse(req.body);
-    const project = await this.projectService.findById(projectId);
-    if (!project) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
-    }
     const trace = await this.traceService.createTrace(projectId, data);
     reply.status(201).send(trace);
   }
@@ -43,10 +40,21 @@ export class TraceHandler {
    * the `{ items, total }` shape used by `/runs` and `/projects`. Pagination
    * happens in the underlying `TraceStorage` so both Postgres and
    * ClickHouse backends can honour `limit` / `offset` consistently.
+   * Always scoped to the requestor's workspace — we pre-resolve
+   * `workspaceId` to `projectIds` here because the storage backends don't
+   * model the workspace relation.
    */
   async listAllTraces(req: FastifyRequest, reply: FastifyReply) {
     const query = ListTracesQuerySchema.parse(req.query);
-    const result = await this.traceService.list(query);
+    const projectRows = await req.server.prisma.project.findMany({
+      where: { workspaceId: req.workspaceId },
+      select: { id: true },
+    });
+    const projectIds = projectRows.map((p) => p.id);
+    const result = await this.traceService.list({
+      ...query,
+      projectIds,
+    });
     reply.send(result);
   }
 

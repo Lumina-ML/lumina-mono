@@ -36,6 +36,7 @@ from lumina.backend.model_registry import use_model as _lumina_use_model
 from lumina.backend.model_registry import link_model as _lumina_link_model
 from lumina.backend.evaluation import init_eval as _lumina_init_eval
 from lumina.backend.evaluation import log_eval_result as _lumina_log_eval_result
+from lumina.backend.evaluation import log_eval_summary as _lumina_log_eval_summary
 from lumina.backend.evaluation import finish_eval as _lumina_finish_eval
 from lumina.backend.trace import trace as _lumina_trace
 from lumina.backend.trace import span as _lumina_span
@@ -198,6 +199,15 @@ AlertLevel = wandb_sdk.AlertLevel
 Settings = wandb_sdk.Settings
 Config = wandb_sdk.Config
 from lumina.apis import InternalApi, PublicApi
+# When the Lumina backend path is active, prefer the Lumina-native
+# PublicApi (which talks to /api/v1/public/* on the self-hosted server)
+# over the legacy WandB-cloud implementation. The dispatch happens at
+# module load time — callers that want to be explicit can import the
+# Lumina version directly from `lumina.backend.public_api`.
+import os as _os_public_dispatch
+if _os_public_dispatch.getenv("LUMINA_API_URL"):
+    from lumina.backend.public_api import LuminaPublicApi as _LuminaPublicApi
+    PublicApi = _LuminaPublicApi  # type: ignore[misc]
 from lumina.errors import CommError, UsageError
 from lumina.sdk.lib import preinit as _preinit
 from lumina.sdk.lib import lazyloader as _lazyloader
@@ -289,8 +299,12 @@ def log_eval_result(key, value, metadata=None):
     return _lumina_log_eval_result(key, value, metadata)
 
 
-def finish_eval(status="completed"):
-    return _lumina_finish_eval(status)
+def log_eval_summary(summary=None, **kwargs):
+    return _lumina_log_eval_summary(summary, **kwargs)
+
+
+def finish_eval(status="completed", *, summary=None):
+    return _lumina_finish_eval(status, summary=summary)
 
 
 def trace(name, *, trace_id=None, project=None, metadata=None):
@@ -373,4 +387,4 @@ if 'dev' in __version__:
     import lumina.env
     import os
     os.environ[lumina.env.ERROR_REPORTING] = os.environ.get(lumina.env.ERROR_REPORTING, 'false')
-__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'LuminaRun', 'log_media', 'login', 'launch', 'launch_agent', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run', 'link_artifacts', 'unlink_artifacts', 'artifact_lineage')
+__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'log_eval_summary', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'LuminaRun', 'log_media', 'login', 'launch', 'launch_agent', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run', 'link_artifacts', 'unlink_artifacts', 'artifact_lineage')

@@ -19,12 +19,9 @@ export class ReportHandler {
 
   async createReport(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = CreateReportSchema.parse(req.body);
-    const project = await this.projectService.findById(projectId);
-    if (!project) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
-    }
     const report = await this.reportService.createReport(projectId, data);
     reply.status(201).send(report);
   }
@@ -38,11 +35,15 @@ export class ReportHandler {
   /**
    * Workspace-wide report list. Backed by `GET /reports`. Same wire shape as
    * `/runs` (`{ items, total }`) so the dashboard's top-level Reports view
-   * can paginate without extra plumbing.
+   * can paginate without extra plumbing. Always scoped to the requestor's
+   * workspace.
    */
   async listAllReports(req: FastifyRequest, reply: FastifyReply) {
     const query = ListReportsQuerySchema.parse(req.query);
-    const result = await this.reportService.list(query);
+    const result = await this.reportService.list({
+      ...query,
+      workspaceId: req.workspaceId,
+    });
     reply.send(result);
   }
 

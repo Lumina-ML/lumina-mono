@@ -23,12 +23,9 @@ export class LaunchHandler {
   async createQueue(req: FastifyRequest, reply: FastifyReply) {
     if (!requireAuth(req, reply)) return;
     const { projectId } = ProjectParamsSchema.parse(req.params);
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = CreateLaunchQueueSchema.parse(req.body);
-    const project = await this.projectService.findById(projectId);
-    if (!project) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
-    }
     const queue = await this.launchService.createQueue(projectId, data);
     reply.status(201).send(queue);
   }
@@ -53,11 +50,6 @@ export class LaunchHandler {
     if (!requireAuth(req, reply)) return;
     const { projectId } = ProjectParamsSchema.parse(req.params);
     const data = CreateLaunchJobSchema.parse(req.body);
-    const project = await this.projectService.findById(projectId);
-    if (!project) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
-    }
     const job = await this.launchService.createJob(projectId, data);
     reply.status(201).send(job);
   }
@@ -82,11 +74,6 @@ export class LaunchHandler {
     if (!requireAuth(req, reply)) return;
     const { projectId } = ProjectParamsSchema.parse(req.params);
     const data = CreateLaunchRunSchema.parse(req.body);
-    const project = await this.projectService.findById(projectId);
-    if (!project) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
-    }
     const run = await this.launchService.createRun(projectId, data);
     reply.status(201).send(run);
   }

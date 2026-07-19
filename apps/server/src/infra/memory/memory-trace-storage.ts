@@ -46,6 +46,12 @@ export class MemoryTraceStorage implements TraceStorage {
     const dir = options.orderByStartedAt ?? "desc";
     const filtered = this.traces.filter((t) => {
       if (options.projectId !== undefined && t.projectId !== options.projectId) return false;
+      if (
+        options.projectIds !== undefined &&
+        !options.projectIds.includes(t.projectId)
+      ) {
+        return false;
+      }
       if (options.runId !== undefined && t.runId !== options.runId) return false;
       if (options.traceId !== undefined && t.traceId !== options.traceId) return false;
       return true;

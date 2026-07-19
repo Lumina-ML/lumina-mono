@@ -15,7 +15,7 @@ import textwrap
 import time
 import traceback
 from functools import wraps
-from typing import Any
+from typing import Any, Optional
 import click
 import yaml
 from click.exceptions import ClickException
@@ -2087,3 +2087,146 @@ def purge_cache(age: str, force: bool):
     lumina.termlog(f'Deleted {purged_count} file(s) ({util.to_human_size(data_deleted)})')
 cli.add_command(beta)
 cli.add_command(leet)
+
+
+# ── Lumina backend CLI subcommands ──────────────────────────────────────
+# These surface the SDK's two long-running loops as first-class
+# commands. `lumina agent` runs a sweep's trials against a user-provided
+# entry-point script; `lumina launch-agent` polls a launch queue and
+# executes any dequeued runs. Both dispatch to the SDK functions
+# imported above so behavior stays in lockstep with `lumina.agent(...)`
+# and `lumina.launch_agent(...)` used programmatically.
+
+
+def _load_entry_point(path: str) -> Callable[[dict[str, Any]], Any]:
+    """Load a callable from a Python file path.
+
+    The file must define either a top-level `def main(params)` function
+    (preferred) or a `run(params)` function. Anything else raises a
+    ClickException so the CLI fails fast with a clear message.
+    """
+    import importlib.util
+
+    p = pathlib.Path(path)
+    if not p.is_file():
+        raise click.ClickException(f"Entry-point not found: {path}")
+    spec = importlib.util.spec_from_file_location(p.stem, p)
+    if spec is None or spec.loader is None:
+        raise click.ClickException(f"Could not load entry-point: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    fn = getattr(module, "main", None) or getattr(module, "run", None)
+    if fn is None:
+        raise click.ClickException(
+            f"{path} must define `main(params)` or `run(params)`",
+        )
+    return fn
+
+
+@cli.command(context_settings=CONTEXT, hidden=False)
+@click.argument("sweep_id")
+@click.option(
+    "--count",
+    default=None,
+    type=int,
+    help="Number of trials to run. Defaults to the sweep's configured budget.",
+)
+@click.option(
+    "--project",
+    "-p",
+    default=None,
+    help="Project the sweep belongs to. Defaults to the active run context.",
+)
+@click.option(
+    "--entry-point",
+    default=None,
+    help="Path to a Python file with `main(params)`. Without this, "
+    "trials run as no-op shells that just record observations.",
+)
+def agent(sweep_id: str, count: Optional[int], project: Optional[str], entry_point: Optional[str]) -> None:
+    """Run a sweep's trials against the Lumina backend.
+
+    By default each trial uses `lumina.agent` which calls the server's
+    `/sweeps/:id/suggest` endpoint for next parameters. With
+    `--entry-point path/to/script.py`, each trial invokes that script
+    with the suggested params and uses its return value as the run
+    summary.
+
+    Usage:
+
+        lumina agent abc-123-sweep-uuid \\
+            --entry-point examples/basic_experiment.py
+    """
+    # Lazy import so the click group loads even if the Lumina backend
+    # dependencies are missing in some edge environment.
+    from lumina.backend.sweep import agent as _lumina_agent
+
+    function = _load_entry_point(entry_point) if entry_point else None
+    kwargs: dict[str, Any] = {"project": project} if project else {}
+    if count is not None:
+        kwargs["count"] = count
+    if function is not None:
+        kwargs["function"] = function
+    try:
+        _lumina_agent(sweep_id, **kwargs)
+    except Exception as e:  # surface any backend failure to the user
+        raise click.ClickException(f"Agent failed: {e}") from e
+
+
+@cli.command(context_settings=CONTEXT, hidden=False, name="launch-agent")
+@click.argument("queue")
+@click.option(
+    "--project",
+    "-p",
+    default=None,
+    help="Project the queue belongs to. Defaults to the active run context.",
+)
+@click.option(
+    "--poll-interval",
+    default=2.0,
+    type=float,
+    help="Seconds to wait between dequeue polls when the queue is empty.",
+)
+@click.option(
+    "--max-runs",
+    default=None,
+    type=int,
+    help="Stop after this many runs. Defaults to running forever.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Claim runs and mark them completed without actually executing.",
+)
+def launch_agent(
+    queue: str,
+    project: Optional[str],
+    poll_interval: float,
+    max_runs: Optional[int],
+    dry_run: bool,
+) -> None:
+    """Poll a launch queue and execute dequeued runs.
+
+    Mirrors `lumina.launch_agent(...)` so the same runner selection
+    logic (subprocess vs container) applies. Use `--dry-run` to validate
+    the queue wiring without spending compute.
+
+    Usage:
+
+        lumina launch-agent training-default --project my-project
+    """
+    from lumina.backend.launch import launch_agent as _lumina_launch_agent
+
+    try:
+        _lumina_launch_agent(
+            queue,
+            project=project,
+            poll_interval=poll_interval,
+            max_runs=max_runs,
+            dry_run=dry_run,
+        )
+    except KeyboardInterrupt:
+        lumina.termlog("Agent interrupted — exiting.")
+    except Exception as e:
+        raise click.ClickException(f"Launch agent failed: {e}") from e

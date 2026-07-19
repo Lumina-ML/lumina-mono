@@ -15,6 +15,8 @@ import {
   UserPlus,
   Trash2,
   Mail,
+  UserCheck,
+  AtSign,
 } from "lucide-vue-next";
 import {
   useWorkspaceMemberships,
@@ -22,16 +24,23 @@ import {
 } from "@/modules/workspace/composables/useWorkspaceSettings";
 import { WorkspaceService, type WorkspaceRole } from "@/services/workspace.service";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
 import { useDateFormat } from "@/composables/useDateFormat";
+import InviteByEmailDialog from "@/modules/workspace/components/InviteByEmailDialog.vue";
 
 const queryClient = useQueryClient();
 const toast = useToast();
+const { confirm } = useConfirm();
 const { formatDate } = useDateFormat();
 
 const { data: memberships, isLoading } = useWorkspaceMemberships();
 const { data: users } = useWorkspaceUsers();
 
+type InviteMode = "pick" | "email";
+const inviteMode = ref<InviteMode>("pick");
+
 const inviteOpen = ref(false);
+const inviteByEmailOpen = ref(false);
 const inviteUserId = ref<string | null>(null);
 const inviteRole = ref<WorkspaceRole>("member");
 
@@ -39,6 +48,17 @@ const availableUsers = computed(() => {
   const memberIds = new Set((memberships.value ?? []).map((m) => m.userId));
   return (users.value ?? []).filter((u) => !memberIds.has(u.id));
 });
+
+function openPickDialog() {
+  inviteMode.value = "pick";
+  inviteUserId.value = null;
+  inviteRole.value = "member";
+  inviteOpen.value = true;
+}
+
+function openEmailDialog() {
+  inviteByEmailOpen.value = true;
+}
 
 const inviteMutation = useMutation({
   mutationFn: () =>
@@ -80,10 +100,14 @@ function onChangeRole(membershipId: string, role: WorkspaceRole) {
   roleMutation.mutate({ membershipId, role });
 }
 
-function onRemove(membershipId: string, name: string) {
-  if (window.confirm(`Remove ${name} from this workspace?`)) {
-    removeMutation.mutate(membershipId);
-  }
+async function onRemove(membershipId: string, name: string) {
+  const ok = await confirm({
+    title: "Remove member?",
+    message: `Remove ${name} from this workspace? They will lose access to its runs, sweeps, and reports.`,
+    confirmText: "Remove",
+    tone: "danger",
+  });
+  if (ok) removeMutation.mutate(membershipId);
 }
 
 const roleColor: Record<WorkspaceRole, "default" | "info" | "primary" | "warning"> = {
@@ -117,10 +141,16 @@ const userOptions = computed(() =>
           People who can access this workspace.
         </p>
       </div>
-      <LButton size="sm" @click="inviteOpen = true">
-        <UserPlus class="mr-1 h-3 w-3" />
-        Invite member
-      </LButton>
+      <div class="flex items-center gap-1">
+        <LButton size="sm" quaternary @click="openPickDialog" :disabled="availableUsers.length === 0">
+          <UserCheck class="mr-1 h-3 w-3" />
+          Add existing
+        </LButton>
+        <LButton size="sm" @click="openEmailDialog">
+          <UserPlus class="mr-1 h-3 w-3" />
+          Invite by email
+        </LButton>
+      </div>
     </div>
 
     <LSkeleton v-if="isLoading" class="p-8" :repeat="3" />
@@ -174,7 +204,7 @@ const userOptions = computed(() =>
       </li>
     </ul>
 
-    <LDialog v-model:show="inviteOpen" title="Invite member" width="420px">
+    <LDialog v-model:show="inviteOpen" title="Add existing user" width="420px">
       <div class="space-y-3">
         <div>
           <label class="mb-1 block text-xs font-medium text-fg-secondary">
@@ -197,7 +227,7 @@ const userOptions = computed(() =>
           />
         </div>
         <p class="text-xs text-fg-tertiary">
-          {{ availableUsers.length }} user(s) available to invite.
+          {{ availableUsers.length }} user(s) available to add.
         </p>
       </div>
       <template #footer>
@@ -213,5 +243,14 @@ const userOptions = computed(() =>
         </div>
       </template>
     </LDialog>
+
+    <InviteByEmailDialog
+      v-model:open="inviteByEmailOpen"
+      @invited="queryClient.invalidateQueries({ queryKey: ['workspace-memberships'] })"
+    />
+
+    <!-- Icon-only badge kept around for templates that referenced it
+         before the refactor. -->
+    <span class="sr-only"><AtSign class="h-3 w-3" /></span>
   </LCard>
 </template>

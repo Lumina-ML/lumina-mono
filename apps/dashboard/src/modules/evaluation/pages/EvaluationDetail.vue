@@ -12,18 +12,19 @@ import {
   LSlider,
   LStatistic,
 } from "@lumina/ui";
-import { ArrowLeft, AlertTriangle } from "lucide-vue-next";
+import { ArrowLeft } from "lucide-vue-next";
 import { useEvaluation } from "@/modules/evaluation/composables/useEvaluations";
 import { EvaluationService } from "@/services/evaluation.service";
 import { useDateFormat } from "@/composables/useDateFormat";
 import {
-  syntheticConfusionMatrix,
-  syntheticPRCurve,
-  syntheticThresholdSamples,
   confusionMatrixStats,
   perClassMetrics,
 } from "@/widgets/evaluation/useEvaluationViz";
-import type { ConfusionMatrix } from "@/widgets/evaluation/types";
+import type {
+  ConfusionMatrix,
+  PRPoint,
+  ThresholdSample,
+} from "@/widgets/evaluation/types";
 import ConfusionMatrixView from "@/widgets/evaluation/ConfusionMatrix.vue";
 import PRCurveView from "@/widgets/evaluation/PRCurve.vue";
 import MetricsTable from "@/widgets/evaluation/MetricsTable.vue";
@@ -40,74 +41,92 @@ const { data: results } = useQuery({
   queryFn: () => EvaluationService.listResults(evaluationId.value),
 });
 
-// ── Derive data ────────────────────────────────────────────────────────
-// Accuracy from the recorded scalar results (if present), else from summary.
+// ── Real data only ──────────────────────────────────────────────────────
+// Everything below reads from recorded scalar results + Evaluation.summary.
+// Nothing is synthesized: when the eval pipeline hasn't written a structured
+// payload, the corresponding view degrades to an empty state that tells the
+// user which SDK call produces it.
+const summary = computed(
+  () => (evaluation.value?.summary ?? {}) as Record<string, unknown>,
+);
+
+// Scalar metrics = per-result rows, with summary scalars layered underneath.
 const summaryMetrics = computed(() => {
-  const r = (results.value ?? []) as Array<{
-    key: string;
-    value: number;
-  }>;
   const out: Record<string, number> = {};
-  for (const x of r) out[x.key] = x.value;
-  // Layer summary values underneath.
-  const summary = (evaluation.value?.summary ?? {}) as Record<string, number>;
-  for (const [k, v] of Object.entries(summary)) {
+  for (const x of results.value ?? []) out[x.key] = x.value;
+  for (const [k, v] of Object.entries(summary.value)) {
     if (typeof v === "number") out[k] = out[k] ?? v;
   }
   return out;
 });
 
-const accuracy = computed(() => {
-  const a = summaryMetrics.value["accuracy"];
-  if (typeof a === "number") return a;
-  // Use f1 as a fallback.
-  const f1 = summaryMetrics.value["f1"];
-  if (typeof f1 === "number") return f1;
-  return 0.85;
-});
-
-const numSamples = computed(() => {
-  const n = summaryMetrics.value["num_samples"];
-  return typeof n === "number" ? n : 1000;
-});
-
-const isRealMatrix = computed(() => {
-  const summary = (evaluation.value?.summary ?? {}) as {
-    confusion_matrix?: ConfusionMatrix;
-  };
-  return !!summary.confusion_matrix;
-});
-
-const confusionMatrix = computed<ConfusionMatrix>(() => {
-  const summary = (evaluation.value?.summary ?? {}) as {
-    confusion_matrix?: ConfusionMatrix;
-  };
-  if (summary.confusion_matrix) return summary.confusion_matrix;
-  return syntheticConfusionMatrix(numSamples.value, accuracy.value);
-});
-
-const stats = computed(() => confusionMatrixStats(confusionMatrix.value));
-const perClass = computed(() => perClassMetrics(confusionMatrix.value));
-
-const prCurve = computed(() => {
-  const summary = (evaluation.value?.summary ?? {}) as { pr_curve?: Array<{ recall: number; precision: number }> };
-  if (summary.pr_curve) return summary.pr_curve;
-  return syntheticPRCurve(50, accuracy.value);
-});
-
-const thresholdSamples = computed(() =>
-  syntheticThresholdSamples(50, accuracy.value),
+const scalarRows = computed(() =>
+  Object.entries(summaryMetrics.value).sort(([a], [b]) => a.localeCompare(b)),
 );
 
-// ── Threshold slider ──────────────────────────────────────────────────
+const confusionMatrix = computed<ConfusionMatrix | null>(() => {
+  const cm = summary.value.confusion_matrix as ConfusionMatrix | undefined;
+  return cm?.labels?.length && cm.matrix?.length ? cm : null;
+});
+
+const prCurve = computed<PRPoint[] | null>(() => {
+  const pr = summary.value.pr_curve as PRPoint[] | undefined;
+  return Array.isArray(pr) && pr.length > 0 ? pr : null;
+});
+
+const thresholdSweep = computed<ThresholdSample[] | null>(() => {
+  const t = summary.value.threshold_sweep as ThresholdSample[] | undefined;
+  return Array.isArray(t) && t.length > 0 ? t : null;
+});
+
+const stats = computed(() =>
+  confusionMatrix.value ? confusionMatrixStats(confusionMatrix.value) : null,
+);
+const perClass = computed(() =>
+  confusionMatrix.value ? perClassMetrics(confusionMatrix.value) : [],
+);
+
+// ── Stat cards (null → "—", never fabricated) ────────────────────────────
+function fmtPct(v: number | null | undefined): string {
+  return typeof v === "number" ? `${(v * 100).toFixed(1)}%` : "—";
+}
+
+const accuracyValue = computed<number | null>(() => {
+  if (stats.value) return stats.value.accuracy;
+  const a = summaryMetrics.value["accuracy"];
+  return typeof a === "number" ? a : null;
+});
+
+const macroF1Value = computed<number | null>(() => {
+  if (perClass.value.length) {
+    return (
+      perClass.value.reduce((a, x) => a + x.f1, 0) / perClass.value.length
+    );
+  }
+  const f1 = summaryMetrics.value["macro_f1"] ?? summaryMetrics.value["f1"];
+  return typeof f1 === "number" ? f1 : null;
+});
+
+const classCount = computed<number | null>(() =>
+  perClass.value.length ? perClass.value.length : null,
+);
+
+const sampleCount = computed<number | null>(() => {
+  if (stats.value) return stats.value.total;
+  const n = summaryMetrics.value["num_samples"];
+  return typeof n === "number" ? n : null;
+});
+
+// ── Threshold slider (drives off real sweep samples) ──────────────────────
 const thresholdPct = ref(50);
-const thresholdSamplesAt = computed(() => {
-  const samples = thresholdSamples.value;
+const thresholdSampleAt = computed<ThresholdSample | null>(() => {
+  const samples = thresholdSweep.value;
+  if (!samples) return null;
   const idx = Math.min(
     samples.length - 1,
     Math.round((thresholdPct.value / 100) * (samples.length - 1)),
   );
-  return samples[idx]!;
+  return samples[idx] ?? null;
 });
 
 const statusVariant = computed(() => {
@@ -151,70 +170,98 @@ const statusVariant = computed(() => {
         </div>
       </div>
 
-      <div
-        v-if="!isRealMatrix"
-        class="flex items-start gap-2 rounded-md border border-accent-warning/30 bg-accent-warning/10 p-3 text-xs"
-      >
-        <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-warning" />
-        <div>
-          <div class="font-medium">Synthetic visualization</div>
-          <div class="text-fg-tertiary">
-            Backend doesn't expose a structured confusion matrix for this
-            evaluation. Showing a derived preview; wire the eval pipeline to
-            record <code class="font-mono">summary.confusion_matrix</code> for
-            live data.
-          </div>
-        </div>
-      </div>
-
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <LCard class="p-4">
-          <LStatistic
-            label="Accuracy"
-            :value="`${(stats.accuracy * 100).toFixed(1)}%`"
-          />
-          <div class="mt-1 font-mono text-[10px] text-fg-tertiary">
+          <LStatistic label="Accuracy" :value="fmtPct(accuracyValue)" />
+          <div
+            v-if="stats"
+            class="mt-1 font-mono text-[10px] text-fg-tertiary"
+          >
             {{ stats.correct }} / {{ stats.total }} correct
           </div>
         </LCard>
         <LCard class="p-4">
+          <LStatistic label="Macro F1" :value="fmtPct(macroF1Value)" />
+        </LCard>
+        <LCard class="p-4">
           <LStatistic
-            label="Macro F1"
-            :value="`${(perClass.reduce((a, x) => a + x.f1, 0) / Math.max(1, perClass.length) * 100).toFixed(1)}%`"
+            label="Classes"
+            :value="classCount === null ? '—' : String(classCount)"
           />
         </LCard>
         <LCard class="p-4">
-          <LStatistic label="Classes" :value="String(perClass.length)" />
-        </LCard>
-        <LCard class="p-4">
-          <LStatistic label="Samples" :value="String(stats.total)" />
+          <LStatistic
+            label="Samples"
+            :value="sampleCount === null ? '—' : String(sampleCount)"
+          />
         </LCard>
       </div>
 
       <LTabs type="line" animated>
+        <!-- ── Confusion matrix ────────────────────────────────────────── -->
         <LTabPane name="overview" tab="Overview">
-          <ConfusionMatrixView :matrix="confusionMatrix" />
-        </LTabPane>
-
-        <LTabPane name="metrics" tab="Metrics">
-          <MetricsTable :rows="perClass" />
-        </LTabPane>
-
-        <LTabPane name="pr" tab="PR Curve">
-          <LCard class="p-4">
-            <PRCurveView :points="prCurve" :height="380" />
+          <ConfusionMatrixView v-if="confusionMatrix" :matrix="confusionMatrix" />
+          <LCard v-else class="p-8">
+            <LEmpty
+              title="No confusion matrix recorded"
+              description="Record one from your eval pipeline via lumina.log_eval_summary(confusion_matrix={'labels': [...], 'matrix': [[...]]})."
+            />
           </LCard>
         </LTabPane>
 
+        <!-- ── Per-class or scalar metrics ─────────────────────────────── -->
+        <LTabPane name="metrics" tab="Metrics">
+          <MetricsTable v-if="perClass.length" :rows="perClass" />
+          <LCard v-else-if="scalarRows.length" class="p-0">
+            <div class="border-b border-border px-4 py-3">
+              <h3 class="text-xs font-medium uppercase tracking-wider text-fg-tertiary">
+                Recorded metrics
+              </h3>
+            </div>
+            <ul class="divide-y divide-border">
+              <li
+                v-for="[key, value] in scalarRows"
+                :key="key"
+                class="flex items-center justify-between px-4 py-2 text-sm"
+              >
+                <span class="font-mono text-fg-tertiary">{{ key }}</span>
+                <span class="font-mono">{{ value }}</span>
+              </li>
+            </ul>
+          </LCard>
+          <LCard v-else class="p-8">
+            <LEmpty
+              title="No metrics yet"
+              description="Log scalars with lumina.log_eval_result(key, value), or a confusion matrix via lumina.log_eval_summary(...)."
+            />
+          </LCard>
+        </LTabPane>
+
+        <!-- ── PR curve ────────────────────────────────────────────────── -->
+        <LTabPane name="pr" tab="PR Curve">
+          <LCard class="p-4">
+            <PRCurveView v-if="prCurve" :points="prCurve" :height="380" />
+            <LEmpty
+              v-else
+              title="No PR curve recorded"
+              description="Record precision/recall points via lumina.log_eval_summary(pr_curve=[{'recall': .., 'precision': ..}, ...])."
+            />
+          </LCard>
+        </LTabPane>
+
+        <!-- ── Threshold sweep ─────────────────────────────────────────── -->
         <LTabPane name="threshold" tab="Threshold">
           <LCard class="p-4">
-            <div class="grid gap-6 lg:grid-cols-[1fr_300px]">
+            <div
+              v-if="thresholdSweep && thresholdSampleAt"
+              class="grid gap-6 lg:grid-cols-[1fr_300px]"
+            >
               <div>
                 <h3 class="mb-3 text-xs font-medium uppercase tracking-wider text-fg-tertiary">
                   Threshold sweep
                 </h3>
                 <PRCurveView
-                  :points="thresholdSamples.map((s) => ({ recall: s.recall, precision: s.precision }))"
+                  :points="thresholdSweep.map((s) => ({ recall: s.recall, precision: s.precision }))"
                   :height="320"
                 />
               </div>
@@ -235,22 +282,28 @@ const statusVariant = computed(() => {
                 <div class="grid grid-cols-3 gap-2 rounded-md border border-border bg-canvas p-3">
                   <div>
                     <div class="text-[10px] font-medium uppercase text-fg-tertiary">Precision</div>
-                    <div class="font-mono text-sm">{{ (thresholdSamplesAt.precision * 100).toFixed(1) }}%</div>
+                    <div class="font-mono text-sm">{{ (thresholdSampleAt.precision * 100).toFixed(1) }}%</div>
                   </div>
                   <div>
                     <div class="text-[10px] font-medium uppercase text-fg-tertiary">Recall</div>
-                    <div class="font-mono text-sm">{{ (thresholdSamplesAt.recall * 100).toFixed(1) }}%</div>
+                    <div class="font-mono text-sm">{{ (thresholdSampleAt.recall * 100).toFixed(1) }}%</div>
                   </div>
                   <div>
                     <div class="text-[10px] font-medium uppercase text-fg-tertiary">F1</div>
-                    <div class="font-mono text-sm">{{ (thresholdSamplesAt.f1 * 100).toFixed(1) }}%</div>
+                    <div class="font-mono text-sm">{{ (thresholdSampleAt.f1 * 100).toFixed(1) }}%</div>
                   </div>
                 </div>
               </div>
             </div>
+            <LEmpty
+              v-else
+              title="No threshold sweep recorded"
+              description="Record samples via lumina.log_eval_summary(threshold_sweep=[{'threshold': .., 'precision': .., 'recall': .., 'f1': ..}, ...])."
+            />
           </LCard>
         </LTabPane>
 
+        <!-- ── Raw results ─────────────────────────────────────────────── -->
         <LTabPane name="results" tab="Raw Results">
           <LCard v-if="results && results.length > 0" class="p-0">
             <ul class="divide-y divide-border">
@@ -267,7 +320,7 @@ const statusVariant = computed(() => {
           <LCard v-else class="p-8">
             <LEmpty
               title="No per-result metrics yet"
-              description="Call /evaluations/:id/results to record per-key scalar metrics."
+              description="Call lumina.log_eval_result(key, value) to record per-key scalar metrics."
             />
           </LCard>
         </LTabPane>

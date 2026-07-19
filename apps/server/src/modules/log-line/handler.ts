@@ -17,6 +17,8 @@ export class LogLineHandler {
     req: FastifyRequest<{ Params: { runId: string } }>,
     reply: FastifyReply,
   ) {
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = LogLinesSchema.parse(req.body);
     const run = await this.runService.getByRunId(req.params.runId);
     if (!run) {

@@ -29,7 +29,7 @@ export class TraceService {
     return this.repository.listByProject(projectId);
   }
 
-  async list(params: ListTracesQuery) {
+  async list(params: ListTracesQuery & { projectIds?: string[] }) {
     return this.repository.list(params);
   }
 

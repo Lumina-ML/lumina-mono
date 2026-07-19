@@ -49,6 +49,31 @@ def main():
     lumina.log_eval_result("accuracy", 0.92)
     lumina.log_eval_result("f1", 0.91, metadata={"class": "macro"})
 
+    # Record structured summary data. These populate the dashboard's
+    # Evaluation detail visualizations (confusion matrix, PR curve, threshold
+    # sweep); repeated calls merge into Evaluation.summary rather than clobber.
+    lumina.log_eval_summary(
+        num_samples=200,
+        confusion_matrix={
+            "labels": ["cat", "dog"],
+            "matrix": [
+                [92, 8],   # actual cat  -> predicted [cat, dog]
+                [7, 93],   # actual dog  -> predicted [cat, dog]
+            ],
+        },
+        pr_curve=[
+            {"recall": 0.0, "precision": 1.00},
+            {"recall": 0.5, "precision": 0.95},
+            {"recall": 0.8, "precision": 0.90},
+            {"recall": 1.0, "precision": 0.85},
+        ],
+        threshold_sweep=[
+            {"threshold": 0.3, "precision": 0.82, "recall": 0.97, "f1": 0.89},
+            {"threshold": 0.5, "precision": 0.91, "recall": 0.92, "f1": 0.91},
+            {"threshold": 0.7, "precision": 0.96, "recall": 0.83, "f1": 0.89},
+        ],
+    )
+
     # Finish evaluation
     finished = lumina.finish_eval("completed")
     print(f"Status: {finished['status']}")

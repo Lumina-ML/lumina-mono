@@ -10,6 +10,7 @@ import { NoopTelemetry } from "../../src/infra/noop/noop-telemetry.js";
 import { LocalObjectStorage } from "../../src/infra/storage/local.js";
 import type { ServerConfig } from "../../src/config/index.js";
 import type { PrismaClient } from "../../src/generated/prisma/index.js";
+import { workspaceGuardPlugin } from "../../src/plugins/workspace-guard.js";
 
 export interface BuildTestAppOptions {
   /** Override the in-memory event bus (e.g. with a real Redis bus). */
@@ -44,6 +45,8 @@ export const TEST_CONFIG: ServerConfig = {
   s3SecretAccessKey: "",
   s3ForcePathStyle: false,
   clickhouseDatabase: "default",
+  defaultWorkspaceId: "default",
+  rotateKeyEmails: [],
 };
 
 /**
@@ -72,6 +75,14 @@ export async function buildTestApp(
     ? options.prisma()
     : options.prisma ?? {}) as PrismaClient;
 
+  // If the fake prisma exposes __setTraceStorage, wire the test app's
+  // in-memory traceStorage so the §11 workspace guard can see rows the
+  // handler wrote through the public API (see fake-prisma.ts comment).
+  const setter = (prisma as unknown as { __setTraceStorage?: (s: MemoryTraceStorage | undefined) => void }).__setTraceStorage;
+  if (typeof setter === "function") {
+    setter(traceStorage);
+  }
+
   app.decorate("prisma", prisma);
   app.decorate("metricStorage", metricStorage);
   app.decorate("timeSeriesStorage", timeSeriesStorage);
@@ -82,6 +93,12 @@ export async function buildTestApp(
   app.decorate("telemetry", telemetry as never);
   app.decorate("storage", storage);
   app.decorate("realtime", { addConnection: () => {}, broadcast: () => {} } as never);
+
+  // Decorate `req.workspaceId` with a default so handlers that use
+  // `assertOwns*` don't 404 every request. The real workspaceContext
+  // plugin reads the user's first membership; for tests we just pin every
+  // request to the default workspace unless overridden per-test.
+  app.decorateRequest("workspaceId", TEST_CONFIG.defaultWorkspaceId);
 
   // Default workspace seed only if the mock supports it.
   if (options.seedDefaultWorkspace !== false) {
@@ -112,6 +129,12 @@ export async function buildTestApp(
       }
     }
   });
+
+  // Register the workspace guard so route-level `config.authz` rules
+  // are enforced the same way they are in production. Tests that want
+  // to exercise cross-workspace isolation pin `req.workspaceId` via
+  // their own `onRequest` hook (see tests/modules/workspace-isolation).
+  await app.register(workspaceGuardPlugin);
 
   return app;
 }

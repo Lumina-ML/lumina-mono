@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Copy,
   Check,
+  AlertTriangle,
 } from "lucide-vue-next";
 import {
   LSidebar,
@@ -26,15 +27,19 @@ import {
   LTag,
   LPopover,
   LAvatar,
+  LDialog,
 } from "@lumina/ui";
 import { useThemeStore } from "@/stores/theme";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useCommandStore } from "@/stores/command";
 import { useAuthStore } from "@/stores/auth";
 import { useWorkspaceStore } from "@/stores/workspace";
+import { useNotificationsStore } from "@/stores/notifications";
 import { useToast } from "@/composables/useToast";
 import { ProjectService } from "@/services/project.service";
 import { useGlobalRealtime } from "@/composables/useGlobalRealtime";
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
+import { WorkspaceService } from "@/services/workspace.service";
 import NotificationBell from "@/components/Notifications/NotificationBell.vue";
 import BrandMark from "@/components/BrandMark.vue";
 
@@ -45,10 +50,75 @@ const sidebarStore = useSidebarStore();
 const workspaceStore = useWorkspaceStore();
 const commandStore = useCommandStore();
 const authStore = useAuthStore();
+const notifications = useNotificationsStore();
 const toast = useToast();
+const queryClient = useQueryClient();
 
 const userMenuOpen = ref(false);
 const copiedKey = ref(false);
+
+// Rotate-key dialog: replacing the previous "toast only" flow that left
+// users without a way to copy the freshly-issued key. Closes the §9 gap
+// in `docs/User-Lifecycle-Flow-Audit.md`.
+const rotatedKey = ref<string | null>(null);
+const rotatedDialogOpen = ref(false);
+const rotatedCopied = ref(false);
+const rotating = ref(false);
+
+// ── Workspace memberships (drives the workspace switcher in the sidebar)
+// The query is reactive on auth.user.id so when a new user signs in the
+// list refreshes. While the request is in flight the popover shows the
+// previous data — better than a blank popover on every open.
+const {
+  data: memberships,
+  refetch: refetchMemberships,
+} = useQuery({
+  queryKey: computed(() => ["workspace-memberships", "me", authStore.user?.id]),
+  queryFn: () => {
+    if (!authStore.user) return Promise.resolve([]);
+    return WorkspaceService.listUserMemberships(authStore.user.id);
+  },
+  enabled: computed(() => !!authStore.user),
+  staleTime: 60_000,
+});
+
+const workspaceOptions = computed(() => {
+  const items = memberships.value ?? [];
+  return items.map((m) => ({
+    id: m.workspaceId,
+    role: m.role,
+    isCurrent: m.workspaceId === workspaceStore.currentId,
+  }));
+});
+
+// Keep the persisted selection valid for this user: if the stored workspace
+// isn't one they belong to (fresh user whose default ≠ "default", or a
+// revoked membership), snap to their first available workspace. This keeps
+// the `X-Lumina-Workspace` header we send acceptable to the server.
+watch(
+  memberships,
+  (list) => {
+    const ids = (list ?? []).map((m) => m.workspaceId);
+    workspaceStore.syncToMemberships(ids);
+  },
+  { immediate: true },
+);
+
+function selectWorkspace(id: string) {
+  if (id === workspaceStore.currentId) return;
+  workspaceStore.setCurrentId(id);
+  toast.info(`Switched to workspace "${id}"`);
+  // Every workspace-scoped query is now stale — drop them all so lists,
+  // details, and the sidebar refetch under the new workspace. Identity
+  // queries (memberships / me) are sent with skipWorkspace so they're
+  // unaffected and keep the switcher populated.
+  void queryClient.invalidateQueries();
+  refetchMemberships();
+}
+
+const currentRole = computed(
+  () => workspaceOptions.value.find((o) => o.isCurrent)?.role,
+);
 
 // Wire the global WebSocket → notifications pipeline for the lifetime
 // of the app shell.
@@ -62,13 +132,47 @@ const userInitial = computed(() => {
 });
 
 async function onRotateKey() {
-  const newKey = await authStore.rotateKey();
   userMenuOpen.value = false;
-  if (newKey) {
-    toast.success("New API key generated. The old one is now invalid.");
-  } else {
-    toast.error(`Failed to rotate key: ${authStore.error ?? "unknown error"}`);
+  rotating.value = true;
+  try {
+    const newKey = await authStore.rotateKey();
+    if (newKey) {
+      rotatedKey.value = newKey;
+      rotatedDialogOpen.value = true;
+      notifications.push({
+        id: `api-key-rotated:${Date.now()}`,
+        source: "ApiKeyRotated",
+        level: "warning",
+        title: "API key rotated",
+        body: "Your old key is now invalid. Store the new key shown on screen.",
+        link: "/settings/api-keys",
+      });
+      toast.info("API key rotated — copy the new one before closing.", {
+        duration: 5000,
+      });
+    } else {
+      toast.error(`Failed to rotate key: ${authStore.error ?? "unknown error"}`);
+    }
+  } finally {
+    rotating.value = false;
   }
+}
+
+async function copyRotatedKey() {
+  if (!rotatedKey.value) return;
+  try {
+    await navigator.clipboard.writeText(rotatedKey.value);
+    rotatedCopied.value = true;
+    setTimeout(() => (rotatedCopied.value = false), 1500);
+  } catch {
+    toast.error("Could not copy key to clipboard.");
+  }
+}
+
+function dismissRotatedDialog() {
+  rotatedKey.value = null;
+  rotatedDialogOpen.value = false;
+  rotatedCopied.value = false;
 }
 
 async function onCopyKey() {
@@ -304,33 +408,52 @@ watch(
                   {{ workspaceStore.currentId }}
                 </div>
                 <div class="truncate text-[10px] text-fg-tertiary">
-                  Workspace · {{ workspaceStore.isDefault ? "default" : "custom" }}
+                  Workspace
+                  <span v-if="currentRole" class="ml-1 text-fg-secondary">
+                    · {{ currentRole }}
+                  </span>
                 </div>
               </div>
             </button>
           </template>
-          <div class="w-56 space-y-1 p-1">
+          <div class="w-60 space-y-1 p-1">
             <div class="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
               Workspaces
             </div>
+            <div
+              v-if="(workspaceOptions ?? []).length === 0"
+              class="px-2 py-2 text-[11px] text-fg-tertiary"
+            >
+              You're only a member of the default workspace.
+            </div>
             <button
+              v-for="opt in workspaceOptions"
+              :key="opt.id"
               type="button"
               class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-canvas"
-              :class="workspaceStore.isDefault ? 'bg-canvas' : ''"
-              disabled
+              :class="opt.isCurrent ? 'bg-canvas' : ''"
+              @click="selectWorkspace(opt.id)"
             >
-              <LAvatar name="default" size="xs" shape="square" />
+              <LAvatar :name="opt.id" size="xs" shape="square" />
               <div class="min-w-0 flex-1">
-                <div class="truncate font-medium">default</div>
+                <div class="truncate font-medium">{{ opt.id }}</div>
                 <div class="truncate text-[10px] text-fg-tertiary">
-                  Seeded on first boot
+                  role: {{ opt.role }}
                 </div>
               </div>
+              <span
+                v-if="opt.isCurrent"
+                class="font-mono text-[10px] text-accent-primary"
+              >
+                current
+              </span>
             </button>
-            <div class="border-t border-border pt-1">
+            <div
+              v-if="(workspaceOptions ?? []).length > 1"
+              class="border-t border-border pt-1"
+            >
               <p class="px-2 py-1 text-[11px] text-fg-tertiary">
-                Multi-workspace support ships with the cluster SKU.
-                Today the server seeds one default workspace.
+                Switching reloads the project + workspace-scoped queries.
               </p>
             </div>
           </div>
@@ -567,6 +690,47 @@ watch(
         <RouterView />
       </main>
     </div>
+
+    <!-- Rotate key confirmation dialog. Reuses the warning callout /
+    copy button shape from SettingsApiKeys.vue so the UX is identical
+    across both rotate entry points. -->
+    <LDialog
+      v-model:show="rotatedDialogOpen"
+      title="Your new API key"
+      width="520px"
+      @close="dismissRotatedDialog"
+    >
+      <div class="space-y-3">
+        <div
+          class="flex items-start gap-2 rounded-md border border-accent-warning/30 bg-accent-warning/10 p-3 text-xs"
+        >
+          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-warning" />
+          <div>
+            <div class="font-medium">Copy this key now — the old one is already invalid.</div>
+            <div class="text-fg-tertiary">
+              Any running SDK processes still using the old key will start
+              receiving 401s on the next <code class="font-mono">log()</code> call.
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 rounded-md border border-border bg-canvas p-2 font-mono text-xs">
+          <span class="min-w-0 flex-1 truncate">{{ rotatedKey }}</span>
+          <LTooltip content="Copy">
+            <LIconButton aria-label="Copy new API key" @click="copyRotatedKey">
+              <Check v-if="rotatedCopied" class="h-3.5 w-3.5 text-accent-success" />
+              <Copy v-else class="h-3.5 w-3.5" />
+            </LIconButton>
+          </LTooltip>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end">
+          <LButton :loading="rotating" @click="dismissRotatedDialog">
+            I've stored it
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
   </div>
 </template>
 
