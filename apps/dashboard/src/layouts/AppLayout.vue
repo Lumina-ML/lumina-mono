@@ -35,6 +35,8 @@ import { useWorkspaceStore } from "@/stores/workspace";
 import { useToast } from "@/composables/useToast";
 import { ProjectService } from "@/services/project.service";
 import { useGlobalRealtime } from "@/composables/useGlobalRealtime";
+import { useQuery } from "@tanstack/vue-query";
+import { WorkspaceService } from "@/services/workspace.service";
 import NotificationBell from "@/components/Notifications/NotificationBell.vue";
 import BrandMark from "@/components/BrandMark.vue";
 
@@ -49,6 +51,45 @@ const toast = useToast();
 
 const userMenuOpen = ref(false);
 const copiedKey = ref(false);
+
+// ── Workspace memberships (drives the workspace switcher in the sidebar)
+// The query is reactive on auth.user.id so when a new user signs in the
+// list refreshes. While the request is in flight the popover shows the
+// previous data — better than a blank popover on every open.
+const {
+  data: memberships,
+  refetch: refetchMemberships,
+} = useQuery({
+  queryKey: computed(() => ["workspace-memberships", "me", authStore.user?.id]),
+  queryFn: () => {
+    if (!authStore.user) return Promise.resolve([]);
+    return WorkspaceService.listUserMemberships(authStore.user.id);
+  },
+  enabled: computed(() => !!authStore.user),
+  staleTime: 60_000,
+});
+
+const workspaceOptions = computed(() => {
+  const items = memberships.value ?? [];
+  return items.map((m) => ({
+    id: m.workspaceId,
+    role: m.role,
+    isCurrent: m.workspaceId === workspaceStore.currentId,
+  }));
+});
+
+function selectWorkspace(id: string) {
+  if (id === workspaceStore.currentId) return;
+  workspaceStore.setCurrentId(id);
+  toast.info(`Switched to workspace "${id}"`);
+  // Force a refresh of project-scoped queries so the sidebar / project
+  // lists reflect the new workspace without a hard reload.
+  refetchMemberships();
+}
+
+const currentRole = computed(
+  () => workspaceOptions.value.find((o) => o.isCurrent)?.role,
+);
 
 // Wire the global WebSocket → notifications pipeline for the lifetime
 // of the app shell.
@@ -304,33 +345,52 @@ watch(
                   {{ workspaceStore.currentId }}
                 </div>
                 <div class="truncate text-[10px] text-fg-tertiary">
-                  Workspace · {{ workspaceStore.isDefault ? "default" : "custom" }}
+                  Workspace
+                  <span v-if="currentRole" class="ml-1 text-fg-secondary">
+                    · {{ currentRole }}
+                  </span>
                 </div>
               </div>
             </button>
           </template>
-          <div class="w-56 space-y-1 p-1">
+          <div class="w-60 space-y-1 p-1">
             <div class="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
               Workspaces
             </div>
+            <div
+              v-if="(workspaceOptions ?? []).length === 0"
+              class="px-2 py-2 text-[11px] text-fg-tertiary"
+            >
+              You're only a member of the default workspace.
+            </div>
             <button
+              v-for="opt in workspaceOptions"
+              :key="opt.id"
               type="button"
               class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-canvas"
-              :class="workspaceStore.isDefault ? 'bg-canvas' : ''"
-              disabled
+              :class="opt.isCurrent ? 'bg-canvas' : ''"
+              @click="selectWorkspace(opt.id)"
             >
-              <LAvatar name="default" size="xs" shape="square" />
+              <LAvatar :name="opt.id" size="xs" shape="square" />
               <div class="min-w-0 flex-1">
-                <div class="truncate font-medium">default</div>
+                <div class="truncate font-medium">{{ opt.id }}</div>
                 <div class="truncate text-[10px] text-fg-tertiary">
-                  Seeded on first boot
+                  role: {{ opt.role }}
                 </div>
               </div>
+              <span
+                v-if="opt.isCurrent"
+                class="font-mono text-[10px] text-accent-primary"
+              >
+                current
+              </span>
             </button>
-            <div class="border-t border-border pt-1">
+            <div
+              v-if="(workspaceOptions ?? []).length > 1"
+              class="border-t border-border pt-1"
+            >
               <p class="px-2 py-1 text-[11px] text-fg-tertiary">
-                Multi-workspace support ships with the cluster SKU.
-                Today the server seeds one default workspace.
+                Switching reloads the project + workspace-scoped queries.
               </p>
             </div>
           </div>

@@ -198,6 +198,15 @@ AlertLevel = wandb_sdk.AlertLevel
 Settings = wandb_sdk.Settings
 Config = wandb_sdk.Config
 from lumina.apis import InternalApi, PublicApi
+# When the Lumina backend path is active, prefer the Lumina-native
+# PublicApi (which talks to /api/v1/public/* on the self-hosted server)
+# over the legacy WandB-cloud implementation. The dispatch happens at
+# module load time — callers that want to be explicit can import the
+# Lumina version directly from `lumina.backend.public_api`.
+import os as _os_public_dispatch
+if _os_public_dispatch.getenv("LUMINA_API_URL"):
+    from lumina.backend.public_api import LuminaPublicApi as _LuminaPublicApi
+    PublicApi = _LuminaPublicApi  # type: ignore[misc]
 from lumina.errors import CommError, UsageError
 from lumina.sdk.lib import preinit as _preinit
 from lumina.sdk.lib import lazyloader as _lazyloader

@@ -22,6 +22,7 @@ import { traceRoutes } from "./modules/trace/routes.js";
 import { reportRoutes } from "./modules/report/routes.js";
 import { runMediaRoutes } from "./modules/run-media/routes.js";
 import { launchRoutes } from "./modules/launch/routes.js";
+import { publicRoutes } from "./modules/public/routes.js";
 import { metricRoutes } from "./modules/metric/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
 import { registryModelRoutes } from "./modules/registry-model/routes.js";
@@ -96,6 +97,10 @@ export async function buildApp() {
   await app.register(runMediaRoutes, { prefix: "/api/v1" });
   await app.register(launchRoutes, { prefix: "/api/v1" });
   await app.register(storageLocalRoutes, { prefix: "/api/v1" });
+  // Public read-only API used by `lumina.PublicApi`. Authenticated like
+  // the rest of /api/v1 but bypasses the internal handlers so the shape
+  // stays stable for external consumers.
+  await app.register(publicRoutes, { prefix: "/api/v1" });
 
   // 5. Default workspace seed. Single-tenant deployments keep the
   // workspace id pinned via `LUMINA_DEFAULT_WORKSPACE_ID` (default
