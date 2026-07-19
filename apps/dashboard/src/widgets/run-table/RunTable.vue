@@ -30,7 +30,10 @@ const columns: ColumnDef<Run>[] = [
     cell: ({ row }) =>
       h(
         RouterLink,
-        { to: `/runs/${row.original.runId}`, class: "font-medium hover:underline" },
+        {
+          to: `/projects/${row.original.projectId}/runs/${row.original.runId}`,
+          class: "font-medium hover:underline",
+        },
         () => row.original.name,
       ),
   },
@@ -59,7 +62,7 @@ const columns: ColumnDef<Run>[] = [
     cell: ({ row }) =>
       h(
         RouterLink,
-        { to: `/runs/${row.original.runId}` },
+        { to: `/projects/${row.original.projectId}/runs/${row.original.runId}` },
         () => h(LButton, { size: "sm" }, () => "View"),
       ),
   },

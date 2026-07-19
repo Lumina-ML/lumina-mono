@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, RouterLink } from "vue-router";
-import { LSkeleton, LTabs, LTabPane } from "@lumina/ui";
-import { LCard, LButton, LTag } from "@lumina/ui";
-import { Calendar, Clock } from "lucide-vue-next";
+import { useQueryClient } from "@tanstack/vue-query";
+import { LSkeleton, LTabs, LTabPane, LTag, LTooltip } from "@lumina/ui";
+import { LCard, LButton } from "@lumina/ui";
+import { Calendar, Clock, Wifi, WifiOff } from "lucide-vue-next";
 import { useRun } from "@/modules/run/composables/useRuns";
 import { useMetrics } from "@/modules/metric/composables/useMetrics";
 import { useSystemMetrics } from "@/modules/metric/composables/useSystemMetrics";
@@ -14,11 +15,13 @@ import LogViewer from "@/widgets/log-viewer/LogViewer.vue";
 import TagList from "@/widgets/tag-list/TagList.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useAutoRefresh } from "@/composables/useAutoRefresh";
+import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
 import VueJsonPretty from "vue-json-pretty";
 import "vue-json-pretty/lib/styles.css";
 import type { LogLevel } from "@/types/log-line";
 
 const route = useRoute();
+const queryClient = useQueryClient();
 const runId = computed(() => route.params.runId as string);
 
 const { data: run, isLoading: isRunLoading, refetch: refetchRun } = useRun(runId);
@@ -29,16 +32,47 @@ const { data: runTags, isLoading: isTagsLoading, refetch: refetchTags } = useRun
 
 const { formatDate, formatDurationMs } = useDateFormat();
 
-const isRunning = computed(() => run.value?.status === "running");
 const logLevelFilter = ref<LogLevel | null>(null);
 
-useAutoRefresh(isRunning, 5000, () => {
-  refetchRun();
-  refetchMetrics();
-  refetchSystemMetrics();
-  refetchLogs();
-  refetchTags();
-});
+// Subscribe to run:<runId> for live updates. The 5s polling loop is gone —
+// the WS push invalidates each query and TanStack Query refetches in the
+// background (or returns cached data immediately if the request is in-flight).
+const { status: wsStatus } = useRealtimeSubscription(
+  computed(() => `run:${runId.value}`),
+  (event) => {
+    switch (event.type) {
+      case "MetricLogged":
+        queryClient.invalidateQueries({ queryKey: ["metrics", runId.value] });
+        queryClient.invalidateQueries({
+          queryKey: ["systemMetrics", runId.value],
+        });
+        queryClient.invalidateQueries({ queryKey: ["run", runId.value] });
+        break;
+      case "RunFinished":
+        queryClient.invalidateQueries({ queryKey: ["run", runId.value] });
+        queryClient.invalidateQueries({ queryKey: ["metrics", runId.value] });
+        queryClient.invalidateQueries({ queryKey: ["logLines", runId.value] });
+        break;
+      default:
+        break;
+    }
+  },
+);
+
+// Fallback: when the WS is closed/errored and the run is still running,
+// keep polling so the UI doesn't go stale.
+const isRunning = computed(() => run.value?.status === "running");
+useAutoRefresh(
+  computed(() => isRunning.value && wsStatus.value !== "open"),
+  5000,
+  () => {
+    refetchRun();
+    refetchMetrics();
+    refetchSystemMetrics();
+    refetchLogs();
+    refetchTags();
+  },
+);
 
 const durationMs = computed(() => {
   if (!run.value) return 0;
@@ -112,7 +146,33 @@ function toggleKey(key: string) {
           </span>
         </div>
       </div>
-      <LButton size="sm" @click="refetchRun()">Refresh</LButton>
+      <div class="flex items-center gap-2">
+        <LTooltip
+          :content="
+            wsStatus === 'open'
+              ? 'Live updates via WebSocket'
+              : wsStatus === 'connecting'
+                ? 'Connecting to live updates…'
+                : 'Live updates unavailable — using polling fallback'
+          "
+        >
+          <span
+            :class="[
+              'flex h-7 w-7 items-center justify-center rounded-full',
+              wsStatus === 'open'
+                ? 'bg-accent-success/15 text-accent-success'
+                : wsStatus === 'connecting'
+                  ? 'bg-accent-warning/15 text-accent-warning'
+                  : 'bg-canvas text-fg-tertiary',
+            ]"
+            :aria-label="`WebSocket status: ${wsStatus}`"
+          >
+            <Wifi v-if="wsStatus === 'open'" class="h-3.5 w-3.5" />
+            <WifiOff v-else class="h-3.5 w-3.5" />
+          </span>
+        </LTooltip>
+        <LButton size="sm" @click="refetchRun()">Refresh</LButton>
+      </div>
     </div>
 
     <!-- Tabs -->

@@ -33,14 +33,54 @@ const activeKey = computed(() => route.path);
 
 const breadcrumbs = computed(() => {
   const crumbs: Array<{ label: string; to?: string }> = [{ label: "Lumina", to: "/" }];
-  if (route.name === "ProjectList") {
+  const name = route.name as string | undefined;
+  const projectId = route.params.projectId as string | undefined;
+  const runId = route.params.runId as string | undefined;
+  const sweepId = route.params.sweepId as string | undefined;
+  const artifactId = route.params.artifactId as string | undefined;
+  const reportId = route.params.reportId as string | undefined;
+
+  if (name === "ProjectList") {
     crumbs.push({ label: "Projects" });
-  } else if (route.name === "ProjectDetail") {
+  } else if (name === "RegistryList") {
+    crumbs.push({ label: "Model Registry" });
+  } else if (name === "ModelVersionDetail") {
+    crumbs.push({ label: "Model Registry", to: "/models" });
+    crumbs.push({
+      label: `${route.params.name}@${route.params.version}`,
+    });
+  } else if (projectId) {
+    // Any project-scoped page
     crumbs.push({ label: "Projects", to: "/projects" });
-    crumbs.push({ label: route.params.projectId as string });
-  } else if (route.name === "RunDetail") {
+    crumbs.push({ label: projectId, to: `/projects/${projectId}` });
+    if (name === "RunDetail" && runId) {
+      crumbs.push({ label: "Runs", to: `/projects/${projectId}/runs` });
+      crumbs.push({ label: runId });
+    } else if (name === "SweepDetail" && sweepId) {
+      crumbs.push({ label: "Sweeps", to: `/projects/${projectId}/sweeps` });
+      crumbs.push({ label: sweepId });
+    } else if (name === "ArtifactDetail" && artifactId) {
+      crumbs.push({ label: "Artifacts", to: `/projects/${projectId}/artifacts` });
+      crumbs.push({ label: artifactId });
+    } else if (name === "ReportDetail" && reportId) {
+      crumbs.push({ label: "Reports", to: `/projects/${projectId}/reports` });
+      crumbs.push({ label: reportId });
+    } else if (name === "ProjectRuns") {
+      crumbs.push({ label: "Runs" });
+    } else if (name === "ProjectSweeps") {
+      crumbs.push({ label: "Sweeps" });
+    } else if (name === "ProjectArtifacts") {
+      crumbs.push({ label: "Artifacts" });
+    } else if (name === "ProjectReports") {
+      crumbs.push({ label: "Reports" });
+    } else if (name === "ProjectLaunch") {
+      crumbs.push({ label: "Launch" });
+    } else if (name === "ProjectSettings") {
+      crumbs.push({ label: "Settings" });
+    }
+  } else if (name === "RunDetailLegacy" && runId) {
     crumbs.push({ label: "Runs" });
-    crumbs.push({ label: route.params.runId as string });
+    crumbs.push({ label: runId });
   }
   return crumbs;
 });
