@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter, RouterView } from "vue-router";
 import {
   Menu,
@@ -25,24 +25,34 @@ import {
   LButton,
   LTag,
   LPopover,
+  LAvatar,
 } from "@lumina/ui";
 import { useThemeStore } from "@/stores/theme";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useCommandStore } from "@/stores/command";
 import { useAuthStore } from "@/stores/auth";
+import { useWorkspaceStore } from "@/stores/workspace";
 import { useToast } from "@/composables/useToast";
+import { ProjectService } from "@/services/project.service";
+import { useGlobalRealtime } from "@/composables/useGlobalRealtime";
+import NotificationBell from "@/components/Notifications/NotificationBell.vue";
 import BrandMark from "@/components/BrandMark.vue";
 
 const route = useRoute();
 const router = useRouter();
 const themeStore = useThemeStore();
 const sidebarStore = useSidebarStore();
+const workspaceStore = useWorkspaceStore();
 const commandStore = useCommandStore();
 const authStore = useAuthStore();
 const toast = useToast();
 
 const userMenuOpen = ref(false);
 const copiedKey = ref(false);
+
+// Wire the global WebSocket → notifications pipeline for the lifetime
+// of the app shell.
+useGlobalRealtime();
 
 const userInitial = computed(() => {
   const u = authStore.user;
@@ -137,6 +147,24 @@ const breadcrumbs = computed(() => {
 function onItemClick() {
   if (sidebarStore.mobileOpen) sidebarStore.setMobileOpen(false);
 }
+
+// ── Track recent projects for the sidebar ─────────────────────────────
+// Whenever the user lands on a project page, push that project onto
+// the sidebar's "recent projects" list. Errors are swallowed — a stale
+// project name in the sidebar is harmless.
+watch(
+  () => route.params.projectId,
+  async (id) => {
+    if (typeof id !== "string") return;
+    try {
+      const p = await ProjectService.get(id);
+      sidebarStore.touchProject({ id: p.id, name: p.name, description: p.description });
+    } catch {
+      /* ignore — sidebar recent-projects is best-effort */
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -237,6 +265,73 @@ function onItemClick() {
           </div>
         </div>
       </nav>
+
+      <!-- Workspace footer -->
+      <div
+        class="border-t border-border p-3"
+        :class="sidebarStore.collapsed ? 'flex justify-center' : ''"
+      >
+        <LPopover
+          v-if="!sidebarStore.collapsed"
+          placement="top-start"
+          trigger="click"
+        >
+          <template #trigger>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-canvas"
+              :aria-label="`Workspace: ${workspaceStore.currentId}`"
+            >
+              <LAvatar
+                :name="workspaceStore.currentId"
+                size="xs"
+                shape="square"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="truncate font-medium text-fg-primary">
+                  {{ workspaceStore.currentId }}
+                </div>
+                <div class="truncate text-[10px] text-fg-tertiary">
+                  Workspace · {{ workspaceStore.isDefault ? "default" : "custom" }}
+                </div>
+              </div>
+            </button>
+          </template>
+          <div class="w-56 space-y-1 p-1">
+            <div class="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
+              Workspaces
+            </div>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-canvas"
+              :class="workspaceStore.isDefault ? 'bg-canvas' : ''"
+              disabled
+            >
+              <LAvatar name="default" size="xs" shape="square" />
+              <div class="min-w-0 flex-1">
+                <div class="truncate font-medium">default</div>
+                <div class="truncate text-[10px] text-fg-tertiary">
+                  Seeded on first boot
+                </div>
+              </div>
+            </button>
+            <div class="border-t border-border pt-1">
+              <p class="px-2 py-1 text-[11px] text-fg-tertiary">
+                Multi-workspace support ships with the cluster SKU.
+                Today the server seeds one default workspace.
+              </p>
+            </div>
+          </div>
+        </LPopover>
+        <button
+          v-else
+          type="button"
+          class="flex h-7 w-7 items-center justify-center rounded text-fg-tertiary hover:bg-canvas"
+          :aria-label="`Workspace: ${workspaceStore.currentId}`"
+        >
+          <LAvatar :name="workspaceStore.currentId" size="xs" shape="square" />
+        </button>
+      </div>
     </LSidebar>
 
     <!-- Mobile drawer -->
@@ -252,7 +347,25 @@ function onItemClick() {
           </LIconButton>
         </div>
         <nav class="flex-1 space-y-3 overflow-auto p-3">
-          <div v-for="group in sidebarStore.navGroups" :key="group.key" class="space-y-1">
+          <!-- Pinned -->
+          <div v-if="sidebarStore.pinnedItems.length > 0" class="space-y-1">
+            <div class="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
+              Pinned
+            </div>
+            <LSidebarItem
+              v-for="item in sidebarStore.pinnedItems"
+              :key="`pin-${item.to}`"
+              :to="item.to"
+              :active="activeKey === item.to"
+              @click="onItemClick"
+            >
+              <template #icon>
+                <component :is="item.icon" class="h-4 w-4" />
+              </template>
+              {{ item.label }}
+            </LSidebarItem>
+          </div>
+          <div v-for="group in sidebarStore.displayGroups" :key="`m-${group.key}`" class="space-y-1">
             <div
               v-if="group.label"
               class="px-2 pt-2 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary"
@@ -340,6 +453,8 @@ function onItemClick() {
             <Moon v-if="themeStore.isDark" class="h-5 w-5" />
             <Sun v-else class="h-5 w-5" />
           </LIconButton>
+
+          <NotificationBell />
 
           <LPopover
             v-model:show="userMenuOpen"

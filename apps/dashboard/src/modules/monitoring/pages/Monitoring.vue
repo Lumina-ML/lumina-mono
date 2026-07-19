@@ -17,17 +17,28 @@ import { Activity, Cpu, Server, Search } from "lucide-vue-next";
 import { RunService } from "@/services/run.service";
 import { SystemMetricService } from "@/services/system-metric.service";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useCurrentProject } from "@/composables/useCurrentProject";
 import type { Run } from "@/types/run";
 
 const { formatDate } = useDateFormat();
+const projectId = useCurrentProject();
 
 const search = ref("");
 const statusFilter = ref<string | null>(null);
 
-// ── Pull recent runs (cross-project) ──────────────────────────────────
+// ── Pull recent runs (scoped to current project if set) ──────────────
 const { data: runsResp, isLoading: runsLoading } = useQuery({
-  queryKey: ["monitoring", "recent-runs"],
-  queryFn: () => RunService.list({ limit: 50, offset: 0 }),
+  queryKey: computed(() => [
+    "monitoring",
+    "recent-runs",
+    projectId.value ?? "all",
+  ]),
+  queryFn: () =>
+    RunService.list({
+      limit: 50,
+      offset: 0,
+      ...(projectId.value ? { project: projectId.value } : {}),
+    }),
 });
 
 const recentRuns = computed<Run[]>(() => runsResp.value?.items ?? []);
@@ -150,14 +161,17 @@ const cpuAvg = computed(() => {
   return null;
 });
 const memAvg = computed(() => {
-  const candidates = ["memory/used", "memory.used", "mem_used"];
+  // SDK writes memory in MiB; render as GB so the card matches the
+  // rest of the monitoring stats.
+  const candidates = ["memory/used", "memory.used", "mem_used", "memory.used_mb"];
   for (const k of candidates) {
     const v = systemStats.data.value?.[k];
-    if (typeof v === "number") return v;
+    if (typeof v === "number") {
+      return k.endsWith("_mb") ? v / 1024 : v;
+    }
   }
   return null;
 });
-void memAvg;
 
 const statusOptions = [
   { label: "All", value: "" },
@@ -239,6 +253,18 @@ const filteredRuns = computed(() => {
             </div>
           </div>
           <Cpu class="h-5 w-5 text-fg-tertiary" />
+        </div>
+      </LCard>
+
+      <LCard class="p-4">
+        <div class="flex items-start justify-between">
+          <div>
+            <div class="text-xs font-medium uppercase text-fg-tertiary">Avg memory used</div>
+            <div class="mt-2 font-mono text-2xl">
+              {{ memAvg == null ? "—" : `${memAvg.toFixed(2)} GB` }}
+            </div>
+          </div>
+          <Server class="h-5 w-5 text-fg-tertiary" />
         </div>
       </LCard>
     </div>
