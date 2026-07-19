@@ -7,7 +7,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import type { StorageProvider } from "./interface.js";
+import type { ObjectStorage } from "../../core/storage/object-storage.js";
 
 export interface S3StorageConfig {
   endpoint?: string;
@@ -18,7 +18,7 @@ export interface S3StorageConfig {
   forcePathStyle?: boolean;
 }
 
-export class S3StorageProvider implements StorageProvider {
+export class S3ObjectStorage implements ObjectStorage {
   private readonly client: S3Client;
 
   constructor(private readonly config: S3StorageConfig) {

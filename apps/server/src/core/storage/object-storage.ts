@@ -1,4 +1,4 @@
-export interface StorageProvider {
+export interface ObjectStorage {
   /** Generate a presigned URL for uploading an object. */
   getUploadUrl(key: string, expiresSeconds?: number): Promise<string>;
 

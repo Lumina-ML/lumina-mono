@@ -8,7 +8,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/vue-table";
-import { NEmpty, NPagination } from "naive-ui";
+import { LEmpty, LPagination } from "@lumina/ui";
 
 const props = defineProps<{
   data: unknown[];
@@ -80,7 +80,7 @@ const showPagination = computed(() => props.total !== undefined && props.total >
           </tr>
           <tr v-else-if="data.length === 0" class="border-b border-border">
             <td :colspan="table.getAllColumns().length" class="p-8">
-              <NEmpty description="No data available" />
+              <LEmpty description="No data available" />
             </td>
           </tr>
           <tr
@@ -100,7 +100,7 @@ const showPagination = computed(() => props.total !== undefined && props.total >
       <div class="text-sm text-muted-foreground">
         Total: {{ total }}
       </div>
-      <NPagination
+      <LPagination
         :page="page"
         :page-size="pageSize"
         :item-count="total"

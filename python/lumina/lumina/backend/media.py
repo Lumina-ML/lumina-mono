@@ -149,6 +149,31 @@ def _serialize_media(key: str, value: Any, type: str) -> tuple[str, str, str]:
             raise FileNotFoundError(f"Not a file: {value}")
         return str(path), path.name, _guess_content_type(path.suffix)
 
+    # Wandb / Lumina SDK Media objects already have a backing file at ``_path``.
+    if _is_wandb_media(value):
+        cls_name = value.__class__.__name__
+        if cls_name in ("Table", "EvalTable"):
+            suffix = ".csv"
+            data = _serialize_wandb_table(value)
+            content_type = "text/csv"
+            fd, temp_path = tempfile.mkstemp(suffix=suffix)
+            try:
+                with os.fdopen(fd, "wb") as f:
+                    f.write(data)
+            except Exception:
+                os.remove(temp_path)
+                raise
+            return temp_path, f"{key}{suffix}", content_type
+        else:
+            path = getattr(value, "_path", None)
+            if path and os.path.isfile(path):
+                suffix = Path(path).suffix
+                return str(path), f"{key}{suffix}", _guess_content_type(suffix)
+            # Fall through to type-specific serialization if no path is set.
+            suffix = ".json"
+            data = json.dumps(value, default=str).encode("utf-8")
+            content_type = "application/json"
+
     if isinstance(value, LuminaTable):
         suffix = ".csv"
         data = value.to_csv().encode("utf-8")
@@ -240,41 +265,75 @@ def _serialize_plotly(value: Any) -> bytes:
     raise TypeError(f"Unsupported plotly type: {type(value)}")
 
 
+def _serialize_wandb_table(value: Any) -> bytes:
+    """Serialize a wandb Table/EvalTable to CSV bytes."""
+    columns = getattr(value, "columns", None) or []
+    data = getattr(value, "data", None) or []
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(columns)
+    for row in data:
+        writer.writerow(row)
+    return output.getvalue().encode("utf-8")
+
+
 def _is_media_value(value: Any) -> bool:
     """Detect whether a value is a media object that should be logged as RunMedia."""
     if isinstance(value, LuminaTable):
         return True
-    module = getattr(value, "__module__", "")
-    name = getattr(value, "__class__", type(value)).__name__
-    if "wandb" in module or "lumina.data_types" in module:
-        return name in ("Image", "Video", "Audio", "Plotly", "Html", "Object3D", "Molecule")
+    # Wandb / Lumina SDK Media types (Image, Audio, Video, Plotly, Html, Table, ...)
+    if _is_wandb_media(value):
+        return True
+    # PIL Image
+    cls = type(value)
+    module = getattr(cls, "__module__", "")
+    name = cls.__name__
     if module.startswith("PIL"):
         return name == "Image"
+    # NumPy array treated as image
     if module.startswith("numpy"):
         return name == "ndarray"
     return False
+
+
+def _is_wandb_media(value: Any) -> bool:
+    """Return True if value is a wandb-sdk Media object."""
+    try:
+        from lumina.sdk.data_types.base_types.media import Media
+
+        return isinstance(value, Media)
+    except Exception:
+        return False
+
+
+def _wandb_media_type(value: Any) -> str | None:
+    """Map a wandb Media object to a Lumina media type string."""
+    cls_name = type(value).__name__
+    mapping = {
+        "Image": "image",
+        "Video": "video",
+        "Audio": "audio",
+        "Plotly": "plotly",
+        "Html": "html",
+        "Table": "table",
+        "EvalTable": "table",
+        "Object3D": "file",
+        "Molecule": "file",
+    }
+    return mapping.get(cls_name)
 
 
 def _infer_media_type(value: Any) -> str:
     """Infer the media type from a value."""
     if isinstance(value, LuminaTable):
         return "table"
-    module = getattr(value, "__module__", "")
-    name = getattr(value, "__class__", type(value)).__name__
+    if _is_wandb_media(value):
+        return _wandb_media_type(value) or "file"
+    cls = type(value)
+    module = getattr(cls, "__module__", "")
+    name = cls.__name__
     if name == "Image":
         return "image"
-    if name == "Video":
-        return "video"
-    if name == "Audio":
-        return "audio"
-    if name == "Plotly":
-        return "plotly"
-    if name == "Html":
-        return "html"
-    if name == "Object3D":
-        return "file"
-    if name == "Molecule":
-        return "file"
     if module.startswith("numpy") and name == "ndarray":
         return "image"
     return "file"

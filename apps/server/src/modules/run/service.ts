@@ -1,16 +1,30 @@
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import type { EventBus } from "../../core/bus/event-bus.js";
 import type { CreateRunInput, UpdateRunInput } from "./schema.js";
 import { RunRepository } from "./repository.js";
 
 export class RunService {
   private readonly repository: RunRepository;
 
-  constructor(prisma: PrismaClient) {
+  constructor(
+    prisma: PrismaClient,
+    private readonly eventBus?: EventBus,
+  ) {
     this.repository = new RunRepository(prisma);
   }
 
   async create(projectId: string, data: CreateRunInput) {
-    return this.repository.create(projectId, data);
+    const run = await this.repository.create(projectId, data);
+
+    if (this.eventBus) {
+      await this.eventBus.publish({
+        type: "RunCreated",
+        payload: { runId: run.runId, projectId },
+        occurredAt: new Date(),
+      });
+    }
+
+    return run;
   }
 
   async getByRunId(runId: string) {
@@ -37,10 +51,30 @@ export class RunService {
   }
 
   async update(runId: string, data: UpdateRunInput) {
-    return this.repository.updateByRunId(runId, data);
+    const run = await this.repository.updateByRunId(runId, data);
+
+    if (this.eventBus && data.status && ["finished", "failed", "crashed", "killed"].includes(data.status)) {
+      await this.eventBus.publish({
+        type: "RunFinished",
+        payload: { runId: run.runId, projectId: run.projectId, status: data.status },
+        occurredAt: new Date(),
+      });
+    }
+
+    return run;
   }
 
   async finish(runId: string) {
-    return this.repository.updateByRunId(runId, { status: "finished" });
+    const run = await this.repository.updateByRunId(runId, { status: "finished" });
+
+    if (this.eventBus) {
+      await this.eventBus.publish({
+        type: "RunFinished",
+        payload: { runId: run.runId, projectId: run.projectId, status: "finished" },
+        occurredAt: new Date(),
+      });
+    }
+
+    return run;
   }
 }

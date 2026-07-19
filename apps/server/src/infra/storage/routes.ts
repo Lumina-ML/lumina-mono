@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { LocalStorageProvider } from "./local.js";
+import { LocalObjectStorage } from "./local.js";
 
 export async function storageLocalRoutes(app: FastifyInstance) {
-  if (!(app.storage instanceof LocalStorageProvider)) {
+  if (!(app.storage instanceof LocalObjectStorage)) {
     return;
   }
 

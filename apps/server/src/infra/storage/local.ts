@@ -1,13 +1,13 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { StorageProvider } from "./interface.js";
+import type { ObjectStorage } from "../../core/storage/object-storage.js";
 
 export interface LocalStorageConfig {
   baseUrl: string;
   basePath: string;
 }
 
-export class LocalStorageProvider implements StorageProvider {
+export class LocalObjectStorage implements ObjectStorage {
   constructor(private readonly config: LocalStorageConfig) {}
 
   private objectPath(key: string) {

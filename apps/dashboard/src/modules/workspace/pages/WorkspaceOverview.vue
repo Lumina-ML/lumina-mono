@@ -1,96 +1,76 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { NSpace, NCard, NStatistic, NButton, NSkeleton } from "naive-ui";
-import { FolderKanban, PlayCircle, Box, Activity } from "lucide-vue-next";
-import { RouterLink } from "vue-router";
-import { useProjects } from "@/modules/project/composables/useProjects";
-import { useRuns } from "@/modules/run/composables/useRuns";
+import { ref, watch } from "vue";
+import { GridStackLayout, WidgetRenderer, LButton } from "@lumina/ui";
+import type { DashboardLayout, LayoutItem } from "@lumina/ui";
 
-const { data: projects } = useProjects(ref({ limit: 100 }));
-const { data: runs, isLoading: isRunsLoading } = useRuns(ref({ limit: 100 }));
+const STORAGE_KEY = "lumina:workspace-layout";
 
-const activeRuns = computed(() => runs.value?.items.filter((r) => r.status === "running").length ?? 0);
-const recentRuns = computed(() => (runs.value?.items ?? []).slice(0, 5));
+const defaultLayout: DashboardLayout = {
+  columns: 12,
+  rowHeight: 80,
+  gap: 16,
+  widgets: [
+    { id: "stats", type: "workspace-stats", x: 0, y: 0, w: 12, h: 2 },
+    { id: "recent-runs", type: "recent-runs", x: 0, y: 2, w: 6, h: 4 },
+    { id: "quick-start", type: "quick-start", x: 6, y: 2, w: 6, h: 4 },
+  ],
+};
+
+function loadLayout(): LayoutItem[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      return JSON.parse(saved) as LayoutItem[];
+    }
+  } catch {
+    // ignore corrupt storage
+  }
+  return defaultLayout.widgets;
+}
+
+const layout = ref<LayoutItem[]>(loadLayout());
+const editable = ref(false);
+
+watch(
+  layout,
+  (newLayout) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newLayout));
+  },
+  { deep: true },
+);
+
+function resetLayout() {
+  layout.value = defaultLayout.widgets.map((item) => ({ ...item }));
+}
 </script>
 
 <template>
   <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight">Workspace Overview</h1>
-      <p class="text-muted-foreground">Welcome to Lumina — your AI/ML control plane.</p>
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">Workspace Overview</h1>
+        <p class="text-muted-foreground">Welcome to Lumina — your AI/ML control plane.</p>
+      </div>
+      <div class="flex gap-2">
+        <LButton size="sm" @click="editable = !editable">
+          {{ editable ? "Done" : "Edit Layout" }}
+        </LButton>
+        <LButton v-if="editable" size="sm" text @click="resetLayout">
+          Reset
+        </LButton>
+      </div>
     </div>
 
-    <NSpace>
-      <NCard>
-        <NStatistic label="Projects" :value="projects?.total ?? 0">
-          <template #prefix>
-            <FolderKanban class="w-4 h-4 inline" />
-          </template>
-        </NStatistic>
-      </NCard>
-      <NCard>
-        <NStatistic label="Total Runs" :value="runs?.total ?? 0">
-          <template #prefix>
-            <PlayCircle class="w-4 h-4 inline" />
-          </template>
-        </NStatistic>
-      </NCard>
-      <NCard>
-        <NStatistic label="Active Runs" :value="activeRuns">
-          <template #prefix>
-            <Activity class="w-4 h-4 inline" />
-          </template>
-        </NStatistic>
-      </NCard>
-      <NCard>
-        <NStatistic label="Artifacts" :value="0">
-          <template #prefix>
-            <Box class="w-4 h-4 inline" />
-          </template>
-        </NStatistic>
-      </NCard>
-    </NSpace>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <NCard title="Recent Runs">
-        <div v-if="isRunsLoading" class="space-y-2">
-          <NSkeleton text :repeat="3" />
-        </div>
-        <div v-else-if="recentRuns.length === 0" class="text-muted-foreground py-4">
-          No runs yet. Run an experiment to see data here.
-        </div>
-        <div v-else class="space-y-2">
-          <RouterLink
-            v-for="run in recentRuns"
-            :key="run.runId"
-            :to="`/runs/${run.runId}`"
-            class="flex items-center justify-between p-3 rounded-md hover:bg-muted transition-colors"
-          >
-            <div>
-              <div class="font-medium">{{ run.name }}</div>
-              <div class="text-xs text-muted-foreground">{{ run.status }}</div>
-            </div>
-            <NButton size="tiny">View</NButton>
-          </RouterLink>
-        </div>
-      </NCard>
-
-      <NCard title="Quick Start">
-        <p class="text-muted-foreground mb-4">
-          Run an experiment with the Python SDK to see data here.
-        </p>
-        <pre class="bg-muted p-3 rounded-md text-sm overflow-x-auto">
-import lumina
-lumina.init(project='demo', name='exp-001')
-lumina.log({'loss': 0.9, 'acc': 0.1}, step=0)
-lumina.finish()
-        </pre>
-        <template #footer>
-          <RouterLink to="/projects">
-            <NButton type="primary">View Projects</NButton>
-          </RouterLink>
-        </template>
-      </NCard>
-    </div>
+    <GridStackLayout
+      v-model:layout="layout"
+      :columns="defaultLayout.columns"
+      :row-height="defaultLayout.rowHeight"
+      :gap="defaultLayout.gap"
+      :editable="editable"
+    >
+      <template #default="{ item }">
+        <WidgetRenderer :item="item" :editable="editable" />
+      </template>
+    </GridStackLayout>
   </div>
 </template>

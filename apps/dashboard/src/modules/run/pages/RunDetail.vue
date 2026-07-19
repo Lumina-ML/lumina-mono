@@ -1,14 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, RouterLink } from "vue-router";
-import {
-  NCard,
-  NTag,
-  NTabs,
-  NTabPane,
-  NButton,
-  NSkeleton,
-} from "naive-ui";
+import { LSkeleton, LTabs, LTabPane } from "@lumina/ui";
+import { LCard, LButton, LTag } from "@lumina/ui";
 import { Calendar, Clock } from "lucide-vue-next";
 import { useRun } from "@/modules/run/composables/useRuns";
 import { useMetrics } from "@/modules/metric/composables/useMetrics";
@@ -87,7 +81,7 @@ function toggleKey(key: string) {
 
 <template>
   <div v-if="isRunLoading" class="space-y-6">
-    <NSkeleton text :repeat="3" />
+    <LSkeleton text :repeat="3" />
   </div>
 
   <div v-else-if="!run" class="text-center py-12">
@@ -100,9 +94,9 @@ function toggleKey(key: string) {
       <div class="space-y-2">
         <div class="flex items-center gap-3">
           <h1 class="text-2xl font-bold tracking-tight">{{ run.name }}</h1>
-          <NTag :type="run.status === 'running' ? 'warning' : run.status === 'finished' ? 'success' : 'error'" round>
+          <LTag :type="run.status === 'running' ? 'warning' : run.status === 'finished' ? 'success' : 'error'" round>
             {{ run.status }}
-          </NTag>
+          </LTag>
         </div>
         <div class="flex items-center gap-4 text-sm text-muted-foreground">
           <RouterLink :to="`/projects/${run.projectId}`" class="hover:underline">
@@ -118,13 +112,13 @@ function toggleKey(key: string) {
           </span>
         </div>
       </div>
-      <NButton size="small" @click="refetchRun()">Refresh</NButton>
+      <LButton size="sm" @click="refetchRun()">Refresh</LButton>
     </div>
 
     <!-- Tabs -->
-    <NTabs type="line" animated>
-      <NTabPane name="metrics" tab="Metrics">
-        <NCard>
+    <LTabs type="line" animated>
+      <LTabPane name="metrics" tab="Metrics">
+        <LCard>
           <div v-if="isMetricsLoading" class="py-12 text-center text-muted-foreground">
             Loading metrics...
           </div>
@@ -133,24 +127,24 @@ function toggleKey(key: string) {
           </div>
           <div v-else class="space-y-4">
             <div class="flex flex-wrap gap-2">
-              <NTag
+              <LTag
                 v-for="key in metricKeys"
                 :key="key"
                 :type="selectedKeys.includes(key) ? 'primary' : 'default'"
                 size="small"
-                style="cursor: pointer"
+                class="cursor-pointer"
                 @click="toggleKey(key)"
               >
                 {{ key }}
-              </NTag>
+              </LTag>
             </div>
             <MetricChart :metrics="filteredMetrics" />
           </div>
-        </NCard>
-      </NTabPane>
+        </LCard>
+      </LTabPane>
 
-      <NTabPane name="system" tab="System">
-        <NCard>
+      <LTabPane name="system" tab="System">
+        <LCard>
           <div v-if="isSystemMetricsLoading" class="py-12 text-center text-muted-foreground">
             Loading system metrics...
           </div>
@@ -158,30 +152,30 @@ function toggleKey(key: string) {
             No system metrics logged yet.
           </div>
           <MetricChart v-else :metrics="systemMetrics.metrics" />
-        </NCard>
-      </NTabPane>
+        </LCard>
+      </LTabPane>
 
-      <NTabPane name="logs" tab="Logs">
-        <NCard>
+      <LTabPane name="logs" tab="Logs">
+        <LCard>
           <LogViewer
             :logs="logLines?.logs ?? []"
             :loading="isLogsLoading"
             v-model:level="logLevelFilter"
           />
-        </NCard>
-      </NTabPane>
+        </LCard>
+      </LTabPane>
 
-      <NTabPane name="tags" tab="Tags">
-        <NCard title="Run Tags">
+      <LTabPane name="tags" tab="Tags">
+        <LCard title="Run Tags">
           <TagList :tags="runTags?.items ?? []" :loading="isTagsLoading" />
-        </NCard>
-      </NTabPane>
+        </LCard>
+      </LTabPane>
 
-      <NTabPane name="config" tab="Config">
-        <NCard title="Run Config">
+      <LTabPane name="config" tab="Config">
+        <LCard title="Run Config">
           <VueJsonPretty :data="run.config" :deep="3" />
-        </NCard>
-      </NTabPane>
-    </NTabs>
+        </LCard>
+      </LTabPane>
+    </LTabs>
   </div>
 </template>

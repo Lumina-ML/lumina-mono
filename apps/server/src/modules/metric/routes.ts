@@ -4,7 +4,7 @@ import { MetricHandler } from "./handler.js";
 import { RunService } from "../run/service.js";
 
 export async function metricRoutes(app: FastifyInstance) {
-  const metricService = new MetricService(app.prisma);
+  const metricService = new MetricService(app.metricStorage, app.eventBus, app.queue);
   const runService = new RunService(app.prisma);
   const handler = new MetricHandler(metricService, runService);
 

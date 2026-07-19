@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, h } from "vue";
 import { RouterLink } from "vue-router";
-import { NCard, NButton } from "naive-ui";
+import { LCard, LButton } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
 import DataTable from "@/components/DataTable.vue";
 import { useProjects } from "@/modules/project/composables/useProjects";
@@ -50,7 +50,7 @@ const columns: ColumnDef<Project>[] = [
       h(
         RouterLink,
         { to: `/projects/${row.original.id}` },
-        () => h(NButton, { size: "small" }, () => "View"),
+        () => h(LButton, { size: "sm" }, () => "View"),
       ),
   },
 ];
@@ -65,7 +65,7 @@ const columns: ColumnDef<Project>[] = [
       </div>
     </div>
 
-    <NCard>
+    <LCard>
       <DataTable
         :data="projects?.items ?? []"
         :columns="columns"
@@ -74,6 +74,6 @@ const columns: ColumnDef<Project>[] = [
         v-model:page-size="pageSize"
         :total="projects?.total ?? 0"
       />
-    </NCard>
+    </LCard>
   </div>
 </template>

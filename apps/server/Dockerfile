@@ -27,7 +27,7 @@ ENV PORT=8000
 ENV HOST=0.0.0.0
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y openssl python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-lock.yaml ./

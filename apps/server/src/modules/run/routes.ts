@@ -4,7 +4,7 @@ import { RunHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
 
 export async function runRoutes(app: FastifyInstance) {
-  const runService = new RunService(app.prisma);
+  const runService = new RunService(app.prisma, app.eventBus);
   const projectService = new ProjectService(app.prisma);
   const handler = new RunHandler(runService, projectService);
 

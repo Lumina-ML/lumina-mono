@@ -1,0 +1,225 @@
+import type { EChartsOption, SeriesOption, DataZoomComponentOption } from "echarts";
+import type {
+  ChartAxis,
+  ChartConfig,
+  ChartDataZoom,
+  ChartLegend,
+  ChartPerformance,
+  ChartSeries,
+  ChartTooltip,
+} from "../types";
+import { getChartThemeColors } from "../theme";
+
+const DEFAULT_SAMPLING_THRESHOLD = 2_000;
+const DEFAULT_LARGE_THRESHOLD = 20_000;
+
+function buildAxisBase(axis: ChartAxis) {
+  const theme = getChartThemeColors();
+
+  return {
+    type: axis.type as any,
+    name: axis.name,
+    min: axis.min,
+    max: axis.max,
+    axisLine: axis.axisLine === false ? { show: false } : { lineStyle: { color: theme.mutedTextColor } },
+    axisLabel:
+      axis.axisLabel === false
+        ? { show: false }
+        : {
+            color: theme.mutedTextColor,
+            formatter:
+              typeof axis.axisLabel === "object" ? axis.axisLabel.formatter : undefined,
+          },
+    axisTick: { show: false },
+    splitLine:
+      axis.splitLine === false
+        ? { show: false }
+        : {
+            show: true,
+            lineStyle: {
+              type:
+                typeof axis.splitLine === "object"
+                  ? (axis.splitLine.lineStyle?.type ?? "dashed")
+                  : "dashed",
+              color: theme.gridLineColor,
+            },
+          },
+    nameTextStyle: { color: theme.mutedTextColor },
+  };
+}
+
+function buildXAxis(axis: ChartAxis): EChartsOption["xAxis"] {
+  return buildAxisBase(axis) as EChartsOption["xAxis"];
+}
+
+function buildYAxis(axis: ChartAxis): EChartsOption["yAxis"] {
+  return buildAxisBase(axis) as EChartsOption["yAxis"];
+}
+
+function applyPerformance(
+  series: ChartSeries,
+  performance: ChartPerformance | undefined,
+): Partial<ChartSeries> {
+  const samplingThreshold = performance?.samplingThreshold ?? DEFAULT_SAMPLING_THRESHOLD;
+  const largeThreshold = performance?.largeThreshold ?? DEFAULT_LARGE_THRESHOLD;
+  const dataLength = series.data.length;
+
+  const result: Partial<ChartSeries> = {};
+
+  if (dataLength > samplingThreshold) {
+    result.sampling = series.sampling ?? "lttb";
+    result.showSymbol = series.showSymbol ?? false;
+  }
+
+  if (dataLength > largeThreshold) {
+    result.progressive = series.progressive ?? 5_000;
+  }
+
+  return result;
+}
+
+function buildSeries(series: ChartSeries, performance?: ChartPerformance): SeriesOption {
+  const perf = applyPerformance(series, performance);
+
+  const base = {
+    name: series.name,
+    data: series.data,
+    itemStyle: series.color ? { color: series.color } : undefined,
+    smooth: series.smooth ?? false,
+    showSymbol: perf.showSymbol ?? series.showSymbol ?? false,
+    symbolSize: series.symbolSize,
+    sampling: perf.sampling ?? series.sampling,
+    progressive: perf.progressive ?? series.progressive,
+    large: series.largeThreshold ? series.data.length > series.largeThreshold : undefined,
+    largeThreshold: series.largeThreshold,
+    animationDuration: 300,
+  };
+
+  switch (series.type) {
+    case "line":
+    case "area":
+      return {
+        ...base,
+        type: "line",
+        lineStyle: {
+          width: series.lineWidth ?? 2,
+          type: series.lineType ?? "solid",
+        },
+        areaStyle:
+          series.type === "area"
+            ? { opacity: series.areaOpacity ?? 0.1 }
+            : undefined,
+      } as SeriesOption;
+    case "bar":
+      return {
+        ...base,
+        type: "bar",
+      } as SeriesOption;
+    case "scatter":
+      return {
+        ...base,
+        type: "scatter",
+      } as SeriesOption;
+    default:
+      return { ...base, type: "line" } as SeriesOption;
+  }
+}
+
+function buildLegend(legend: ChartLegend | undefined): EChartsOption["legend"] {
+  if (legend?.show === false) return { show: false };
+
+  const positionMap: Record<string, string> = {
+    top: "top",
+    bottom: "bottom",
+    left: "left",
+    right: "right",
+  };
+
+  return {
+    show: legend?.show ?? true,
+    [positionMap[legend?.position ?? "bottom"]]: 0,
+    type: legend?.type ?? "scroll",
+    textStyle: { color: getChartThemeColors().mutedTextColor },
+  };
+}
+
+function buildTooltip(tooltip: ChartTooltip | undefined): EChartsOption["tooltip"] {
+  const theme = getChartThemeColors();
+
+  return {
+    trigger: tooltip?.trigger ?? "axis",
+    axisPointer:
+      tooltip?.crosshair === false
+        ? { type: "none" }
+        : {
+            type:
+              typeof tooltip?.crosshair === "object"
+                ? (tooltip.crosshair.type ?? "cross")
+                : "cross",
+            label: { backgroundColor: theme.tooltipBackground },
+          },
+    backgroundColor: theme.tooltipBackground,
+    borderColor: theme.tooltipBorder,
+    textStyle: { color: theme.textColor },
+    formatter: tooltip?.formatter,
+  };
+}
+
+function buildDataZoom(dz: ChartDataZoom): DataZoomComponentOption {
+  const base = {
+    type: dz.type,
+    xAxisIndex: dz.xAxisIndex,
+    yAxisIndex: dz.yAxisIndex,
+  };
+
+  if (dz.type === "slider") {
+    return {
+      ...base,
+      start: dz.start ?? 0,
+      end: dz.end ?? 100,
+      bottom: 0,
+      height: 20,
+      borderColor: "transparent",
+      fillerColor: "hsl(var(--ldl-primary) / 0.2)",
+      handleStyle: { color: "hsl(var(--ldl-primary))" },
+      textStyle: { color: getChartThemeColors().mutedTextColor },
+    } as DataZoomComponentOption;
+  }
+
+  return base as DataZoomComponentOption;
+}
+
+/**
+ * 把 Lumina ChartConfig 转成 ECharts option。
+ */
+export function toEChartsOption(config: ChartConfig): EChartsOption {
+  const theme = getChartThemeColors();
+
+  return {
+    backgroundColor: config.backgroundColor ?? theme.backgroundColor,
+    color: theme.palette,
+    title: config.title
+      ? {
+          text: config.title,
+          left: "center",
+          textStyle: { fontSize: 14, fontWeight: "normal", color: theme.textColor },
+        }
+      : undefined,
+    tooltip: buildTooltip(config.tooltip),
+    legend: buildLegend(config.legend),
+    grid: {
+      left: config.grid?.left ?? "3%",
+      right: config.grid?.right ?? "4%",
+      top: config.grid?.top ?? "15%",
+      bottom: config.grid?.bottom ?? "15%",
+      containLabel: config.grid?.containLabel ?? true,
+    },
+    xAxis: buildXAxis(config.xAxis),
+    yAxis: buildYAxis(config.yAxis),
+    dataZoom: config.dataZoom?.map(buildDataZoom) as DataZoomComponentOption[] | undefined,
+    series: config.series.map((s) => buildSeries(s, config.performance)) as SeriesOption[],
+    animation: config.animation?.enabled ?? true,
+    animationDuration: config.animation?.duration ?? 300,
+    animationEasing: config.animation?.easing ?? "cubicOut",
+  };
+}

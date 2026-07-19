@@ -14,6 +14,7 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
+    "@lumina/ui": "workspace:*",
     "@tanstack/vue-query": "^5.49.0",
     "@tanstack/vue-table": "^8.21.3",
     "@tanstack/vue-virtual": "^3.13.32",
@@ -24,11 +25,9 @@
     "date-fns": "^4.4.0",
     "echarts": "^5.5.0",
     "lucide-vue-next": "^0.400.0",
-    "naive-ui": "^2.44.1",
     "pinia": "^2.1.0",
     "tailwind-merge": "^3.6.0",
     "vee-validate": "^4.15.1",
-    "vfonts": "^0.0.3",
     "vue": "^3.4.0",
     "vue-echarts": "^6.7.0",
     "vue-json-pretty": "^2.6.0",
