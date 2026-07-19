@@ -9,7 +9,8 @@
 
 /*
  * 语义 token → Tailwind 工具类。
- * 原始 :root / .dark token 值由 @lumina/ui 的 theme.css 提供(经 dist/style.css 加载),
+ * 原始 :root / .dark token 值由 @lumina/ui 的 theme.css 提供(经 main.ts 的
+ * `@lumina/ui/style.css` 加载, vite alias 解析到 packages/lumina-ui/src/theme/theme.css),
  * 这里只做「语义名 → hsl(var(--…))」映射,hsl(var()) 为运行时解析。
  */
 @theme {

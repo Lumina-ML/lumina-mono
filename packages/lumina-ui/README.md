@@ -64,7 +64,7 @@ pnpm add @lumina/ui
 在应用入口引入主题 CSS，并用 `LThemeProvider` 包裹应用：
 
 ```ts
-import "@lumina/ui/dist/style.css";
+import "@lumina/ui/style.css";
 ```
 
 ```vue
