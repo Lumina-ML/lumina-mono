@@ -61,11 +61,25 @@ pnpm add @lumina/ui
 
 ### 引入样式
 
-在应用入口引入主题 CSS：
+在应用入口引入主题 CSS，并用 `LThemeProvider` 包裹应用：
 
 ```ts
 import "@lumina/ui/dist/style.css";
 ```
+
+```vue
+<script setup lang="ts">
+import { LThemeProvider } from "@lumina/ui";
+</script>
+
+<template>
+  <LThemeProvider>
+    <RouterView />
+  </LThemeProvider>
+</template>
+```
+
+`LThemeProvider` 内部使用 naive-ui 的 `NConfigProvider` 注入 `luminaThemeOverrides`，让所有 naive-ui 组件吃上 Lumina 的 Design Token。应用层只需引入一次，无需再自己配置 naive-ui 主题。
 
 ### 基础组件
 
