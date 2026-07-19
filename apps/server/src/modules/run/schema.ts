@@ -7,6 +7,7 @@ export const RunStatusSchema = z.enum([
   "failed",
   "crashed",
   "killed",
+  "preempting",
 ]);
 
 export const CreateRunSchema = z.object({

@@ -4,7 +4,7 @@ import { LogLineHandler } from "./handler.js";
 import { RunService } from "../run/service.js";
 
 export async function logLineRoutes(app: FastifyInstance) {
-  const logLineService = new LogLineService(app.prisma);
+  const logLineService = new LogLineService(app.timeSeriesStorage);
   const runService = new RunService(app.prisma);
   const handler = new LogLineHandler(logLineService, runService);
 

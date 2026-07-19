@@ -1,19 +1,40 @@
-import type { PrismaClient } from "../../generated/prisma/index.js";
+import type { TimeSeriesStorage } from "../../core/storage/time-series-storage.js";
 import type { LogLinesInput } from "./schema.js";
-import { LogLineRepository } from "./repository.js";
 
 export class LogLineService {
-  private readonly repository: LogLineRepository;
-
-  constructor(prisma: PrismaClient) {
-    this.repository = new LogLineRepository(prisma);
-  }
+  constructor(private readonly storage: TimeSeriesStorage) {}
 
   async log(runId: string, projectId: string, data: LogLinesInput) {
-    return this.repository.createMany(runId, projectId, data);
+    const rows = data.logs.map((log) => ({
+      runId,
+      projectId,
+      level: log.level ?? "INFO",
+      message: log.message,
+      step: log.step ?? null,
+      timestamp: log.timestamp ?? new Date(),
+    }));
+    await this.storage.insertBatch("log_line", rows);
   }
 
   async list(runId: string, params: { level?: string; limit: number }) {
-    return this.repository.list(runId, params);
+    const rows = await this.storage.query("log_line", {
+      runId,
+      limit: params.limit,
+      orderBy: { column: "timestamp", direction: "asc" },
+    });
+
+    const levelFilter = params.level;
+    const logs = rows
+      .filter((row) => !levelFilter || row.level === levelFilter)
+      .map((row) => ({
+        level: String(row.level ?? "INFO"),
+        message: String(row.message),
+        step: row.step == null ? undefined : Number(row.step),
+        timestamp: (row.timestamp instanceof Date
+          ? row.timestamp
+          : new Date(row.timestamp as string)).toISOString(),
+      }));
+
+    return { runId, logs };
   }
 }
