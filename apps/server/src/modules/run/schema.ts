@@ -12,7 +12,10 @@ export const RunStatusSchema = z.enum([
 
 export const CreateRunSchema = z.object({
   project: z.string().min(1).max(128),
-  name: z.string().min(1).max(256),
+  // Name is optional so SDK calls like `lumina.init(project="foo")` (no
+  // explicit name) succeed. The repository assigns a generated slug when
+  // the field is missing or empty.
+  name: z.string().min(1).max(256).optional(),
   sweepId: z.string().uuid().optional(),
   config: z.record(z.unknown()).default({}),
   metadata: z.record(z.unknown()).default({}),

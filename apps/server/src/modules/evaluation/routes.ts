@@ -13,4 +13,5 @@ export async function evaluationRoutes(app: FastifyInstance) {
   app.get("/evaluations/:evaluationId", handler.getEvaluation.bind(handler));
   app.patch("/evaluations/:evaluationId", handler.patchEvaluation.bind(handler));
   app.post("/evaluations/:evaluationId/results", handler.createResult.bind(handler));
+  app.get("/evaluations/:evaluationId/results", handler.listResults.bind(handler));
 }

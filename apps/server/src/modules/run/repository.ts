@@ -6,12 +6,16 @@ export class RunRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async create(projectId: string, data: CreateRunInput) {
+    const trimmed = data.name?.trim();
+    const fallbackName = trimmed && trimmed.length > 0
+      ? trimmed
+      : `run-${Math.random().toString(16).slice(2, 10)}`;
     return this.prisma.run.create({
       data: {
         projectId,
         runId: uuidv7(),
         sweepId: data.sweepId,
-        name: data.name,
+        name: fallbackName,
         status: "running",
         config: data.config as any,
         metadata: data.metadata as any,

@@ -55,6 +55,14 @@ export class TraceService {
     return this.repository.createSpan(traceId, { ...data, spanId, parentSpanId: data.parentSpanId });
   }
 
+  async listSpansByTrace(traceId: string): Promise<SpanRow[]> {
+    const trace = await this.repository.findByTraceId(traceId);
+    if (!trace) {
+      throw new Error(`Trace not found: ${traceId}`);
+    }
+    return trace.spans;
+  }
+
   async findSpanById(spanId: string): Promise<SpanRow | null> {
     return this.repository.findSpanById(spanId);
   }

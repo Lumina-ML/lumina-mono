@@ -76,6 +76,21 @@ export class TraceHandler {
     }
   }
 
+  async listSpans(req: FastifyRequest, reply: FastifyReply) {
+    const { traceId } = TraceParamsSchema.parse(req.params);
+    try {
+      const spans = await this.traceService.listSpansByTrace(traceId);
+      reply.send({ items: spans });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.startsWith("Trace not found")) {
+        reply.status(404).send({ error: msg });
+        return;
+      }
+      throw err;
+    }
+  }
+
   async getSpan(req: FastifyRequest, reply: FastifyReply) {
     const { spanId } = SpanParamsSchema.parse(req.params);
     const span = await this.traceService.findSpanById(spanId);

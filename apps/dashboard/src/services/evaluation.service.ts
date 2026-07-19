@@ -3,6 +3,7 @@ import type {
   Evaluation,
   EvaluationResult,
   CreateEvaluationInput,
+  PatchEvaluationInput,
   ListEvaluationsQuery,
 } from "@/types/evaluation";
 import type { PaginatedResponse } from "@/types/project";
@@ -23,6 +24,16 @@ export const EvaluationService = {
   create(projectId: string, data: CreateEvaluationInput): Promise<Evaluation> {
     return fetchApi(`/api/v1/projects/${projectId}/evaluations`, {
       method: "POST",
+      body: data,
+    });
+  },
+
+  patchEvaluation(
+    evaluationId: string,
+    data: PatchEvaluationInput,
+  ): Promise<Evaluation> {
+    return fetchApi(`/api/v1/evaluations/${evaluationId}`, {
+      method: "PATCH",
       body: data,
     });
   },

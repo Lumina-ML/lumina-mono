@@ -3,6 +3,8 @@ import type {
   Trace,
   Span,
   CreateTraceInput,
+  PatchTraceInput,
+  PatchSpanInput,
   ListTracesQuery,
 } from "@/types/trace";
 import type { PaginatedResponse } from "@/types/project";
@@ -27,7 +29,25 @@ export const TraceService = {
     });
   },
 
+  patchTrace(traceId: string, data: PatchTraceInput): Promise<Trace> {
+    return fetchApi(`/api/v1/traces/${traceId}`, {
+      method: "PATCH",
+      body: data,
+    });
+  },
+
   listSpans(traceId: string): Promise<Span[]> {
     return fetchApi(`/api/v1/traces/${traceId}/spans`);
+  },
+
+  getSpan(spanId: string): Promise<Span> {
+    return fetchApi(`/api/v1/spans/${spanId}`);
+  },
+
+  patchSpan(spanId: string, data: PatchSpanInput): Promise<Span> {
+    return fetchApi(`/api/v1/spans/${spanId}`, {
+      method: "PATCH",
+      body: data,
+    });
   },
 };

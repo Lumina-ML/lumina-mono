@@ -24,7 +24,13 @@ export interface CreateRegistryModelInput {
   description?: string;
 }
 
+export interface PatchRegistryModelVersionInput {
+  aliases?: string[];
+  metadata?: Record<string, unknown>;
+}
+
 export interface ListRegistryModelsQuery {
+  projectId?: string;
   limit?: number;
   offset?: number;
 }

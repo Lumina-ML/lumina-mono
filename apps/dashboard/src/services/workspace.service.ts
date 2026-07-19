@@ -22,13 +22,29 @@ export interface User {
   id: string;
   email: string;
   name: string | null;
+  avatar: string | null;
   createdAt: string;
+}
+
+export interface CreateUserInput {
+  email: string;
+  name?: string;
+  avatar?: string;
+}
+
+export interface UpdateUserInput {
+  name?: string;
+  avatar?: string;
 }
 
 /** Backend exposes these endpoints under workspace-membership routes. */
 export const WorkspaceService = {
   listMemberships(workspaceId: string): Promise<WorkspaceMembership[]> {
     return fetchApi(`/api/v1/workspaces/${workspaceId}/memberships`);
+  },
+
+  getMembership(membershipId: string): Promise<WorkspaceMembership> {
+    return fetchApi(`/api/v1/workspace-memberships/${membershipId}`);
   },
 
   createMembership(input: {
@@ -60,6 +76,33 @@ export const WorkspaceService = {
 
   listUsers(): Promise<User[]> {
     return fetchApi("/api/v1/users");
+  },
+
+  getUser(userId: string): Promise<User> {
+    return fetchApi(`/api/v1/users/${userId}`);
+  },
+
+  getCurrentUser(): Promise<User> {
+    return fetchApi("/api/v1/users/me");
+  },
+
+  createUser(data: CreateUserInput): Promise<User> {
+    return fetchApi("/api/v1/users", { method: "POST", body: data });
+  },
+
+  updateUser(userId: string, data: UpdateUserInput): Promise<User> {
+    return fetchApi(`/api/v1/users/${userId}`, {
+      method: "PATCH",
+      body: data,
+    });
+  },
+
+  deleteUser(userId: string): Promise<void> {
+    return fetchApi(`/api/v1/users/${userId}`, { method: "DELETE" });
+  },
+
+  listUserMemberships(userId: string): Promise<WorkspaceMembership[]> {
+    return fetchApi(`/api/v1/users/${userId}/memberships`);
   },
 
   generateApiKey(userId: string): Promise<{ apiKey: string }> {

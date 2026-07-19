@@ -31,6 +31,12 @@ export interface CreateEvaluationInput {
   metadata?: Record<string, unknown>;
 }
 
+export interface PatchEvaluationInput {
+  status?: EvaluationStatus;
+  summary?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
 export interface ListEvaluationsQuery {
   projectId?: string;
   status?: EvaluationStatus;

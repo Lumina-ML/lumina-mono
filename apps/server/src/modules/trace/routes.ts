@@ -13,6 +13,7 @@ export async function traceRoutes(app: FastifyInstance) {
   app.get("/traces/:traceId", handler.getTrace.bind(handler));
   app.patch("/traces/:traceId", handler.patchTrace.bind(handler));
   app.post("/traces/:traceId/spans", handler.createSpan.bind(handler));
+  app.get("/traces/:traceId/spans", handler.listSpans.bind(handler));
   app.get("/spans/:spanId", handler.getSpan.bind(handler));
   app.patch("/spans/:spanId", handler.patchSpan.bind(handler));
 }

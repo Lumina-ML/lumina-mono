@@ -32,4 +32,12 @@ export class EvaluationService {
   async createResult(evaluationId: string, data: CreateEvaluationResultInput) {
     return this.repository.createResult(evaluationId, data);
   }
+
+  async listResults(evaluationId: string) {
+    const evaluation = await this.repository.findById(evaluationId);
+    if (!evaluation) {
+      return null;
+    }
+    return evaluation.results ?? [];
+  }
 }

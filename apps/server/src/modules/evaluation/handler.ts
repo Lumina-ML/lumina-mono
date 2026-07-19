@@ -58,4 +58,14 @@ export class EvaluationHandler {
     const result = await this.evaluationService.createResult(evaluationId, data);
     reply.status(201).send(result);
   }
+
+  async listResults(req: FastifyRequest, reply: FastifyReply) {
+    const { evaluationId } = EvaluationParamsSchema.parse(req.params);
+    const results = await this.evaluationService.listResults(evaluationId);
+    if (results === null) {
+      reply.status(404).send({ error: "Evaluation not found" });
+      return;
+    }
+    reply.send({ items: results });
+  }
 }
