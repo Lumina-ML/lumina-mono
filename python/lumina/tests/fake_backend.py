@@ -27,6 +27,8 @@ _ARTIFACT_FILES: dict[str, list[dict[str, Any]]] = {}  # version_id -> files
 _LINEAGE: list[dict[str, Any]] = []  # {child, parent, type}
 _VERSION_DIGESTS: dict[str, str] = {}
 _UPLOADS: dict[str, int] = {}  # upload_url -> bytes received
+_SWEEPS: dict[str, dict[str, Any]] = {}  # by id
+_SWEEP_RUNS: list[dict[str, Any]] = []  # per-sweep run rows for observations
 
 
 def _reset_state() -> None:
@@ -40,6 +42,8 @@ def _reset_state() -> None:
     _LINEAGE.clear()
     _VERSION_DIGESTS.clear()
     _UPLOADS.clear()
+    _SWEEPS.clear()
+    _SWEEP_RUNS.clear()
 
 
 def _project_id_for(name: str) -> str:
@@ -102,9 +106,45 @@ def _handle(method: str, path: str, body: dict[str, Any], *, upload_base: str = 
         project = body.get("project")
         run = _RUNS.setdefault(
             run_id,
-            {"runId": run_id, "status": "running", "metadata": {}, "projectId": _project_id_for(project) if project else None},
+            {
+                "runId": run_id,
+                "status": "running",
+                "metadata": {},
+                "config": body.get("config", {}),
+                "summary": {},
+                "projectId": _project_id_for(project) if project else None,
+                "sweepId": body.get("sweepId"),
+            },
         )
+        # If attached to a sweep, record a stub row in _SWEEP_RUNS so the
+        # observations + should-terminate endpoints can see it.
+        if body.get("sweepId"):
+            if not any(r["runId"] == run_id for r in _SWEEP_RUNS):
+                _SWEEP_RUNS.append({
+                    "sweepId": body["sweepId"],
+                    "runId": run_id,
+                    "metric": None,
+                    "status": "running",
+                    "params": body.get("config", {}),
+                })
         return run, 201
+    if method == "POST" and base_path.endswith("/metrics") and base_path.startswith("/api/v1/runs/"):
+        run_id = base_path.split("/")[4]
+        run = _RUNS.setdefault(run_id, {"runId": run_id, "status": "running", "summary": {}, "config": {}, "sweepId": None})
+        summary = run.setdefault("summary", {})
+        for m in body.get("metrics", []):
+            summary[m["key"]] = m["value"]
+        # Mirror into _SWEEP_RUNS so observations + should-terminate endpoints see it.
+        sweep_id = run.get("sweepId")
+        if sweep_id:
+            existing = next((r for r in _SWEEP_RUNS if r["runId"] == run_id), None)
+            if existing:
+                for k, v in summary.items():
+                    if isinstance(v, (int, float)):
+                        existing[k] = v
+            else:
+                _SWEEP_RUNS.append({"sweepId": sweep_id, "runId": run_id, "metric": summary.get("_metric"), "status": run.get("status", "running"), "params": run.get("config", {})})
+        return {"ok": True}, 200
 
     # Artifact routes
     if method == "GET" and base_path.startswith("/api/v1/projects/") and base_path.endswith("/artifacts"):
@@ -210,6 +250,98 @@ def _handle(method: str, path: str, body: dict[str, Any], *, upload_base: str = 
         before = len(_LINEAGE)
         _LINEAGE[:] = [l for l in _LINEAGE if not (l["child"] == child and l["parent"] == parent)]
         return None, 204 if len(_LINEAGE) < before else 404
+
+    # Sweep routes
+    if method == "GET" and base_path.startswith("/api/v1/projects/") and base_path.endswith("/sweeps"):
+        project_id = base_path.split("/")[4]
+        items = [s for s in _SWEEPS.values() if s.get("projectId") == project_id]
+        return {"items": items}, 200
+    if method == "POST" and base_path.startswith("/api/v1/projects/") and base_path.endswith("/sweeps"):
+        project_id = base_path.split("/")[4]
+        sid = f"sweep-{len(_SWEEPS) + 1}"
+        row = {
+            "id": sid,
+            "projectId": project_id,
+            "name": body["name"],
+            "method": body.get("method", "random"),
+            "config": body.get("config", {}),
+            "state": "running",
+            "bestRunId": None,
+        }
+        _SWEEPS[sid] = row
+        return row, 201
+    if method == "GET" and base_path.startswith("/api/v1/sweeps/") and base_path.count("/") == 4:
+        sid = base_path.split("/")[4]
+        return _SWEEPS.get(sid, {"error": "not found"}), 200 if sid in _SWEEPS else 404
+    if method == "GET" and base_path.endswith("/observations") and base_path.startswith("/api/v1/sweeps/"):
+        sid = base_path.split("/")[4]
+        return {"items": [r for r in _SWEEP_RUNS if r["sweepId"] == sid]}, 200
+    if method == "POST" and base_path.endswith("/suggest") and base_path.startswith("/api/v1/sweeps/"):
+        sid = base_path.split("/")[4]
+        count = int(body.get("count", 1))
+        sweep = _SWEEPS.get(sid, {})
+        params = (sweep.get("config") or {}).get("parameters", {})
+        # Return candidates with reasonable values for known keys.
+        candidates = []
+        for i in range(count):
+            candidate: dict[str, Any] = {}
+            for k, spec in params.items():
+                if isinstance(spec, dict) and "values" in spec:
+                    candidate[k] = spec["values"][i % len(spec["values"])]
+                elif isinstance(spec, dict) and "min" in spec:
+                    mn, mx = spec["min"], spec["max"]
+                    candidate[k] = mn + (mx - mn) * ((i + 1) / (count + 1))
+                else:
+                    candidate[k] = None
+            candidates.append(candidate)
+        return {"candidates": candidates}, 200
+    if method == "POST" and base_path.endswith("/should-terminate") and base_path.startswith("/api/v1/sweeps/"):
+        sid = base_path.split("/")[4]
+        run_id = body.get("runId")
+        step = int(body.get("step", 0))
+        metric = float(body.get("metric", 0))
+        sweep = _SWEEPS.get(sid, {})
+        cfg = sweep.get("config") or {}
+        et = cfg.get("early_terminate") or {}
+        min_iter = int(et.get("min_iter", 1))
+        if step < min_iter:
+            return {"shouldTerminate": False, "reason": "below min_iter"}, 200
+        peers = [r["metric"] for r in _SWEEP_RUNS if r["sweepId"] == sid and r["runId"] != run_id and r.get("metric") is not None]
+        goal = ((cfg.get("metric") or {}).get("goal") or "minimize")
+        if len(peers) < 3:
+            return {"shouldTerminate": False, "reason": "not enough peers"}, 200
+        sorted_p = sorted(peers + [metric])
+        if et.get("type") == "hyperband":
+            rank = sorted_p.index(metric)
+            keep = max(1, len(sorted_p) // int(et.get("eta", 3)))
+            stop = rank >= len(sorted_p) - keep
+        else:  # median
+            median = sorted_p[len(sorted_p) // 2]
+            stop = metric > median if goal == "minimize" else metric < median
+        return {"shouldTerminate": stop, "reason": "test"}, 200
+    if method == "POST" and base_path.endswith("/record-best") and base_path.startswith("/api/v1/sweeps/"):
+        sid = base_path.split("/")[4]
+        sweep = _SWEEPS.get(sid)
+        if not sweep:
+            return {"error": "not found"}, 404
+        cfg = sweep.get("config") or {}
+        metric_name = (cfg.get("metric") or {}).get("name", "_metric")
+        goal = (cfg.get("metric") or {}).get("goal", "minimize")
+        # Look up metric by configured name in each run's underlying _RUNS row.
+        rows = []
+        for row in _SWEEP_RUNS:
+            if row["sweepId"] != sid:
+                continue
+            run_row = _RUNS.get(row["runId"], {})
+            summary = run_row.get("summary", {})
+            val = summary.get(metric_name)
+            if isinstance(val, (int, float)):
+                rows.append({"runId": row["runId"], "metric": val})
+        if not rows:
+            return {"bestRunId": None}, 200
+        best = min(rows, key=lambda r: r["metric"]) if goal == "minimize" else max(rows, key=lambda r: r["metric"])
+        sweep["bestRunId"] = best["runId"]
+        return {"bestRunId": best["runId"]}, 200
 
     return {"error": "not implemented", "path": path, "method": method}, 501
 
@@ -319,6 +451,17 @@ class FakeLuminaBackend:
 
     def get_upload_count(self, url: str) -> int | None:
         return _UPLOADS.get(url)
+
+    # Sweep test introspection
+    def seed_sweep_runs(self, sweep_id: str, rows: list[dict[str, Any]]) -> None:
+        for r in rows:
+            _SWEEP_RUNS.append({"sweepId": sweep_id, **r})
+
+    def get_sweep_observations(self, sweep_id: str) -> list[dict[str, Any]]:
+        return [r for r in _SWEEP_RUNS if r["sweepId"] == sweep_id]
+
+    def get_sweep(self, sweep_id: str) -> dict[str, Any]:
+        return dict(_SWEEPS.get(sweep_id, {}))
 
 
 @pytest.fixture

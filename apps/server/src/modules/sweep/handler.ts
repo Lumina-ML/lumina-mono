@@ -1,7 +1,12 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { SweepService } from "./service.js";
-import { CreateSweepSchema, UpdateSweepSchema } from "./schema.js";
+import {
+  CreateSweepSchema,
+  UpdateSweepSchema,
+  SuggestRequestSchema,
+  ShouldTerminateRequestSchema,
+} from "./schema.js";
 import { ProjectService } from "../project/service.js";
 import { RunService } from "../run/service.js";
 
@@ -54,5 +59,36 @@ export class SweepHandler {
     const { sweepId } = SweepParamsSchema.parse(req.params);
     await this.sweepService.delete(sweepId);
     reply.status(204).send();
+  }
+
+  async listObservations(req: FastifyRequest, reply: FastifyReply) {
+    const { sweepId } = SweepParamsSchema.parse(req.params);
+    const observations = await this.sweepService.listObservations(sweepId);
+    reply.send({ items: observations });
+  }
+
+  async suggest(req: FastifyRequest, reply: FastifyReply) {
+    const { sweepId } = SweepParamsSchema.parse(req.params);
+    const { count } = SuggestRequestSchema.parse(req.body ?? {});
+    const candidates = await this.sweepService.suggestNext(sweepId, count);
+    reply.send({ candidates });
+  }
+
+  async shouldTerminate(req: FastifyRequest, reply: FastifyReply) {
+    const { sweepId } = SweepParamsSchema.parse(req.params);
+    const data = ShouldTerminateRequestSchema.parse(req.body);
+    const result = await this.sweepService.evaluateEarlyTermination(
+      sweepId,
+      data.runId,
+      data.step,
+      data.metric,
+    );
+    reply.send(result);
+  }
+
+  async recordBestRun(req: FastifyRequest, reply: FastifyReply) {
+    const { sweepId } = SweepParamsSchema.parse(req.params);
+    const bestRunId = await this.sweepService.recordBestRun(sweepId);
+    reply.send({ bestRunId });
   }
 }

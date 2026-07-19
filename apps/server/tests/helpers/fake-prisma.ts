@@ -54,6 +54,28 @@ interface FakeArtifactLineageRow {
   type: string;
 }
 
+interface FakeSweepRow {
+  id: string;
+  projectId: string;
+  name: string;
+  method: string;
+  config: Record<string, unknown>;
+  state: string;
+  bestRunId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface FakeRunWithSweep {
+  id: string;
+  runId: string;
+  sweepId: string;
+  config: Record<string, unknown>;
+  summary: Record<string, unknown>;
+  status: string;
+  createdAt: Date;
+}
+
 /**
  * Minimal in-memory Prisma replacement that supports the operations the
  * server modules need in tests. Each model is a Map keyed by its primary
@@ -76,6 +98,14 @@ export function createFakePrisma(options: {
     version: string;
     aliases?: string[];
     metadata?: Record<string, unknown>;
+    state?: string;
+  }>;
+  sweeps?: Array<{
+    id?: string;
+    projectId: string;
+    name: string;
+    method?: string;
+    config?: Record<string, unknown>;
     state?: string;
   }>;
 } = {}): PrismaClient {
@@ -149,6 +179,26 @@ export function createFakePrisma(options: {
 
   const filesById = new Map<string, FakeArtifactFileRow>();
   const lineageById = new Map<string, FakeArtifactLineageRow>();
+  const sweepsById = new Map<string, FakeSweepRow>();
+  for (const s of options.sweeps ?? []) {
+    const id = s.id ?? uuidv7();
+    const row: FakeSweepRow = {
+      id,
+      projectId: s.projectId,
+      name: s.name,
+      method: s.method ?? "random",
+      config: s.config ?? {},
+      state: s.state ?? "running",
+      bestRunId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    sweepsById.set(id, row);
+  }
+  // Runs already seeded in options.runs may need sweepId; we tag them via
+  // the runModel by stamping a sweepId field. To keep things simple we
+  // expose sweep-attached runs through the sweepModel itself.
+  const sweepRuns: FakeRunWithSweep[] = [];
 
   const runModel = {
     findUnique: async ({ where }: { where: { runId?: string; id?: string } }) => {
@@ -425,6 +475,60 @@ export function createFakePrisma(options: {
     },
   };
 
+  const sweepModel = {
+    create: async ({ data }: { data: Partial<FakeSweepRow> }) => {
+      const id = data.id ?? uuidv7();
+      const row: FakeSweepRow = {
+        id,
+        projectId: data.projectId!,
+        name: data.name!,
+        method: data.method ?? "random",
+        config: data.config ?? {},
+        state: data.state ?? "running",
+        bestRunId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      sweepsById.set(id, row);
+      return row;
+    },
+    findUnique: async ({ where, include }: { where: { id?: string }; include?: unknown }) => {
+      const row = where.id ? sweepsById.get(where.id) : null;
+      if (!row) return null;
+      if (include) {
+        const inc = include as { runs?: { orderBy?: { createdAt: "asc" | "desc" } } };
+        const runs = sweepRuns
+          .filter((r) => r.sweepId === row.id)
+          .sort((a, b) => {
+            const dir = inc.runs?.orderBy?.createdAt === "asc" ? 1 : -1;
+            return dir * (a.createdAt.getTime() - b.createdAt.getTime());
+          });
+        return { ...row, runs };
+      }
+      return row;
+    },
+    findMany: async ({ where }: { where?: { projectId?: string } } = {}) => {
+      const all = Array.from(sweepsById.values());
+      const filtered = where?.projectId ? all.filter((s) => s.projectId === where.projectId) : all;
+      return filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+    update: async ({ where, data }: { where: { id: string }; data: Partial<FakeSweepRow> }) => {
+      const row = sweepsById.get(where.id);
+      if (!row) throw new Error(`Sweep ${where.id} not found`);
+      Object.assign(row, data, { updatedAt: new Date() });
+      return row;
+    },
+    delete: async ({ where }: { where: { id: string } }) => {
+      sweepsById.delete(where.id);
+      return sweepsById.get(where.id) ?? null;
+    },
+  };
+
+  const runWithSweepModel = {
+    insert: (row: FakeRunWithSweep) => sweepRuns.push(row),
+    findBySweep: (sweepId: string) => sweepRuns.filter((r) => r.sweepId === sweepId),
+  };
+
   function attachVersionIncludes(row: FakeArtifactVersionRow, include: unknown) {
     const result: Record<string, unknown> = { ...row };
     const inc = include as { files?: unknown; artifact?: unknown };
@@ -465,7 +569,7 @@ export function createFakePrisma(options: {
   }
 
   // We return a cast object; only the methods above are accessed.
-  return {
+  const exposed = {
     run: runModel,
     workspace: workspaceModel,
     project: projectModel,
@@ -473,7 +577,10 @@ export function createFakePrisma(options: {
     artifactVersion: artifactVersionModel,
     artifactFile: artifactFileModel,
     artifactLineage: artifactLineageModel,
-  } as unknown as PrismaClient;
+    sweep: sweepModel,
+    __test: { runWithSweep: runWithSweepModel },
+  };
+  return exposed as unknown as PrismaClient;
 }
 
 export interface FakeRunRow {

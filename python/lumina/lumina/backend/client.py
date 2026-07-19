@@ -72,8 +72,8 @@ class LuminaClient:
             payload["config"] = config
         return self._request("POST", "/api/v1/runs", payload)
 
-    def finish_run(self, run_id: str) -> dict[str, Any]:
-        return self._request("PATCH", f"/api/v1/runs/{run_id}", {"status": "finished"})
+    def finish_run(self, run_id: str, status: str = "finished") -> dict[str, Any]:
+        return self._request("PATCH", f"/api/v1/runs/{run_id}", {"status": status})
 
     def update_run(
         self,
