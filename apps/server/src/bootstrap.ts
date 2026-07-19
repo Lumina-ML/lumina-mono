@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import fastify from "fastify";
 import { ZodError } from "zod";
+import { Prisma } from "./generated/prisma/index.js";
 import { configPlugin } from "./plugins/config.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { clickhousePlugin } from "./plugins/clickhouse.js";
@@ -61,6 +62,12 @@ export async function buildApp() {
   // as a generic "Internal Server Error" to clients, which is
   // indistinguishable from a real server bug. This makes the contract
   // explicit: invalid input → 400 with field-level issues.
+  //
+  // Also map Prisma's P2002 (unique constraint) to 409 so that a
+  // duplicate-signup or duplicate-artifact returns "Conflict" instead
+  // of leaking as 500. Without this, every handler would need its own
+  // catch block (user.ts already has one for its own P2002 — leave it,
+  // it just becomes a no-op fast-path).
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof ZodError) {
       reply.status(400).send({
@@ -71,6 +78,16 @@ export async function buildApp() {
           code: i.code,
           message: i.message,
         })),
+      });
+      return;
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const target = (err.meta?.target as string[] | undefined) ?? [];
+      const field = target[0] ?? "field";
+      reply.status(409).send({
+        error: "Conflict",
+        message: `A record with this ${field} already exists.`,
+        field,
       });
       return;
     }

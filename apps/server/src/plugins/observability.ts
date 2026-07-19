@@ -49,11 +49,22 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
   // second `app.get("/healthz", …)` call when both plugins were
   // loaded; this stub is intentionally absent.
 
-  // Prometheus metrics endpoint
+  // Prometheus metrics endpoint. Reads from the per-app telemetry
+  // registry (the same one PrometheusTelemetry writes into) instead of
+  // the global `promClient.register` — multiple `buildApp()` calls in
+  // the same process (E2E test files) each have their own.
   if (config.metricsEnabled) {
     app.get(config.metricsPath, async (_req, reply) => {
-      const metrics = await promClient.register.metrics();
-      reply.type(promClient.register.contentType).send(metrics);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const registry = (app.telemetry as any).registry as
+        | { metrics(): Promise<string>; contentType: string }
+        | undefined;
+      if (!registry) {
+        reply.status(503).send("# no telemetry registry attached\n");
+        return;
+      }
+      const metrics = await registry.metrics();
+      reply.type(registry.contentType).send(metrics);
     });
   }
 
