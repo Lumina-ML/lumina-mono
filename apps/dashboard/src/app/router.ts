@@ -114,6 +114,17 @@ const router = createRouter({
               props: true,
             },
             {
+              path: "evaluations",
+              name: "ProjectEvaluations",
+              component: () => import("@/modules/evaluation/pages/ProjectEvaluations.vue"),
+            },
+            {
+              path: "evaluations/:evaluationId",
+              name: "EvaluationDetail",
+              component: () => import("@/modules/evaluation/pages/EvaluationDetail.vue"),
+              props: true,
+            },
+            {
               path: "traces",
               name: "ProjectTraces",
               component: () => import("@/modules/project/pages/ProjectTraces.vue"),

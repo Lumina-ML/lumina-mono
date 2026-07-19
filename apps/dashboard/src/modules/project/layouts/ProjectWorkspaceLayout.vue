@@ -9,12 +9,14 @@ import {
   FileText,
   Rocket,
   Settings as SettingsIcon,
+  Activity,
 } from "lucide-vue-next";
 import { useProject } from "@/modules/project/composables/useProjects";
 import { useRuns } from "@/modules/run/composables/useRuns";
 import { useSweeps } from "@/modules/sweep/composables/useSweeps";
 import { useArtifacts } from "@/modules/artifact/composables/useArtifacts";
 import { useReports } from "@/modules/report/composables/useReports";
+import { useEvaluations } from "@/modules/evaluation/composables/useEvaluations";
 
 const route = useRoute();
 const router = useRouter();
@@ -26,12 +28,15 @@ const { data: runsResponse } = useRuns(
   computed(() => ({ project: projectId.value, limit: 1, offset: 0 })),
 );
 const { data: sweepsResponse } = useSweeps(
-  computed(() => ({ project: projectId.value, limit: 1, offset: 0 })),
+  computed(() => ({ projectId: projectId.value, limit: 1, offset: 0 })),
 );
 const { data: artifactsResponse } = useArtifacts(
   computed(() => ({ projectId: projectId.value, limit: 1, offset: 0 })),
 );
 const { data: reportsResponse } = useReports(
+  computed(() => ({ projectId: projectId.value, limit: 1, offset: 0 })),
+);
+const { data: evaluationsResponse } = useEvaluations(
   computed(() => ({ projectId: projectId.value, limit: 1, offset: 0 })),
 );
 
@@ -77,6 +82,13 @@ const tabs = computed<TabDef[]>(() => [
     to: `/projects/${projectId.value}/reports`,
     icon: FileText,
     count: () => reportsResponse.value?.total,
+  },
+  {
+    key: "evaluations",
+    label: "Evaluations",
+    to: `/projects/${projectId.value}/evaluations`,
+    icon: Activity,
+    count: () => evaluationsResponse.value?.total,
   },
   {
     key: "launch",
