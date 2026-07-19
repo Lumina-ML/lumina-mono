@@ -1,20 +1,31 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useRoute, RouterLink } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import {
   LSkeleton,
   LCard,
   LTag,
-  LTraceTimeline,
   LEmpty,
-  LJsonView,
+  LSwitch,
 } from "@lumina/ui";
-import type { TraceSpan } from "@lumina/ui";
-import { ArrowLeft, Clock, Hash, Activity, ChevronRight } from "lucide-vue-next";
+import {
+  ArrowLeft,
+  Clock,
+  Hash,
+  MessageSquare,
+} from "lucide-vue-next";
 import { useTrace } from "@/modules/trace/composables/useTraces";
 import { TraceService } from "@/services/trace.service";
 import { useDateFormat } from "@/composables/useDateFormat";
+import {
+  buildSpanTree,
+  findSpan,
+  type SpanNode,
+} from "@/widgets/trace/types";
+import SpanTree from "@/widgets/trace/SpanTree.vue";
+import SpanTimeline from "@/widgets/trace/SpanTimeline.vue";
+import SpanDetail from "@/widgets/trace/SpanDetail.vue";
 
 const route = useRoute();
 const projectId = computed(() => route.params.projectId as string);
@@ -29,80 +40,43 @@ const { data: spans, isLoading: spansLoading } = useQuery({
   enabled: computed(() => !!traceId.value),
 });
 
-interface SpanNode {
-  id: string;
-  parentSpanId: string | null;
-  name: string;
-  startTime: string;
-  endTime: string | null;
-  attributes: Record<string, unknown>;
-  children: SpanNode[];
-}
-
-function buildSpanTree(
-  flat: Array<{
-    id: string;
-    parentSpanId: string | null;
-    name: string;
-    startTime: string;
-    endTime: string | null;
-    attributes: Record<string, unknown>;
-  }>,
-): SpanNode[] {
-  const byId = new Map<string, SpanNode>();
-  for (const s of flat) byId.set(s.id, { ...s, children: [] });
-  const roots: SpanNode[] = [];
-  for (const node of byId.values()) {
-    if (node.parentSpanId && byId.has(node.parentSpanId)) {
-      byId.get(node.parentSpanId)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-  return roots;
-}
-
 const spanTree = computed<SpanNode[]>(() => buildSpanTree(spans.value ?? []));
 
-const traceSpans = computed<TraceSpan[]>(() => {
-  function toTraceSpan(node: SpanNode): TraceSpan {
-    const startMs = new Date(node.startTime).getTime();
-    const endMs = node.endTime ? new Date(node.endTime).getTime() : Date.now();
-    return {
-      id: node.id,
-      name: node.name,
-      startTime: startMs,
-      endTime: endMs,
-      duration: endMs - startMs,
-      status: (node.attributes as { status?: string }).status ?? "ok",
-      children: node.children.map(toTraceSpan),
-    };
+const selectedSpanId = ref<string | null>(null);
+const chatMode = ref(false);
+
+const selectedSpan = computed<SpanNode | null>(() => {
+  if (!selectedSpanId.value) return null;
+  return findSpan(spanTree.value, selectedSpanId.value);
+});
+
+// Auto-select the first root span when data arrives.
+watch(spanTree, (tree) => {
+  if (!selectedSpanId.value && tree.length > 0) {
+    selectedSpanId.value = tree[0]!.id;
   }
-  return spanTree.value.map(toTraceSpan);
 });
 
 const durationMs = computed(() => {
   if (!trace.value?.startTime) return 0;
   const start = new Date(trace.value.startTime).getTime();
-  const end = trace.value.endTime ? new Date(trace.value.endTime).getTime() : Date.now();
+  const end = trace.value.endTime
+    ? new Date(trace.value.endTime).getTime()
+    : Date.now();
   return end - start;
 });
 
-const flatSpanList = computed<SpanNode[]>(() => {
-  const out: SpanNode[] = [];
-  function walk(nodes: SpanNode[]) {
-    for (const n of nodes) {
-      out.push(n);
-      walk(n.children);
-    }
-  }
-  walk(spanTree.value);
-  return out;
+const spanCount = computed(() => {
+  const walk = (nodes: SpanNode[]): number =>
+    nodes.reduce((a, n) => a + 1 + walk(n.children), 0);
+  return walk(spanTree.value);
 });
+
+import { watch } from "vue";
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-4">
     <RouterLink
       :to="`/projects/${projectId}`"
       class="inline-flex items-center gap-1 text-sm text-fg-tertiary hover:text-fg-primary"
@@ -114,7 +88,7 @@ const flatSpanList = computed<SpanNode[]>(() => {
     <LSkeleton v-if="isLoading" text :repeat="3" />
 
     <template v-else-if="trace">
-      <div class="flex items-start justify-between gap-4">
+      <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
           <h1 class="truncate text-2xl font-semibold tracking-tight">
             {{ trace.name }}
@@ -132,69 +106,75 @@ const flatSpanList = computed<SpanNode[]>(() => {
             <span>Started {{ formatDate(trace.startTime) }}</span>
           </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-3">
+          <label class="flex cursor-pointer items-center gap-2 text-xs">
+            <LSwitch v-model:value="chatMode" />
+            <MessageSquare class="h-3.5 w-3.5" />
+            Chat mode
+          </label>
           <LTag size="small" type="default">
-            {{ trace._count?.spans ?? flatSpanList.length }} spans
+            {{ spanCount }} spans
           </LTag>
         </div>
       </div>
 
-      <LCard class="p-4">
-        <h3 class="mb-3 text-xs font-medium uppercase tracking-wider text-fg-tertiary">
-          Span Timeline
-        </h3>
-        <div v-if="spansLoading" class="py-12 text-center text-sm text-fg-tertiary">
-          Loading spans…
-        </div>
-        <LTraceTimeline
-          v-else-if="traceSpans.length > 0"
-          :spans="traceSpans"
-          :container-height="500"
-        />
-        <LEmpty
-          v-else
-          title="No spans recorded"
-          description="This trace has no spans yet."
-          class="py-8"
-        />
-      </LCard>
-
-      <div class="grid gap-4 lg:grid-cols-2">
-        <LCard class="p-4">
-          <h3 class="mb-3 text-xs font-medium uppercase tracking-wider text-fg-tertiary">
-            Spans
-          </h3>
-          <ul v-if="flatSpanList.length > 0" class="divide-y divide-border">
-            <li
-              v-for="span in flatSpanList"
-              :key="span.id"
-              class="flex items-center gap-2 py-2 text-sm"
-            >
-              <ChevronRight class="h-3.5 w-3.5 text-fg-tertiary" />
-              <Activity class="h-3.5 w-3.5 text-fg-tertiary" />
-              <span class="truncate">{{ span.name }}</span>
-              <span class="ml-auto font-mono text-xs text-fg-tertiary">
-                {{ span.endTime ? formatDurationMs(new Date(span.endTime).getTime() - new Date(span.startTime).getTime()) : "—" }}
-              </span>
-            </li>
-          </ul>
-          <p v-else class="py-4 text-center text-sm text-fg-tertiary">
-            No spans.
-          </p>
+      <!-- Three-column layout -->
+      <div
+        class="grid gap-3 overflow-hidden"
+        style="grid-template-columns: 280px minmax(0, 1fr) 360px; height: calc(100vh - 220px); min-height: 480px;"
+      >
+        <!-- Tree -->
+        <LCard class="overflow-hidden p-0">
+          <div class="border-b border-border px-3 py-2">
+            <h3 class="text-xs font-medium uppercase tracking-wider text-fg-tertiary">
+              Spans
+            </h3>
+          </div>
+          <LSkeleton v-if="spansLoading" class="p-3" :repeat="4" />
+          <SpanTree
+            v-else-if="spanTree.length > 0"
+            :spans="spanTree"
+            :selected-span-id="selectedSpanId"
+            @select="(id: string) => (selectedSpanId = id)"
+          />
+          <LEmpty
+            v-else
+            class="p-6"
+            title="No spans"
+            description="This trace has no spans yet."
+          />
         </LCard>
 
-        <LCard class="p-4">
-          <h3 class="mb-3 text-xs font-medium uppercase tracking-wider text-fg-tertiary">
-            Metadata
-          </h3>
-          <LJsonView
-            v-if="trace.metadata && Object.keys(trace.metadata).length > 0"
-            :data="trace.metadata"
-            :deep="3"
+        <!-- Timeline -->
+        <LCard class="overflow-hidden p-0">
+          <div class="border-b border-border px-3 py-2">
+            <h3 class="text-xs font-medium uppercase tracking-wider text-fg-tertiary">
+              Timeline
+            </h3>
+          </div>
+          <LSkeleton v-if="spansLoading" class="p-3" :repeat="4" />
+          <SpanTimeline
+            v-else-if="spanTree.length > 0"
+            :spans="spanTree"
+            :selected-span-id="selectedSpanId"
+            @select="(id: string) => (selectedSpanId = id)"
           />
-          <p v-else class="py-4 text-center text-sm text-fg-tertiary">
-            No metadata.
-          </p>
+          <LEmpty
+            v-else
+            class="p-6"
+            title="No spans"
+            description="This trace has no spans yet."
+          />
+        </LCard>
+
+        <!-- Detail -->
+        <LCard class="overflow-hidden p-0">
+          <div class="border-b border-border px-3 py-2">
+            <h3 class="text-xs font-medium uppercase tracking-wider text-fg-tertiary">
+              Detail
+            </h3>
+          </div>
+          <SpanDetail :span="selectedSpan" :chat-mode="chatMode" />
         </LCard>
       </div>
     </template>
