@@ -23,7 +23,10 @@ const columns: ColumnDef<Trace>[] = [
     cell: ({ row }) =>
       h(
         RouterLink,
-        { to: `/traces/${row.original.id}`, class: "font-medium hover:underline" },
+        {
+          to: `/projects/${row.original.projectId}/traces/${row.original.id}`,
+          class: "font-medium hover:underline",
+        },
         () => row.original.name,
       ),
   },

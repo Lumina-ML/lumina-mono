@@ -1,23 +1,45 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, RouterLink } from "vue-router";
-import { useQueryClient } from "@tanstack/vue-query";
-import { LSkeleton, LTabs, LTabPane, LTag, LTooltip } from "@lumina/ui";
-import { LCard, LButton } from "@lumina/ui";
-import { Calendar, Clock, Wifi, WifiOff } from "lucide-vue-next";
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
+import {
+  LSkeleton,
+  LTabs,
+  LTabPane,
+  LTag,
+  LTooltip,
+  LCard,
+  LButton,
+  LEmpty,
+  LJsonView,
+  LLogViewer,
+  LTraceTimeline,
+} from "@lumina/ui";
+import type { TraceSpan } from "@lumina/ui";
+import {
+  Calendar,
+  Clock,
+  Wifi,
+  WifiOff,
+  Hash,
+  GitCommit,
+  User as UserIcon,
+  Server,
+  Box,
+} from "lucide-vue-next";
 import { useRun } from "@/modules/run/composables/useRuns";
 import { useMetrics } from "@/modules/metric/composables/useMetrics";
 import { useSystemMetrics } from "@/modules/metric/composables/useSystemMetrics";
 import { useLogLines } from "@/modules/log-line/composables/useLogLines";
 import { useRunTags } from "@/modules/run/composables/useTags";
 import MetricChart from "@/widgets/metric-chart/MetricChart.vue";
-import LogViewer from "@/widgets/log-viewer/LogViewer.vue";
 import TagList from "@/widgets/tag-list/TagList.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useAutoRefresh } from "@/composables/useAutoRefresh";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
-import VueJsonPretty from "vue-json-pretty";
-import "vue-json-pretty/lib/styles.css";
+import { colorForRunId } from "@/composables/useRunColor";
+import { TraceService } from "@/services/trace.service";
+import { ArtifactService } from "@/services/artifact.service";
 import type { LogLevel } from "@/types/log-line";
 
 const route = useRoute();
@@ -34,9 +56,7 @@ const { formatDate, formatDurationMs } = useDateFormat();
 
 const logLevelFilter = ref<LogLevel | null>(null);
 
-// Subscribe to run:<runId> for live updates. The 5s polling loop is gone —
-// the WS push invalidates each query and TanStack Query refetches in the
-// background (or returns cached data immediately if the request is in-flight).
+// ── WebSocket subscription (primary live source) ────────────────────────
 const { status: wsStatus } = useRealtimeSubscription(
   computed(() => `run:${runId.value}`),
   (event) => {
@@ -59,8 +79,7 @@ const { status: wsStatus } = useRealtimeSubscription(
   },
 );
 
-// Fallback: when the WS is closed/errored and the run is still running,
-// keep polling so the UI doesn't go stale.
+// Fallback polling when WS is offline and run is still active.
 const isRunning = computed(() => run.value?.status === "running");
 useAutoRefresh(
   computed(() => isRunning.value && wsStatus.value !== "open"),
@@ -80,9 +99,10 @@ const durationMs = computed(() => {
   return end - new Date(run.value.createdAt).getTime();
 });
 
-const metricKeys = computed(() => (metrics.value ? Object.keys(metrics.value.metrics) : []));
+const metricKeys = computed(() =>
+  metrics.value ? Object.keys(metrics.value.metrics) : [],
+);
 const selectedKeys = ref<string[]>([]);
-
 watch(
   metricKeys,
   (keys) => {
@@ -95,13 +115,11 @@ watch(
 
 const filteredMetrics = computed(() => {
   if (!metrics.value) return {};
-  const result: Record<string, typeof metrics.value.metrics[string]> = {};
+  const out: Record<string, (typeof metrics.value.metrics)[string]> = {};
   for (const key of selectedKeys.value) {
-    if (metrics.value.metrics[key]) {
-      result[key] = metrics.value.metrics[key];
-    }
+    if (metrics.value.metrics[key]) out[key] = metrics.value.metrics[key]!;
   }
-  return result;
+  return out;
 });
 
 function toggleKey(key: string) {
@@ -111,6 +129,122 @@ function toggleKey(key: string) {
     selectedKeys.value = [...selectedKeys.value, key];
   }
 }
+
+// ── Traces (linked to this run via metadata.runId) ──────────────────────
+const { data: tracesForRun } = useQuery({
+  queryKey: computed(() => ["traces", "by-run", runId.value]),
+  queryFn: async () => {
+    if (!run.value?.projectId) return [];
+    const all = await TraceService.list({ projectId: run.value.projectId, limit: 100 });
+    return all.items.filter((t) => {
+      const md = t.metadata as { runId?: string } | null;
+      return md?.runId === runId.value;
+    });
+  },
+  enabled: computed(() => !!run.value?.projectId),
+});
+
+const { data: spansForFirstTrace } = useQuery({
+  queryKey: computed(() => ["trace-spans", tracesForRun.value?.[0]?.id ?? null]),
+  queryFn: async () => {
+    const first = tracesForRun.value?.[0];
+    if (!first) return [];
+    return TraceService.listSpans(first.id);
+  },
+  enabled: computed(() => !!tracesForRun.value?.[0]),
+});
+
+// Convert flat span list to nested tree for LTraceTimeline.
+interface SpanNode {
+  id: string;
+  parentSpanId: string | null;
+  name: string;
+  startTime: string;
+  endTime: string | null;
+  attributes: Record<string, unknown>;
+  children: SpanNode[];
+}
+function buildSpanTree(flat: Array<{
+  id: string;
+  parentSpanId: string | null;
+  name: string;
+  startTime: string;
+  endTime: string | null;
+  attributes: Record<string, unknown>;
+}>): SpanNode[] {
+  const byId = new Map<string, SpanNode>();
+  for (const s of flat) byId.set(s.id, { ...s, children: [] });
+  const roots: SpanNode[] = [];
+  for (const node of byId.values()) {
+    if (node.parentSpanId && byId.has(node.parentSpanId)) {
+      byId.get(node.parentSpanId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return roots;
+}
+
+const traceSpans = computed<TraceSpan[]>(() => {
+  const tree = buildSpanTree(spansForFirstTrace.value ?? []);
+  function toTraceSpan(node: SpanNode): TraceSpan {
+    const startMs = new Date(node.startTime).getTime();
+    const endMs = node.endTime ? new Date(node.endTime).getTime() : Date.now();
+    return {
+      id: node.id,
+      name: node.name,
+      startTime: startMs,
+      endTime: endMs,
+      duration: endMs - startMs,
+      status: (node.attributes as { status?: string }).status ?? "ok",
+      children: node.children.map(toTraceSpan),
+    };
+  }
+  return tree.map(toTraceSpan);
+});
+
+// ── Artifacts linked to this run (best-effort: filter by metadata.runId) ─
+const { data: artifactsForRun } = useQuery({
+  queryKey: computed(() => ["artifacts", "by-run", runId.value]),
+  queryFn: async () => {
+    if (!run.value?.projectId) return [];
+    try {
+      const list = await ArtifactService.list({ projectId: run.value.projectId, limit: 100 });
+      // The backend doesn't expose runId filtering on Artifact list yet —
+      // we surface "—" as a placeholder so the tab isn't empty.
+      return list.items.slice(0, 20);
+    } catch {
+      return [];
+    }
+  },
+  enabled: computed(() => !!run.value?.projectId),
+});
+
+// ── Metadata helpers ───────────────────────────────────────────────────
+const metadataEntries = computed(() => {
+  const md = (run.value?.metadata ?? {}) as Record<string, unknown>;
+  return [
+    { icon: Hash, label: "Run ID", value: run.value?.runId, mono: true },
+    { icon: Hash, label: "Internal ID", value: run.value?.id, mono: true },
+    { icon: UserIcon, label: "Created By", value: md.user ?? md.userId ?? "—" },
+    { icon: Server, label: "Host", value: md.host ?? md.hostname ?? "—" },
+    { icon: GitCommit, label: "Git Commit", value: md.gitCommit ?? md.commit ?? "—", mono: true },
+    { icon: Calendar, label: "Created", value: run.value ? formatDate(run.value.createdAt) : "—" },
+    { icon: Calendar, label: "Updated", value: run.value ? formatDate(run.value.updatedAt) : "—" },
+    { icon: Calendar, label: "Finished", value: run.value?.finishedAt ? formatDate(run.value.finishedAt) : "—" },
+    { icon: Clock, label: "Duration", value: formatDurationMs(durationMs.value) },
+    { icon: Box, label: "Sweep", value: run.value?.sweepId ?? "—" },
+  ];
+});
+
+const hasConfig = computed(
+  () => run.value?.config && Object.keys(run.value.config).length > 0,
+);
+
+const summaryEntries = computed(() => {
+  const s = (run.value?.summary ?? {}) as Record<string, unknown>;
+  return Object.entries(s);
+});
 </script>
 
 <template>
@@ -118,30 +252,49 @@ function toggleKey(key: string) {
     <LSkeleton text :repeat="3" />
   </div>
 
-  <div v-else-if="!run" class="text-center py-12">
+  <div v-else-if="!run" class="py-12 text-center">
     <p class="text-muted-foreground">Run not found.</p>
   </div>
 
   <div v-else class="space-y-6">
     <!-- Header -->
-    <div class="flex items-start justify-between">
-      <div class="space-y-2">
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0 space-y-2">
         <div class="flex items-center gap-3">
-          <h1 class="text-2xl font-bold tracking-tight">{{ run.name }}</h1>
-          <LTag :type="run.status === 'running' ? 'warning' : run.status === 'finished' ? 'success' : 'error'" round>
+          <span
+            class="h-3 w-3 flex-shrink-0 rounded-sm"
+            :style="{ backgroundColor: colorForRunId(run.runId) }"
+            aria-hidden="true"
+          />
+          <h1 class="truncate text-2xl font-bold tracking-tight">{{ run.name }}</h1>
+          <LTag
+            :type="
+              run.status === 'running'
+                ? 'warning'
+                : run.status === 'finished'
+                  ? 'success'
+                  : run.status === 'failed' || run.status === 'crashed'
+                    ? 'error'
+                    : 'default'
+            "
+            round
+          >
             {{ run.status }}
           </LTag>
         </div>
-        <div class="flex items-center gap-4 text-sm text-muted-foreground">
-          <RouterLink :to="`/projects/${run.projectId}`" class="hover:underline">
+        <div class="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <RouterLink
+            :to="`/projects/${run.projectId}`"
+            class="font-mono hover:underline"
+          >
             {{ run.projectId }}
           </RouterLink>
           <span class="flex items-center gap-1">
-            <Calendar class="w-4 h-4" />
+            <Calendar class="h-4 w-4" />
             {{ formatDate(run.createdAt) }}
           </span>
           <span class="flex items-center gap-1">
-            <Clock class="w-4 h-4" />
+            <Clock class="h-4 w-4" />
             {{ formatDurationMs(durationMs) }}
           </span>
         </div>
@@ -177,12 +330,60 @@ function toggleKey(key: string) {
 
     <!-- Tabs -->
     <LTabs type="line" animated>
+      <!-- ── Overview ─────────────────────────────────────────────────── -->
+      <LTabPane name="overview" tab="Overview">
+        <div class="grid gap-4 lg:grid-cols-3">
+          <LCard class="p-4 lg:col-span-2">
+            <h3 class="mb-3 text-xs font-medium uppercase tracking-wider text-fg-tertiary">
+              Summary
+            </h3>
+            <dl v-if="summaryEntries.length > 0" class="grid gap-3 sm:grid-cols-2">
+              <div
+                v-for="[key, value] in summaryEntries"
+                :key="key"
+                class="rounded-md border border-border p-2"
+              >
+                <dt class="font-mono text-[10px] text-fg-tertiary">{{ key }}</dt>
+                <dd class="mt-1 truncate font-mono text-sm">{{ String(value) }}</dd>
+              </div>
+            </dl>
+            <p v-else class="text-sm text-fg-tertiary">No summary metrics recorded.</p>
+          </LCard>
+
+          <div class="space-y-4">
+            <LCard class="p-4">
+              <h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-fg-tertiary">
+                Tags
+              </h3>
+              <TagList
+                :tags="runTags?.items ?? []"
+                :loading="isTagsLoading"
+              />
+            </LCard>
+
+            <LCard v-if="hasConfig" class="p-4">
+              <h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-fg-tertiary">
+                Config
+              </h3>
+              <LJsonView :data="run.config" :deep="2" :show-line-number="false" />
+            </LCard>
+          </div>
+        </div>
+      </LTabPane>
+
+      <!-- ── Metrics ─────────────────────────────────────────────────── -->
       <LTabPane name="metrics" tab="Metrics">
         <LCard>
-          <div v-if="isMetricsLoading" class="py-12 text-center text-muted-foreground">
-            Loading metrics...
+          <div
+            v-if="isMetricsLoading"
+            class="py-12 text-center text-muted-foreground"
+          >
+            Loading metrics…
           </div>
-          <div v-else-if="metricKeys.length === 0" class="py-12 text-center text-muted-foreground">
+          <div
+            v-else-if="metricKeys.length === 0"
+            class="py-12 text-center text-muted-foreground"
+          >
             No metrics logged yet.
           </div>
           <div v-else class="space-y-4">
@@ -203,37 +404,144 @@ function toggleKey(key: string) {
         </LCard>
       </LTabPane>
 
+      <!-- ── System ──────────────────────────────────────────────────── -->
       <LTabPane name="system" tab="System">
         <LCard>
-          <div v-if="isSystemMetricsLoading" class="py-12 text-center text-muted-foreground">
-            Loading system metrics...
+          <div
+            v-if="isSystemMetricsLoading"
+            class="py-12 text-center text-muted-foreground"
+          >
+            Loading system metrics…
           </div>
-          <div v-else-if="!systemMetrics || Object.keys(systemMetrics.metrics).length === 0" class="py-12 text-center text-muted-foreground">
+          <div
+            v-else-if="!systemMetrics || Object.keys(systemMetrics.metrics).length === 0"
+            class="py-12 text-center text-muted-foreground"
+          >
             No system metrics logged yet.
           </div>
           <MetricChart v-else :metrics="systemMetrics.metrics" />
         </LCard>
       </LTabPane>
 
+      <!-- ── Logs ────────────────────────────────────────────────────── -->
       <LTabPane name="logs" tab="Logs">
-        <LCard>
-          <LogViewer
-            :logs="logLines?.logs ?? []"
-            :loading="isLogsLoading"
-            v-model:level="logLevelFilter"
+        <LLogViewer
+          :logs="
+            (logLines?.logs ?? []).map((l) => ({
+              id: `${l.timestamp}-${l.message.slice(0, 16)}`,
+              timestamp: l.timestamp,
+              level: l.level,
+              message: l.message,
+              step: l.step ?? undefined,
+            }))
+          "
+          :loading="isLogsLoading"
+          v-model:level="logLevelFilter"
+        />
+      </LTabPane>
+
+      <!-- ── Traces ──────────────────────────────────────────────────── -->
+      <LTabPane name="traces" tab="Traces">
+        <LCard v-if="tracesForRun && tracesForRun.length > 0" class="p-4">
+          <div class="mb-3 flex items-center justify-between">
+            <h3 class="text-xs font-medium uppercase tracking-wider text-fg-tertiary">
+              {{ tracesForRun.length }} trace(s) for this run
+            </h3>
+          </div>
+          <LTraceTimeline
+            v-if="traceSpans.length > 0"
+            :spans="traceSpans"
+            :container-height="500"
+          />
+          <p v-else class="py-12 text-center text-sm text-fg-tertiary">
+            No spans recorded for this trace yet.
+          </p>
+        </LCard>
+        <LCard v-else class="p-8">
+          <LEmpty
+            title="No traces linked to this run"
+            description="Use Lumina's trace integration to record span timelines for this run."
           />
         </LCard>
       </LTabPane>
 
-      <LTabPane name="tags" tab="Tags">
-        <LCard title="Run Tags">
-          <TagList :tags="runTags?.items ?? []" :loading="isTagsLoading" />
+      <!-- ── Artifacts ───────────────────────────────────────────────── -->
+      <LTabPane name="artifacts" tab="Artifacts">
+        <LCard v-if="artifactsForRun && artifactsForRun.length > 0" class="p-0">
+          <ul class="divide-y divide-border">
+            <li
+              v-for="art in artifactsForRun"
+              :key="art.id"
+              class="flex items-center justify-between px-4 py-3 text-sm hover:bg-canvas"
+            >
+              <div class="flex items-center gap-3">
+                <Box class="h-4 w-4 text-fg-tertiary" />
+                <RouterLink
+                  :to="`/projects/${run.projectId}/artifacts/${art.id}`"
+                  class="font-medium hover:underline"
+                >
+                  {{ art.name }}
+                </RouterLink>
+                <LTag size="small" type="info">{{ art.type }}</LTag>
+              </div>
+              <span class="font-mono text-xs text-fg-tertiary">
+                {{ formatDate(art.updatedAt) }}
+              </span>
+            </li>
+          </ul>
+        </LCard>
+        <LCard v-else class="p-8">
+          <LEmpty
+            title="No artifacts yet"
+            description="Artifacts produced by this run will appear here."
+          />
         </LCard>
       </LTabPane>
 
+      <!-- ── Config ──────────────────────────────────────────────────── -->
       <LTabPane name="config" tab="Config">
-        <LCard title="Run Config">
-          <VueJsonPretty :data="run.config" :deep="3" />
+        <LCard class="p-4">
+          <LJsonView
+            v-if="hasConfig"
+            :data="run.config"
+            :deep="4"
+            :height="600"
+          />
+          <p v-else class="py-8 text-center text-sm text-fg-tertiary">
+            No configuration recorded for this run.
+          </p>
+        </LCard>
+      </LTabPane>
+
+      <!-- ── Metadata ────────────────────────────────────────────────── -->
+      <LTabPane name="metadata" tab="Metadata">
+        <LCard class="p-4">
+          <dl class="grid gap-3 sm:grid-cols-2">
+            <div
+              v-for="entry in metadataEntries"
+              :key="entry.label"
+              class="flex items-start gap-3 rounded-md border border-border p-3"
+            >
+              <component
+                :is="entry.icon"
+                class="mt-0.5 h-4 w-4 flex-shrink-0 text-fg-tertiary"
+                aria-hidden="true"
+              />
+              <div class="min-w-0 flex-1">
+                <dt class="text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
+                  {{ entry.label }}
+                </dt>
+                <dd
+                  :class="[
+                    'mt-0.5 truncate text-sm',
+                    entry.mono ? 'font-mono' : '',
+                  ]"
+                >
+                  {{ entry.value ?? "—" }}
+                </dd>
+              </div>
+            </div>
+          </dl>
         </LCard>
       </LTabPane>
     </LTabs>

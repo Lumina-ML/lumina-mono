@@ -92,6 +92,17 @@ const router = createRouter({
               props: true,
             },
             {
+              path: "traces",
+              name: "ProjectTraces",
+              component: () => import("@/modules/project/pages/ProjectTraces.vue"),
+            },
+            {
+              path: "traces/:traceId",
+              name: "TraceDetail",
+              component: () => import("@/modules/trace/pages/TraceDetail.vue"),
+              props: true,
+            },
+            {
               path: "launch",
               name: "ProjectLaunch",
               component: () => import("@/modules/project/pages/ProjectLaunch.vue"),
