@@ -1,92 +1,148 @@
 /**
  * Lumina Design Language — Theme Variables
  *
- * 所有语义化颜色以 HSL 格式定义，便于暗色模式切换。
- * 如需新增 token，请同步更新 tokens/colors.ts。
+ * 与 Dashboard Tailwind v4 主题保持一致。所有语义化颜色以 HSL 格式定义，
+ * 便于运行时 light/dark 切换。如需新增 token，请同步更新 tokens/colors.ts。
  */
 
 :root {
-  /* Foreground */
-  --ldl-foreground: 222.2 84% 4.9%;
-  --ldl-foreground-muted: 215.4 16.3% 46.9%;
-  --ldl-foreground-disabled: 215.4 16.3% 60%;
+  /* Radius */
+  --radius: 0.5rem;
 
-  /* Layer System — Light */
-  --ldl-canvas: 0 0% 100%;
-  --ldl-surface: 0 0% 100%;
-  --ldl-panel: 0 0% 100%;
-  --ldl-panel-hover: 210 40% 96.1%;
-  --ldl-card: 0 0% 100%;
-  --ldl-card-hover: 210 40% 96.1%;
-  --ldl-overlay: 0 0% 100% / 0.8;
-  --ldl-floating: 0 0% 100%;
+  /* Foreground / Text */
+  --foreground: 222.2 84% 4.9%;
+  --foreground-muted: 215.4 16.3% 46.9%;
+  --foreground-disabled: 215.4 16.3% 60%;
 
-  /* Borders */
-  --ldl-border: 214.3 31.8% 91.4%;
-  --ldl-divider: 214.3 31.8% 91.4%;
-  --ldl-selection: 210 40% 96.1%;
+  /* Background / Layers */
+  --background: 0 0% 100%;
+  --canvas: 0 0% 100%;
+  --surface: 0 0% 100%;
+  --panel: 0 0% 100%;
+  --panel-hover: 210 40% 96.1%;
+  --card: 0 0% 100%;
+  --card-hover: 210 40% 96.1%;
+  --card-foreground: 222.2 84% 4.9%;
+  --overlay: 0 0% 100% / 0.8;
+  --floating: 0 0% 100%;
 
-  /* Brand */
-  --ldl-primary: 222.2 47.4% 11.2%;
-  --ldl-primary-foreground: 210 40% 98%;
-  --ldl-secondary: 210 40% 96.1%;
-  --ldl-secondary-foreground: 222.2 47.4% 11.2%;
-  --ldl-accent: 210 40% 96.1%;
-  --ldl-accent-foreground: 222.2 47.4% 11.2%;
+  /* Borders & Dividers */
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --divider: 214.3 31.8% 91.4%;
+  --selection: 210 40% 96.1%;
+
+  /* Brand / Accent */
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
 
   /* States */
-  --ldl-muted: 210 40% 96.1%;
-  --ldl-muted-foreground: 215.4 16.3% 46.9%;
-  --ldl-destructive: 0 84.2% 60.2%;
-  --ldl-destructive-foreground: 210 40% 98%;
-  --ldl-info: 217 91% 60%;
-  --ldl-success: 142 76% 36%;
-  --ldl-warning: 38 92% 50%;
-  --ldl-error: 0 84% 60%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --info: 217 91% 60%;
+  --success: 142 76% 36%;
+  --warning: 38 92% 50%;
+  --error: 0 84% 60%;
 
-  /* Focus */
-  --ldl-ring: 222.2 84% 4.9%;
+  /* Focus / Ring */
+  --ring: 222.2 84% 4.9%;
+
+  /* Legacy LDL aliases — 与 Dashboard 变量对齐，保持向下兼容 */
+  --ldl-foreground: var(--foreground);
+  --ldl-foreground-muted: var(--foreground-muted);
+  --ldl-foreground-disabled: var(--foreground-disabled);
+
+  --ldl-canvas: var(--canvas);
+  --ldl-surface: var(--surface);
+  --ldl-panel: var(--panel);
+  --ldl-panel-hover: var(--panel-hover);
+  --ldl-card: var(--card);
+  --ldl-card-hover: var(--card-hover);
+  --ldl-overlay: var(--overlay);
+  --ldl-floating: var(--floating);
+
+  --ldl-border: var(--border);
+  --ldl-divider: var(--divider);
+  --ldl-selection: var(--selection);
+
+  --ldl-primary: var(--primary);
+  --ldl-primary-foreground: var(--primary-foreground);
+  --ldl-secondary: var(--secondary);
+  --ldl-secondary-foreground: var(--secondary-foreground);
+  --ldl-accent: var(--accent);
+  --ldl-accent-foreground: var(--accent-foreground);
+
+  --ldl-muted: var(--muted);
+  --ldl-muted-foreground: var(--muted-foreground);
+  --ldl-destructive: var(--destructive);
+  --ldl-destructive-foreground: var(--destructive-foreground);
+  --ldl-info: var(--info);
+  --ldl-success: var(--success);
+  --ldl-warning: var(--warning);
+  --ldl-error: var(--error);
+
+  --ldl-ring: var(--ring);
 }
 
 .dark {
-  /* Foreground */
-  --ldl-foreground: 210 40% 98%;
-  --ldl-foreground-muted: 215 20.2% 65.1%;
-  --ldl-foreground-disabled: 215 20.2% 45%;
+  /* Foreground / Text */
+  --foreground: 210 40% 98%;
+  --foreground-muted: 215 20.2% 65.1%;
+  --foreground-disabled: 215 20.2% 45%;
 
-  /* Layer System — Dark */
-  --ldl-canvas: 222.2 84% 4.9%;
-  --ldl-surface: 222.2 84% 4.9%;
-  --ldl-panel: 222.2 84% 4.9%;
-  --ldl-panel-hover: 217.2 32.6% 17.5%;
-  --ldl-card: 222.2 84% 4.9%;
-  --ldl-card-hover: 217.2 32.6% 17.5%;
-  --ldl-overlay: 222.2 84% 4.9% / 0.8;
-  --ldl-floating: 222.2 84% 4.9%;
+  /* Background / Layers */
+  --background: 222.2 84% 4.9%;
+  --canvas: 222.2 84% 4.9%;
+  --surface: 222.2 84% 4.9%;
+  --panel: 222.2 84% 4.9%;
+  --panel-hover: 217.2 32.6% 17.5%;
+  --card: 222.2 84% 4.9%;
+  --card-hover: 217.2 32.6% 17.5%;
+  --card-foreground: 210 40% 98%;
+  --overlay: 222.2 84% 4.9% / 0.8;
+  --floating: 222.2 84% 4.9%;
 
-  /* Borders */
-  --ldl-border: 217.2 32.6% 17.5%;
-  --ldl-divider: 217.2 32.6% 17.5%;
-  --ldl-selection: 217.2 32.6% 17.5%;
+  /* Borders & Dividers */
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --divider: 217.2 32.6% 17.5%;
+  --selection: 217.2 32.6% 17.5%;
 
-  /* Brand */
-  --ldl-primary: 210 40% 98%;
-  --ldl-primary-foreground: 222.2 47.4% 11.2%;
-  --ldl-secondary: 217.2 32.6% 17.5%;
-  --ldl-secondary-foreground: 210 40% 98%;
-  --ldl-accent: 217.2 32.6% 17.5%;
-  --ldl-accent-foreground: 210 40% 98%;
+  /* Brand / Accent */
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
 
   /* States */
-  --ldl-muted: 217.2 32.6% 17.5%;
-  --ldl-muted-foreground: 215 20.2% 65.1%;
-  --ldl-destructive: 0 62.8% 30.6%;
-  --ldl-destructive-foreground: 210 40% 98%;
-  --ldl-info: 217 91% 60%;
-  --ldl-success: 142 71% 45%;
-  --ldl-warning: 38 92% 50%;
-  --ldl-error: 0 62.8% 30.6%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --info: 217 91% 60%;
+  --success: 142 71% 45%;
+  --warning: 38 92% 50%;
+  --error: 0 62.8% 30.6%;
 
-  /* Focus */
-  --ldl-ring: 212.7 26.8% 83.9%;
+  /* Focus / Ring */
+  --ring: 212.7 26.8% 83.9%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

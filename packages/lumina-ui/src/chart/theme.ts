@@ -22,18 +22,18 @@ export interface ChartThemeColors {
 export function getChartThemeColors(): ChartThemeColors {
   return {
     backgroundColor: "transparent",
-    textColor: "hsl(var(--ldl-foreground))",
-    mutedTextColor: "hsl(var(--ldl-foreground-muted))",
-    gridLineColor: "hsl(var(--ldl-border))",
-    tooltipBackground: "hsl(var(--ldl-card))",
-    tooltipBorder: "hsl(var(--ldl-border))",
+    textColor: "hsl(var(--foreground))",
+    mutedTextColor: "hsl(var(--foreground-muted))",
+    gridLineColor: "hsl(var(--border))",
+    tooltipBackground: "hsl(var(--card))",
+    tooltipBorder: "hsl(var(--border))",
     palette: [
-      "hsl(var(--ldl-primary))",
-      "hsl(var(--ldl-info))",
-      "hsl(var(--ldl-success))",
-      "hsl(var(--ldl-warning))",
-      "hsl(var(--ldl-error))",
-      "hsl(var(--ldl-accent))",
+      "hsl(var(--primary))",
+      "hsl(var(--info))",
+      "hsl(var(--success))",
+      "hsl(var(--warning))",
+      "hsl(var(--error))",
+      "hsl(var(--accent))",
     ],
   };
 }
