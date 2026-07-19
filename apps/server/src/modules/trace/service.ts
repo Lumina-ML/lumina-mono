@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { PrismaClient } from "../../generated/prisma/index.js";
+import type { SpanRow, TraceRow, TraceStorage } from "../../core/storage/trace-storage.js";
 import type {
   CreateTraceInput,
   PatchTraceInput,
@@ -11,11 +11,11 @@ import { TraceRepository } from "./repository.js";
 export class TraceService {
   private readonly repository: TraceRepository;
 
-  constructor(prisma: PrismaClient) {
-    this.repository = new TraceRepository(prisma);
+  constructor(storage: TraceStorage) {
+    this.repository = new TraceRepository(storage);
   }
 
-  async createTrace(projectId: string, data: CreateTraceInput) {
+  async createTrace(projectId: string, data: CreateTraceInput): Promise<TraceRow> {
     const traceId = data.traceId ?? crypto.randomUUID();
     return this.repository.createTrace(projectId, { ...data, traceId });
   }
@@ -24,15 +24,15 @@ export class TraceService {
     return this.repository.findByTraceId(traceId);
   }
 
-  async listByProject(projectId: string) {
+  async listByProject(projectId: string): Promise<TraceRow[]> {
     return this.repository.listByProject(projectId);
   }
 
-  async updateTrace(traceId: string, data: PatchTraceInput) {
+  async updateTrace(traceId: string, data: PatchTraceInput): Promise<TraceRow | null> {
     return this.repository.updateTrace(traceId, data);
   }
 
-  async finishTrace(traceId: string, status?: "ok" | "error", latencyMs?: number) {
+  async finishTrace(traceId: string, status?: "ok" | "error", latencyMs?: number): Promise<TraceRow | null> {
     return this.repository.updateTrace(traceId, {
       status,
       latencyMs,
@@ -40,32 +40,35 @@ export class TraceService {
     });
   }
 
-  async createSpan(traceId: string, data: CreateSpanInput) {
-    const trace = await this.repository.findInternalIdByTraceId(traceId);
+  async createSpan(traceId: string, data: CreateSpanInput): Promise<SpanRow> {
+    const trace = await this.repository.findByTraceId(traceId);
     if (!trace) {
       throw new Error(`Trace not found: ${traceId}`);
     }
     const spanId = data.spanId ?? crypto.randomUUID();
-    let parentSpanId: string | undefined;
     if (data.parentSpanId) {
-      const parent = await this.repository.findInternalIdBySpanId(data.parentSpanId);
+      const parent = await this.repository.findSpanById(data.parentSpanId);
       if (!parent) {
         throw new Error(`Parent span not found: ${data.parentSpanId}`);
       }
-      parentSpanId = parent.id;
     }
-    return this.repository.createSpan(trace.id, { ...data, spanId, parentSpanId });
+    return this.repository.createSpan(traceId, { ...data, spanId, parentSpanId: data.parentSpanId });
   }
 
-  async findSpanById(spanId: string) {
+  async findSpanById(spanId: string): Promise<SpanRow | null> {
     return this.repository.findSpanById(spanId);
   }
 
-  async updateSpan(spanId: string, data: PatchSpanInput) {
+  async updateSpan(spanId: string, data: PatchSpanInput): Promise<SpanRow | null> {
     return this.repository.updateSpan(spanId, data);
   }
 
-  async finishSpan(spanId: string, status?: "ok" | "error", output?: Record<string, unknown>, latencyMs?: number) {
+  async finishSpan(
+    spanId: string,
+    status?: "ok" | "error",
+    output?: Record<string, unknown>,
+    latencyMs?: number,
+  ): Promise<SpanRow | null> {
     return this.repository.updateSpan(spanId, {
       status,
       output,

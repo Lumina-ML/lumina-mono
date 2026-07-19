@@ -39,7 +39,20 @@ export class TraceHandler {
 
   async getTrace(req: FastifyRequest, reply: FastifyReply) {
     const { traceId } = TraceParamsSchema.parse(req.params);
-    const trace = await this.traceService.findByTraceId(traceId);
+    const result = await this.traceService.findByTraceId(traceId);
+    if (!result) {
+      reply.status(404).send({ error: "Trace not found" });
+      return;
+    }
+    // Flatten to preserve the previous `{ ...trace, spans: [...] }` wire shape
+    // that downstream consumers (dashboard) rely on.
+    reply.send({ ...result.trace, spans: result.spans });
+  }
+
+  async patchTrace(req: FastifyRequest, reply: FastifyReply) {
+    const { traceId } = TraceParamsSchema.parse(req.params);
+    const data = PatchTraceSchema.parse(req.body);
+    const trace = await this.traceService.updateTrace(traceId, data);
     if (!trace) {
       reply.status(404).send({ error: "Trace not found" });
       return;
@@ -47,18 +60,20 @@ export class TraceHandler {
     reply.send(trace);
   }
 
-  async patchTrace(req: FastifyRequest, reply: FastifyReply) {
-    const { traceId } = TraceParamsSchema.parse(req.params);
-    const data = PatchTraceSchema.parse(req.body);
-    const trace = await this.traceService.updateTrace(traceId, data);
-    reply.send(trace);
-  }
-
   async createSpan(req: FastifyRequest, reply: FastifyReply) {
     const { traceId } = TraceParamsSchema.parse(req.params);
     const data = CreateSpanSchema.parse(req.body);
-    const span = await this.traceService.createSpan(traceId, data);
-    reply.status(201).send(span);
+    try {
+      const span = await this.traceService.createSpan(traceId, data);
+      reply.status(201).send(span);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.startsWith("Trace not found") || msg.startsWith("Parent span not found")) {
+        reply.status(404).send({ error: msg });
+        return;
+      }
+      throw err;
+    }
   }
 
   async getSpan(req: FastifyRequest, reply: FastifyReply) {
@@ -75,6 +90,10 @@ export class TraceHandler {
     const { spanId } = SpanParamsSchema.parse(req.params);
     const data = PatchSpanSchema.parse(req.body);
     const span = await this.traceService.updateSpan(spanId, data);
+    if (!span) {
+      reply.status(404).send({ error: "Span not found" });
+      return;
+    }
     reply.send(span);
   }
 }

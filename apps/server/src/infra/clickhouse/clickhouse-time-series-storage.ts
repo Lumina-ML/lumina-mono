@@ -9,15 +9,11 @@ import type {
 const TABLE_MAP: Record<TimeSeriesTable, string> = {
   log_line: "log_lines",
   system_metric: "system_metrics",
-  trace: "traces",
-  span: "spans",
 };
 
 const TIMESTAMP_COLUMN_MAP: Record<TimeSeriesTable, string> = {
   log_line: "timestamp",
   system_metric: "loggedAt",
-  trace: "startedAt",
-  span: "startedAt",
 };
 
 export class ClickHouseTimeSeriesStorage implements TimeSeriesStorage {
@@ -99,32 +95,6 @@ export class ClickHouseTimeSeriesStorage implements TimeSeriesStorage {
           step: Number(r.step ?? 0),
           value: Number(r.value),
           loggedAt: r.loggedAt ? new Date(r.loggedAt as string | number | Date) : new Date(),
-        };
-      case "trace":
-        return {
-          projectId: String(r.projectId),
-          runId: r.runId == null ? null : String(r.runId),
-          traceId: String(r.traceId),
-          name: String(r.name),
-          status: String(r.status ?? "ok"),
-          latencyMs: r.latencyMs == null ? null : Number(r.latencyMs),
-          metadata: JSON.stringify(r.metadata ?? {}),
-          startedAt: r.startedAt ? new Date(r.startedAt as string | number | Date) : new Date(),
-          finishedAt: r.finishedAt ? new Date(r.finishedAt as string | number | Date) : null,
-        };
-      case "span":
-        return {
-          traceId: String(r.traceId),
-          parentSpanId: r.parentSpanId == null ? null : String(r.parentSpanId),
-          spanId: String(r.spanId),
-          name: String(r.name),
-          kind: String(r.kind ?? "internal"),
-          input: JSON.stringify(r.input ?? {}),
-          output: JSON.stringify(r.output ?? {}),
-          latencyMs: r.latencyMs == null ? null : Number(r.latencyMs),
-          status: String(r.status ?? "ok"),
-          startedAt: r.startedAt ? new Date(r.startedAt as string | number | Date) : new Date(),
-          finishedAt: r.finishedAt ? new Date(r.finishedAt as string | number | Date) : null,
         };
       default:
         return r;

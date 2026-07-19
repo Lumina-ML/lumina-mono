@@ -1,6 +1,15 @@
 import type { PrismaClient } from "../../src/generated/prisma/index.js";
 import { uuidv7 } from "../../src/shared/uuid7.js";
 
+interface FakeProjectRow {
+  id: string;
+  workspaceId: string;
+  name: string;
+  displayName: string | null;
+  description: string | null;
+  settings: Record<string, unknown>;
+}
+
 /**
  * Minimal in-memory Prisma replacement that supports the operations the
  * server modules need in tests. Each model is a Map keyed by its primary
@@ -12,6 +21,7 @@ import { uuidv7 } from "../../src/shared/uuid7.js";
  */
 export function createFakePrisma(options: {
   runs?: Array<{ runId: string; projectId: string; name?: string }>;
+  projects?: Array<{ id?: string; workspaceId?: string; name: string }>;
 } = {}): PrismaClient {
   const runsByRunId = new Map<string, FakeRunRow>();
   const runsById = new Map<string, FakeRunRow>();
@@ -32,6 +42,20 @@ export function createFakePrisma(options: {
     };
     runsByRunId.set(r.runId, row);
     runsById.set(id, row);
+  }
+
+  const projectsById = new Map<string, FakeProjectRow>();
+  for (const p of options.projects ?? []) {
+    const id = p.id ?? uuidv7();
+    const row: FakeProjectRow = {
+      id,
+      workspaceId: p.workspaceId ?? "default",
+      name: p.name,
+      displayName: null,
+      description: null,
+      settings: {},
+    };
+    projectsById.set(id, row);
   }
 
   const runModel = {
@@ -91,9 +115,51 @@ export function createFakePrisma(options: {
   };
 
   const projectModel = {
-    findUnique: async () => null,
-    create: async () => null,
-    findFirst: async () => null,
+    findUnique: async ({ where }: { where: { id?: string; workspaceId_name?: { workspaceId: string; name: string } } }) => {
+      if (where.id) return projectsById.get(where.id) ?? null;
+      if (where.workspaceId_name) {
+        return (
+          Array.from(projectsById.values()).find(
+            (p) =>
+              p.workspaceId === where.workspaceId_name!.workspaceId &&
+              p.name === where.workspaceId_name!.name,
+          ) ?? null
+        );
+      }
+      return null;
+    },
+    findFirst: async ({ where }: { where?: { workspaceId?: string } } = {}) => {
+      const all = Array.from(projectsById.values());
+      if (where?.workspaceId) {
+        return all.find((p) => p.workspaceId === where.workspaceId) ?? null;
+      }
+      return all[0] ?? null;
+    },
+    create: async ({ data }: { data: Partial<FakeProjectRow> }) => {
+      const row: FakeProjectRow = {
+        id: data.id ?? uuidv7(),
+        workspaceId: data.workspaceId ?? "default",
+        name: data.name ?? "project",
+        displayName: data.displayName ?? null,
+        description: data.description ?? null,
+        settings: data.settings ?? {},
+      };
+      projectsById.set(row.id, row);
+      return row;
+    },
+    findMany: async () => Array.from(projectsById.values()),
+    count: async () => projectsById.size,
+    update: async ({ where, data }: { where: { id: string }; data: Partial<FakeProjectRow> }) => {
+      const row = projectsById.get(where.id);
+      if (!row) throw new Error(`Project ${where.id} not found`);
+      Object.assign(row, data);
+      return row;
+    },
+    delete: async ({ where }: { where: { id: string } }) => {
+      const row = projectsById.get(where.id);
+      if (row) projectsById.delete(where.id);
+      return row;
+    },
   };
 
   // We return a cast object; only the methods above are accessed.

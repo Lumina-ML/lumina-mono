@@ -4,7 +4,7 @@ import { TraceHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
 
 export async function traceRoutes(app: FastifyInstance) {
-  const traceService = new TraceService(app.prisma);
+  const traceService = new TraceService(app.traceStorage);
   const projectService = new ProjectService(app.prisma);
   const handler = new TraceHandler(traceService, projectService);
 

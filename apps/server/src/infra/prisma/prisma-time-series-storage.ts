@@ -5,7 +5,7 @@ import type {
   TimeSeriesStorage,
   TimeSeriesTable,
 } from "../../core/storage/time-series-storage.js";
-import { toDate, toDateOrNull } from "../../utils/date.js";
+import { toDate } from "../../utils/date.js";
 
 
 export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
@@ -36,38 +36,6 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
             step: Number(r.step ?? 0),
             value: Number(r.value),
             loggedAt: toDate(r.loggedAt),
-          })),
-        });
-        break;
-      case "trace":
-        await this.prisma.trace.createMany({
-          data: rows.map((r) => ({
-            projectId: String(r.projectId),
-            runId: r.runId == null ? null : String(r.runId),
-            traceId: String(r.traceId),
-            name: String(r.name),
-            status: String(r.status ?? "ok") as any,
-            latencyMs: r.latencyMs == null ? null : Number(r.latencyMs),
-            metadata: (r.metadata as any) ?? {},
-            startedAt: toDate(r.startedAt),
-            finishedAt: toDateOrNull(r.finishedAt),
-          })),
-        });
-        break;
-      case "span":
-        await this.prisma.span.createMany({
-          data: rows.map((r) => ({
-            traceId: String(r.traceId),
-            parentSpanId: r.parentSpanId == null ? null : String(r.parentSpanId),
-            spanId: String(r.spanId),
-            name: String(r.name),
-            kind: String(r.kind ?? "internal") as any,
-            input: (r.input as any) ?? {},
-            output: (r.output as any) ?? {},
-            latencyMs: r.latencyMs == null ? null : Number(r.latencyMs),
-            status: String(r.status ?? "ok") as any,
-            startedAt: toDate(r.startedAt),
-            finishedAt: toDateOrNull(r.finishedAt),
           })),
         });
         break;
@@ -105,10 +73,6 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
         return this.prisma.logLine;
       case "system_metric":
         return this.prisma.systemMetric;
-      case "trace":
-        return this.prisma.trace;
-      case "span":
-        return this.prisma.span;
       default:
         throw new Error(`Unsupported time series table: ${table}`);
     }
@@ -118,9 +82,6 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
     switch (table) {
       case "system_metric":
         return "loggedAt";
-      case "span":
-      case "trace":
-        return "startedAt";
       case "log_line":
       default:
         return "timestamp";

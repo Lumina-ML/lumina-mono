@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import fastify from "fastify";
 import { MemoryMetricStorage } from "../../src/infra/memory/memory-metric-storage.js";
 import { MemoryTimeSeriesStorage } from "../../src/infra/memory/memory-time-series-storage.js";
+import { MemoryTraceStorage } from "../../src/infra/memory/memory-trace-storage.js";
 import { MemoryEventBus } from "../../src/infra/memory/memory-event-bus.js";
 import { NoopCache } from "../../src/infra/noop/noop-cache.js";
 import { NoopQueue } from "../../src/infra/noop/noop-queue.js";
@@ -17,6 +18,8 @@ export interface BuildTestAppOptions {
   metricStorage?: MemoryMetricStorage;
   /** Override the in-memory time series storage. */
   timeSeriesStorage?: MemoryTimeSeriesStorage;
+  /** Override the in-memory trace storage. */
+  traceStorage?: MemoryTraceStorage;
   /** Mock Prisma client; required for handlers that touch Postgres. */
   prisma?: Partial<PrismaClient> | (() => Partial<PrismaClient>);
   /** Default workspace seed behavior; defaults to no-op when prisma is mocked. */
@@ -58,6 +61,7 @@ export async function buildTestApp(
   // Decorate infra with in-memory defaults; tests may swap them out.
   const metricStorage = options.metricStorage ?? new MemoryMetricStorage();
   const timeSeriesStorage = options.timeSeriesStorage ?? new MemoryTimeSeriesStorage();
+  const traceStorage = options.traceStorage ?? new MemoryTraceStorage();
   const eventBus = options.eventBus ?? new MemoryEventBus();
   const cache = new NoopCache();
   const queue = new NoopQueue();
@@ -71,6 +75,7 @@ export async function buildTestApp(
   app.decorate("prisma", prisma);
   app.decorate("metricStorage", metricStorage);
   app.decorate("timeSeriesStorage", timeSeriesStorage);
+  app.decorate("traceStorage", traceStorage);
   app.decorate("eventBus", eventBus);
   app.decorate("cache", cache);
   app.decorate("queue", queue);

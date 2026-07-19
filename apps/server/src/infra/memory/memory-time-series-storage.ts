@@ -14,8 +14,6 @@ export class MemoryTimeSeriesStorage implements TimeSeriesStorage {
   private readonly tables: Record<TimeSeriesTable, TimeSeriesRow[]> = {
     log_line: [],
     system_metric: [],
-    trace: [],
-    span: [],
   };
 
   async insertBatch(table: TimeSeriesTable, rows: TimeSeriesRow[]): Promise<void> {
@@ -52,9 +50,6 @@ export class MemoryTimeSeriesStorage implements TimeSeriesStorage {
     switch (table) {
       case "system_metric":
         return "loggedAt";
-      case "span":
-      case "trace":
-        return "startedAt";
       case "log_line":
       default:
         return "timestamp";
@@ -65,8 +60,6 @@ export class MemoryTimeSeriesStorage implements TimeSeriesStorage {
   reset(): void {
     this.tables.log_line = [];
     this.tables.system_metric = [];
-    this.tables.trace = [];
-    this.tables.span = [];
   }
 
   private extractTimestamp(row: TimeSeriesRow, column: string): number | undefined {
