@@ -63,13 +63,63 @@ def log_eval_result(
     return client.add_evaluation_result(ctx.eval_id, key, value, metadata)
 
 
-def finish_eval(status: str = "completed") -> dict[str, Any]:
-    """Finish the current evaluation."""
+def log_eval_summary(
+    summary: Optional[dict[str, Any]] = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Record structured summary data for the current evaluation.
+
+    Merges the given payload into ``Evaluation.summary`` (existing keys are
+    preserved unless overwritten). This is where the dashboard's confusion
+    matrix / PR curve / threshold sweep visualizations come from — the
+    recognized keys are:
+
+    - ``confusion_matrix``: ``{"labels": [...], "matrix": [[...], ...]}``
+    - ``pr_curve``: ``[{"recall": .., "precision": ..}, ...]``
+    - ``threshold_sweep``: ``[{"threshold": .., "precision": .., "recall": .., "f1": ..}, ...]``
+
+    Any other scalar keys (e.g. ``accuracy``, ``num_samples``) are also
+    surfaced as metric cards. Both positional dict and keyword forms work::
+
+        lumina.log_eval_summary(accuracy=0.93, num_samples=1000)
+        lumina.log_eval_summary({"confusion_matrix": cm})
+    """
+    ctx = get_run_context()
+    if not ctx.eval_id:
+        raise ValueError("No active evaluation. Call init_eval() first.")
+
+    payload: dict[str, Any] = {}
+    if summary:
+        payload.update(summary)
+    payload.update(kwargs)
+    if not payload:
+        raise ValueError("log_eval_summary requires at least one key")
+
+    client = LuminaClient()
+    # Merge with any summary already recorded so repeated calls accumulate
+    # rather than clobber (PATCH replaces the summary field wholesale).
+    existing = client.get_evaluation(ctx.eval_id).get("summary") or {}
+    merged = {**existing, **payload}
+    return client.patch_evaluation(ctx.eval_id, summary=merged)
+
+
+def finish_eval(
+    status: str = "completed",
+    *,
+    summary: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Finish the current evaluation, optionally recording a final summary."""
     ctx = get_run_context()
     if not ctx.eval_id:
         raise ValueError("No active evaluation. Call init_eval() first.")
     client = LuminaClient()
-    result = client.patch_evaluation(ctx.eval_id, status=status)
+    if summary:
+        existing = client.get_evaluation(ctx.eval_id).get("summary") or {}
+        result = client.patch_evaluation(
+            ctx.eval_id, status=status, summary={**existing, **summary}
+        )
+    else:
+        result = client.patch_evaluation(ctx.eval_id, status=status)
     ctx.eval_id = None
     return result
 
