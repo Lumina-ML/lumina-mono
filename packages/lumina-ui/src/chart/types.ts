@@ -86,6 +86,26 @@ export interface ChartDataZoom {
   end?: number;
 }
 
+export interface ChartToolbox {
+  /** 是否显示工具栏，默认 true */
+  show?: boolean;
+  /** 保存图片，默认 true */
+  saveAsImage?: boolean;
+  /** 区域缩放/缩放还原，默认 true */
+  dataZoom?: boolean;
+  /** 还原初始状态，默认 true */
+  restore?: boolean;
+}
+
+export interface ChartBrush {
+  /** 框选后回调，参数为选中的数据索引区间 */
+  onBrush?: (range: { start: number; end: number }[]) => void;
+  /** 限制在特定 x 轴上，默认 0 */
+  xAxisIndex?: number | number[];
+  /** 限制在特定 y 轴上 */
+  yAxisIndex?: number | number[];
+}
+
 export interface ChartAnimation {
   enabled?: boolean;
   duration?: number;
@@ -124,6 +144,8 @@ export interface ChartConfig {
   tooltip?: ChartTooltip;
   grid?: ChartGrid;
   dataZoom?: ChartDataZoom[];
+  toolbox?: ChartToolbox;
+  brush?: ChartBrush;
   animation?: ChartAnimation;
   /** 覆盖默认背景色 */
   backgroundColor?: string;

@@ -15,8 +15,13 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
+    "@tanstack/vue-table": "^8.21.3",
+    "@tanstack/vue-virtual": "^3.13.32",
     "gridstack": "^12.6.0",
-    "naive-ui": "^2.44.1"
+    "isomorphic-dompurify": "^3.19.0",
+    "marked": "^18.0.6",
+    "naive-ui": "^2.44.1",
+    "vue-json-pretty": "^2.6.0"
   },
   "peerDependencies": {
     "echarts": "^5.5.0",
