@@ -41,6 +41,12 @@ const showKey = ref(false);
 const signInError = ref<string | null>(null);
 const signingIn = ref(false);
 
+// Probe failure is shown as a banner on top of the sign-in form so the
+// user knows we couldn't reach the server (rather than silently landing
+// on an empty form). Distinguishes network errors (server down / DNS /
+// CORS) from HTTP 4xx (auth) and 5xx (server-side problem).
+const probeError = ref<string | null>(null);
+
 // ── First-run (bootstrap) state ──────────────────────────────────────
 const bootstrapName = ref("");
 const bootstrapEmail = ref("");
@@ -106,7 +112,7 @@ async function onSignIn() {
       redirectAfterAuth();
     }
   } catch (err) {
-    signInError.value = err instanceof Error ? err.message : "Sign-in failed.";
+    signInError.value = describeFetchError(err);
   } finally {
     signingIn.value = false;
   }
@@ -198,6 +204,28 @@ async function onCreateUser() {
 }
 
 /**
+ * Turn a thrown error from fetchApi into a copy line the user can act
+ * on. Network failures bubble up as `TypeError` from `fetch()` rather
+ * than as `ApiError`, so we treat anything that's not an `ApiError` as
+ * "can't reach the server".
+ */
+function describeFetchError(err: unknown): string {
+  if (!(err instanceof ApiError)) {
+    return "Can't reach the Lumina server. Check that the API URL is correct and the server is running.";
+  }
+  if (err.status === 401 || err.status === 403) {
+    return "That API key was rejected. Double-check it from your dashboard and try again.";
+  }
+  if (err.status >= 500) {
+    return `The Lumina server is having trouble (HTTP ${err.status}). Please retry in a moment.`;
+  }
+  // 4xx with a message from the server — surface verbatim.
+  const data = err.data as { message?: string } | undefined;
+  if (data?.message) return data.message;
+  return `Sign-in failed (HTTP ${err.status}).`;
+}
+
+/**
  * Shared error shape for both create-user flows. Branches on 409 (the
  * only "expected" client-side failure — every other error is a real
  * server/network problem and should surface verbatim).
@@ -230,8 +258,12 @@ onMounted(async () => {
   try {
     const { items } = await WorkspaceService.listUsers();
     mode.value = items.length === 0 ? "first-run" : "sign-in";
-  } catch {
-    // If we can't even list users, fall back to manual sign-in.
+  } catch (err) {
+    // We couldn't reach the server (or the server rejected the probe).
+    // Either way, fall back to the manual sign-in form so the user has
+    // something to interact with, and surface the reason as a banner so
+    // they know why the auto-bootstrap prompt didn't appear.
+    probeError.value = describeFetchError(err);
     mode.value = "sign-in";
   }
 });
@@ -351,6 +383,20 @@ const apiBase = import.meta.env.VITE_LUMINA_API_URL || "(default — same origin
               Paste your API key, or create a new account below.
             </p>
           </div>
+
+          <LAlert
+            v-if="probeError"
+            type="warning"
+            :show-icon="true"
+            title="Couldn't reach the server"
+          >
+            {{ probeError }}
+            <template v-if="apiBase">
+              <div class="mt-1 text-[11px] text-fg-tertiary">
+                Tried: <code class="font-mono">{{ apiBase }}</code>
+              </div>
+            </template>
+          </LAlert>
 
           <LCard class="p-6">
             <form class="space-y-4" @submit.prevent="onSignIn">

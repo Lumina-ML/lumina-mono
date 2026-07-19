@@ -41,6 +41,12 @@ const serverConfigSchema = z.object({
   // `LUMINA_DEFAULT_WORKSPACE_ID` so seeded users land somewhere
   // meaningful instead of an arbitrary slug.
   defaultWorkspaceId: z.string().min(1).default("default"),
+
+  // Dashboard URL printed in the startup banner. Defaults to the same
+  // host as the API but on the conventional Vite port (3000). Override
+  // via `LUMINA_DASHBOARD_URL` when the dashboard sits behind a reverse
+  // proxy or runs on a different port.
+  dashboardUrl: z.string().url().optional(),
 });
 
 export type ServerConfig = z.infer<typeof serverConfigSchema>;
@@ -71,6 +77,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     s3SecretAccessKey: env.S3_SECRET_ACCESS_KEY,
     s3ForcePathStyle: env.S3_FORCE_PATH_STYLE,
     defaultWorkspaceId: env.LUMINA_DEFAULT_WORKSPACE_ID,
+    dashboardUrl: env.LUMINA_DASHBOARD_URL,
   });
 
   if (!parsed.success) {

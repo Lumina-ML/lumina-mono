@@ -291,20 +291,28 @@ function preempt() {
   updateMutation.mutate({ status: "preempting" });
 }
 
-function cancel() {
-  if (!run.value) return;
-  // Confirm: cancellation flips the status to `killed` and is recorded in
-  // the audit log. Use LDialog instead of window.confirm so the warning
-  // styling matches the rest of the dashboard.
-  if (
-    !window.confirm(
-      `Cancel run "${run.value.name}"? This stops the run, sets status to "killed", and is irreversible.`,
-    )
-  ) {
-    return;
-  }
-  updateMutation.mutate({ status: "killed" });
+// ── Cancel confirmation dialog (replaces window.confirm) ────────────────
+// `cancel()` flips the run's status to `killed`, which is recorded in
+// the audit log and is irreversible. We open an LDialog instead of using
+// `window.confirm` so the warning styling matches the rest of the
+// dashboard and the user has a chance to type-confirm the run name.
+const cancelOpen = ref(false);
+const cancelConfirm = ref("");
+
+function openCancelDialog() {
+  cancelConfirm.value = "";
+  cancelOpen.value = true;
 }
+
+function confirmCancel() {
+  if (!run.value) return;
+  updateMutation.mutate({ status: "killed" });
+  cancelOpen.value = false;
+}
+
+const canConfirmCancel = computed(
+  () => !!run.value && cancelConfirm.value.trim() === run.value.name,
+);
 
 // ── Notes editor dialog ─────────────────────────────────────────────────
 const notesOpen = ref(false);
@@ -443,7 +451,7 @@ const canDelete = computed(
           size="sm"
           quaternary
           :loading="updateMutation.isPending.value"
-          @click="cancel"
+          @click="openCancelDialog"
         >
           <XCircle class="mr-1 h-3 w-3" />
           Cancel
@@ -721,6 +729,74 @@ const canDelete = computed(
             @click="saveNotes"
           >
             Save notes
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
+
+    <!-- ── Cancel run confirmation ─────────────────────────────────── -->
+    <LDialog
+      v-model:show="cancelOpen"
+      title="Cancel this run?"
+      width="480px"
+      @close="cancelConfirm = ''"
+    >
+      <div class="space-y-3">
+        <div
+          class="flex items-start gap-2 rounded-md border border-accent-warning/30 bg-accent-warning/10 p-3 text-xs"
+        >
+          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-warning" />
+          <div>
+            <div class="font-medium">
+              Cancellation flips the run's status to <code class="font-mono">killed</code>
+              and is recorded in the audit log.
+            </div>
+            <div class="text-fg-tertiary">
+              If you're still inside a training loop, the SDK will pick up the
+              status change on its next heartbeat. Use <em>preempt</em> instead
+              if you want a softer stop.
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <label
+            for="run-cancel-confirm"
+            class="text-xs font-medium text-fg-secondary"
+          >
+            Type the run name
+            <code class="font-mono text-fg-primary">{{ run.name }}</code>
+            to confirm.
+          </label>
+          <LInput
+            id="run-cancel-confirm"
+            v-model:value="cancelConfirm"
+            :placeholder="run.name"
+            autocomplete="off"
+            spellcheck="false"
+            :disabled="updateMutation.isPending.value"
+            @keydown.enter="canConfirmCancel && confirmCancel()"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton
+            quaternary
+            :disabled="updateMutation.isPending.value"
+            @click="cancelOpen = false"
+          >
+            Keep running
+          </LButton>
+          <LButton
+            type="warning"
+            :disabled="!canConfirmCancel"
+            :loading="updateMutation.isPending.value"
+            @click="confirmCancel"
+          >
+            <XCircle class="mr-1 h-3 w-3" />
+            Cancel run
           </LButton>
         </div>
       </template>
