@@ -3,7 +3,7 @@ import { useDateFormat } from "../composables/useDateFormat";
 
 export interface LTimestampProps {
   value?: Date | string | number;
-  preset?: "datetime" | "date" | "time" | "short" | "long" | "relative";
+  preset?: "datetime" | "date" | "time" | "short" | "long" | "relative" | "iso";
 }
 
 const props = withDefaults(defineProps<LTimestampProps>(), {

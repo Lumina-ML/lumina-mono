@@ -56,6 +56,42 @@ const show = ref(false);
 </template>
 ```
 
+### 业务底座组件
+
+面向 MLOps 场景的通用业务组件：
+
+- **Run**：`LRunStatus`、`LRunCard`
+- **Metric**：`LMetricValue`、`LMetricChart`
+- **Log**：`LLogLine`
+- **Artifact**：`LArtifactTree`
+- **Config**：`LConfigViewer`、`LCopyable`
+- **Tag**：`LTagInput`
+- **Time**：`LTimestamp`、`LDuration`
+
+```vue
+<script setup lang="ts">
+import { LRunCard, LMetricChart, LTagInput } from "@lumina/ui";
+import { ref } from "vue";
+
+const tags = ref(["baseline", "v1"]);
+</script>
+
+<template>
+  <LRunCard
+    name="exp-001"
+    status="running"
+    project="demo"
+    :duration-ms="125000"
+    :tags="tags.map(t => ({ name: t }))"
+  />
+  <LMetricChart
+    title="loss"
+    :series="[{ name: 'train', data: [[0, 0.9], [1, 0.5]] }]"
+  />
+  <LTagInput v-model:tags="tags" />
+</template>
+```
+
 ### 图表
 
 ```vue
@@ -141,7 +177,8 @@ src/
 ├── composables/        # useTheme, usePagination, useWidgetData, useBreakpoint, useDebounce,
 │                       # useLocalStorage, useSessionStorage, useToggle, useClipboard,
 │                       # useCountdown, useDateFormat
-└── hoc/                # LAsync, LErrorBoundary, LList
+├── hoc/                # LAsync, LErrorBoundary, LList
+└── business/           # Lumina 业务底座组件
 ```
 
 ## 开发
@@ -158,4 +195,7 @@ pnpm --filter @lumina/ui typecheck
 
 # 测试
 pnpm --filter @lumina/ui test
+
+# 代码检查
+pnpm --filter @lumina/ui lint
 ```
