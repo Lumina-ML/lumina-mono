@@ -417,7 +417,7 @@ class LuminaRun:
         from lumina.backend.artifact import LuminaArtifact
 
         if isinstance(artifact_or_path, LuminaArtifact):
-            return artifact_or_path.save(project=self._project)
+            return artifact_or_path.save(project=self._project, aliases=aliases)
         if isinstance(artifact_or_path, str):
             art = LuminaArtifact(
                 name=name or artifact_or_path,
@@ -425,7 +425,7 @@ class LuminaRun:
                 description=None,
             )
             art.add_file(artifact_or_path)
-            return art.save(project=self._project)
+            return art.save(project=self._project, aliases=aliases)
         raise TypeError("log_artifact expects a LuminaArtifact or file path")
 
     def use_artifact(
@@ -439,11 +439,18 @@ class LuminaRun:
         from lumina.backend.artifact import use_lumina_artifact
 
         if isinstance(artifact_or_name, str):
-            alias = "latest"
+            alias = (aliases or ["latest"])[0]
             name = artifact_or_name
             if ":" in name:
                 name, alias = name.split(":", 1)
-            return use_lumina_artifact(name, project=self._project, alias=alias)
+            used = use_lumina_artifact(name, project=self._project, alias=alias)
+            # If use_as is set, attach the consumed artifact as a lineage
+            # parent of this run (recorded under metadata rather than a
+            # separate lineage edge, since run->artifact lineage isn't
+            # modelled yet on the server side).
+            if use_as:
+                used["use_as"] = use_as
+            return used
         raise TypeError("use_artifact expects an artifact name string")
 
     def log_model(

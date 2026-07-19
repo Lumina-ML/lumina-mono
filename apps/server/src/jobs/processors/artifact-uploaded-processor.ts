@@ -11,9 +11,17 @@ export class ArtifactUploadedProcessor implements JobProcessor {
       artifactVersionId: string;
       projectId: string;
       fileCount: number;
+      digest?: string;
     };
 
-    // Placeholder for async side effects: thumbnail generation, indexing, etc.
-    console.log(`Processing artifact upload: ${payload.artifactVersionId} (${payload.fileCount} files)`);
+    // The manifest (carrying `digest` + file list) is now persisted on the
+    // ArtifactVersion row at finalize-time. Async side effects such as
+    // thumbnail generation, embedding indexing, and content-search
+    // ingestion can be hooked in here. For now, just log so the worker
+    // surfaces activity in the registry.
+    console.log(
+      `Processing artifact upload: ${payload.artifactVersionId} ` +
+        `(${payload.fileCount} files, digest=${payload.digest ?? "n/a"})`,
+    );
   }
 }

@@ -5,6 +5,7 @@ import type {
   CreateArtifactFileInput,
   PatchArtifactVersionInput,
 } from "./schema.js";
+import type { Manifest } from "./schema.js";
 
 export class ArtifactRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -84,14 +85,39 @@ export class ArtifactRepository {
     });
   }
 
-  async createFile(versionId: string, storageKey: string, data: CreateArtifactFileInput) {
+  async updateVersionManifest(id: string, manifest: Manifest, digest: string) {
+    return this.prisma.artifactVersion.update({
+      where: { id },
+      data: { manifest: manifest as unknown as object, digest },
+    });
+  }
+
+  async findFileByPath(versionId: string, path: string) {
+    return this.prisma.artifactFile.findUnique({
+      where: { artifactVersionId_path: { artifactVersionId: versionId, path } },
+    });
+  }
+
+  async findFileByDigest(versionId: string, sha256: string) {
+    return this.prisma.artifactFile.findFirst({
+      where: { artifactVersionId: versionId, sha256 },
+    });
+  }
+
+  async createFile(
+    versionId: string,
+    data: CreateArtifactFileInput & { storageKey?: string },
+  ) {
     return this.prisma.artifactFile.create({
       data: {
         artifactVersionId: versionId,
         path: data.path,
-        size: data.size,
+        size: data.size ?? 0n,
         md5: data.md5,
-        storageKey,
+        sha256: data.sha256,
+        contentType: data.contentType,
+        referenceUri: data.referenceUri,
+        storageKey: data.storageKey,
       },
     });
   }
@@ -100,6 +126,40 @@ export class ArtifactRepository {
     return this.prisma.artifactFile.findMany({
       where: { artifactVersionId: versionId },
       orderBy: { path: "asc" },
+    });
+  }
+
+  // Lineage
+  async attachLineage(childVersionId: string, parentVersionId: string, type: string) {
+    return this.prisma.artifactLineage.upsert({
+      where: {
+        artifactVersionId_parentArtifactVersionId: {
+          artifactVersionId: childVersionId,
+          parentArtifactVersionId: parentVersionId,
+        },
+      },
+      create: { artifactVersionId: childVersionId, parentArtifactVersionId: parentVersionId, type },
+      update: { type },
+    });
+  }
+
+  async detachLineage(childVersionId: string, parentVersionId: string) {
+    await this.prisma.artifactLineage.deleteMany({
+      where: { artifactVersionId: childVersionId, parentArtifactVersionId: parentVersionId },
+    });
+  }
+
+  async listParents(childVersionId: string) {
+    return this.prisma.artifactLineage.findMany({
+      where: { artifactVersionId: childVersionId },
+      include: { parentArtifactVersion: { include: { artifact: true } } },
+    });
+  }
+
+  async listChildren(parentVersionId: string) {
+    return this.prisma.artifactLineage.findMany({
+      where: { parentArtifactVersionId: parentVersionId },
+      include: { artifactVersion: { include: { artifact: true } } },
     });
   }
 }

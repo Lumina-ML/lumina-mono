@@ -300,6 +300,10 @@ model ArtifactVersion {
   aliases     String[]          @default([])
   metadata    Json              @default("{}")
   state       ArtifactVersionState @default(committed)
+  /// sha256 digest over the canonical manifest, populated on finalize.
+  digest      String?
+  /// Serialized manifest entries (path, digest, size, referenceUri, contentType).
+  manifest    Json?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -328,12 +332,22 @@ model ArtifactFile {
   path                String
   size                BigInt   @default(0)
   md5                 String?
-  storageKey          String
+  /// Content-addressed sha256 (lowercase hex). Null for reference artifacts.
+  sha256              String?
+  /// Optional ETag / opaque server-side tag.
+  etag                String?
+  /// External URI for reference artifacts (e.g. s3://, https://). When set,
+  /// `storageKey` is null and no upload is required.
+  referenceUri        String?
+  /// MIME type hint supplied by the uploader.
+  contentType         String?
+  storageKey          String?
   createdAt           DateTime @default(now())
 
   artifactVersion ArtifactVersion @relation(fields: [artifactVersionId], references: [id], onDelete: Cascade)
 
   @@unique([artifactVersionId, path])
+  @@index([artifactVersionId, sha256])
 }
 
 model ArtifactLineage {

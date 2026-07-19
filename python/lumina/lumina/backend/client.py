@@ -222,15 +222,55 @@ class LuminaClient:
             payload["metadata"] = metadata
         return self._request("POST", f"/api/v1/artifacts/{artifact_id}/versions", payload)
 
-    def add_artifact_file(self, version_id: str, path: str, size: int) -> dict[str, Any]:
+    def add_artifact_file(
+        self,
+        version_id: str,
+        path: str,
+        size: int,
+        sha256: Optional[str] = None,
+        content_type: Optional[str] = None,
+        reference_uri: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"path": path, "size": size}
+        if sha256:
+            payload["sha256"] = sha256
+        if content_type:
+            payload["contentType"] = content_type
+        if reference_uri:
+            payload["referenceUri"] = reference_uri
         return self._request(
             "POST",
             f"/api/v1/versions/{version_id}/files",
-            {"path": path, "size": size},
+            payload,
         )
 
     def get_artifact_version(self, version_id: str) -> dict[str, Any]:
         return self._request("GET", f"/api/v1/versions/{version_id}")
+
+    def finalize_artifact_version(self, version_id: str) -> dict[str, Any]:
+        """Trigger server-side manifest build + event emission."""
+        return self._request("POST", f"/api/v1/versions/{version_id}/finalize", {})
+
+    def attach_artifact_lineage(
+        self,
+        child_version_id: str,
+        parent_version_id: str,
+        lineage_type: str = "derived_from",
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/api/v1/versions/{child_version_id}/lineage",
+            {"parentVersionId": parent_version_id, "type": lineage_type},
+        )
+
+    def detach_artifact_lineage(self, child_version_id: str, parent_version_id: str) -> None:
+        self._request(
+            "DELETE",
+            f"/api/v1/versions/{child_version_id}/lineage/{parent_version_id}",
+        )
+
+    def list_artifact_lineage(self, version_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/versions/{version_id}/lineage")
 
     def patch_artifact_version(
         self,
