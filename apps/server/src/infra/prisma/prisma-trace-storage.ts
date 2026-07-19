@@ -57,6 +57,13 @@ export class PrismaTraceStorage implements TraceStorage {
     const where: Record<string, unknown> = {};
     if (options.projectId !== undefined) where.projectId = options.projectId;
     if (options.runId !== undefined) where.runId = options.runId;
+    if (options.projectIds !== undefined && options.projectIds.length > 0) {
+      where.projectId = { in: options.projectIds };
+    } else if (options.projectIds !== undefined && options.projectIds.length === 0) {
+      // Explicit empty set means "no projects in this workspace" — short
+      // circuit to zero rows instead of leaking every trace.
+      return { items: [], total: 0 };
+    }
     const take = options.limit ?? 100;
     const skip = options.offset ?? 0;
     const [traces, total] = await Promise.all([

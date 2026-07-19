@@ -7,6 +7,7 @@ import {
   type ListRunsQuery,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
+import { assertOwnsRun } from "../../core/authz/assert-workspace.js";
 
 export class RunHandler {
   constructor(
@@ -56,6 +57,7 @@ export class RunHandler {
     req: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
   ) {
+    if (!(await assertOwnsRun(req.server.prisma, req, reply, req.params.id))) return;
     const run = await this.runService.getByRunId(req.params.id);
     if (!run) {
       reply.status(404).send({ error: "Run not found" });
@@ -68,6 +70,7 @@ export class RunHandler {
     req: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
   ) {
+    if (!(await assertOwnsRun(req.server.prisma, req, reply, req.params.id))) return;
     const data = UpdateRunSchema.parse(req.body);
     const run = await this.runService.update(req.params.id, data);
     reply.send(run);
@@ -77,6 +80,7 @@ export class RunHandler {
     req: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
   ) {
+    if (!(await assertOwnsRun(req.server.prisma, req, reply, req.params.id))) return;
     await this.runService.delete(req.params.id);
     reply.status(204).send();
   }

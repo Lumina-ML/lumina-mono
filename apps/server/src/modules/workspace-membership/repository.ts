@@ -25,6 +25,18 @@ export class WorkspaceMembershipRepository {
     });
   }
 
+  /**
+   * Look up a membership by its composite key. Hits the
+   * `@@unique([workspaceId, userId])` index directly — single row read.
+   * Used by the workspace-guard helper to authorize detail-route access
+   * without trusting `req.params` for cross-workspace enumeration.
+   */
+  async findByWorkspaceAndUser(workspaceId: string, userId: string) {
+    return this.prisma.workspaceMembership.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+    });
+  }
+
   async listByWorkspace(workspaceId: string) {
     return this.prisma.workspaceMembership.findMany({
       where: { workspaceId },

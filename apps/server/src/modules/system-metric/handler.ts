@@ -6,6 +6,7 @@ import {
   type ListSystemMetricsQuery,
 } from "./schema.js";
 import { RunService } from "../run/service.js";
+import { assertOwnsRun } from "../../core/authz/assert-workspace.js";
 
 export class SystemMetricHandler {
   constructor(
@@ -17,6 +18,7 @@ export class SystemMetricHandler {
     req: FastifyRequest<{ Params: { runId: string } }>,
     reply: FastifyReply,
   ) {
+    if (!(await assertOwnsRun(req.server.prisma, req, reply, req.params.runId))) return;
     const data = LogSystemMetricsSchema.parse(req.body);
     const run = await this.runService.getByRunId(req.params.runId);
     if (!run) {
@@ -31,6 +33,7 @@ export class SystemMetricHandler {
     req: FastifyRequest<{ Params: { runId: string }; Querystring: ListSystemMetricsQuery }>,
     reply: FastifyReply,
   ) {
+    if (!(await assertOwnsRun(req.server.prisma, req, reply, req.params.runId))) return;
     const query = ListSystemMetricsQuerySchema.parse(req.query);
     const run = await this.runService.getByRunId(req.params.runId);
     if (!run) {

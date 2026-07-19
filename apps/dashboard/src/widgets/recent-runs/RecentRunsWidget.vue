@@ -1,14 +1,30 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
+import { useQueryClient } from "@tanstack/vue-query";
 import { LCard, LButton, LSkeleton, LEmpty, LTag } from "@lumina/ui";
 import { useRuns } from "@/modules/run/composables/useRuns";
 import { useCurrentProject } from "@/composables/useCurrentProject";
+import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
 import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 
 const projectId = useCurrentProject();
 const { formatDate } = useDateFormat();
+const queryClient = useQueryClient();
+
+// Subscribe to workspace-wide run lifecycle events so a freshly logged
+// metric appears in this widget without a page reload. Closes the §5 gap
+// in `docs/User-Lifecycle-Flow-Audit.md` — WorkspaceOverview was the
+// only top-level view still offline after Phase 2.
+useRealtimeSubscription(
+  computed(() => "workspace:default"),
+  (event) => {
+    if (event.type === "RunCreated" || event.type === "RunFinished") {
+      queryClient.invalidateQueries({ queryKey: ["runs"] });
+    }
+  },
+);
 
 // When a project is selected, scope to it. Otherwise show the global
 // recent runs feed.

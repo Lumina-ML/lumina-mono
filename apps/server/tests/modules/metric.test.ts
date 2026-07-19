@@ -60,4 +60,38 @@ describe("metric module (Phase 2 E2E baseline)", () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatchObject({ runId: RUN_ID, keys: ["loss", "acc"], count: 2 });
   });
+
+  // SDK-Server-FE Gap doc item #14: ListMetricsQuery.keys widens to accept
+  // both ?keys=a,b,c (comma-separated) and ?keys=a&keys=b (repeated).
+  // Regression-locks both shapes — touches metric/handler.ts and
+  // metric/schema.ts.
+  it("GET /runs/:runId/metrics accepts ?keys=a,b,c and ?keys=a&keys=b", async () => {
+    await app.inject({
+      method: "POST",
+      url: `/api/v1/runs/${RUN_ID}/metrics`,
+      payload: {
+        metrics: [
+          { key: "loss", step: 0, value: 0.9 },
+          { key: "loss", step: 1, value: 0.5 },
+          { key: "acc", step: 0, value: 0.1 },
+        ],
+      },
+    });
+
+    const comma = await app.inject({
+      method: "GET",
+      url: `/api/v1/runs/${RUN_ID}/metrics?keys=loss,acc`,
+    });
+    expect(comma.statusCode).toBe(200);
+    const commaBody = comma.json();
+    expect(Object.keys(commaBody.metrics).sort()).toEqual(["acc", "loss"]);
+
+    const repeated = await app.inject({
+      method: "GET",
+      url: `/api/v1/runs/${RUN_ID}/metrics?keys=loss&keys=acc`,
+    });
+    expect(repeated.statusCode).toBe(200);
+    const repeatedBody = repeated.json();
+    expect(Object.keys(repeatedBody.metrics).sort()).toEqual(["acc", "loss"]);
+  });
 });

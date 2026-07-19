@@ -87,6 +87,14 @@ export class ClickHouseTraceStorage implements TraceStorage {
   async listTracesPaginated(
     options: TraceQueryOptions,
   ): Promise<{ items: TraceRow[]; total: number }> {
+    // ClickHouse has no JOIN — when the caller wants workspace-scoped
+    // traces, it must pre-resolve `workspaceId` to a list of `projectIds`.
+    // An explicit empty list means "no projects in this workspace" → return
+    // zero rows without leaking every trace.
+    if (options.projectIds !== undefined && options.projectIds.length === 0) {
+      return { items: [], total: 0 };
+    }
+
     const conditions: string[] = [];
     const params: Record<string, unknown> = {
       limit: options.limit ?? 100,
@@ -95,6 +103,12 @@ export class ClickHouseTraceStorage implements TraceStorage {
     if (options.projectId !== undefined) {
       conditions.push(`projectId = {projectId:String}`);
       params.projectId = options.projectId;
+    }
+    if (options.projectIds !== undefined && options.projectIds.length > 0) {
+      // ClickHouse's `IN` with an array parameter — see
+      // https://clickhouse.com/docs/en/sql-reference/operators/in
+      conditions.push(`projectId IN {projectIds:Array(String)}`);
+      params.projectIds = options.projectIds;
     }
     if (options.runId !== undefined) {
       conditions.push(`runId = {runId:String}`);

@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Copy,
   Check,
+  AlertTriangle,
 } from "lucide-vue-next";
 import {
   LSidebar,
@@ -26,12 +27,14 @@ import {
   LTag,
   LPopover,
   LAvatar,
+  LDialog,
 } from "@lumina/ui";
 import { useThemeStore } from "@/stores/theme";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useCommandStore } from "@/stores/command";
 import { useAuthStore } from "@/stores/auth";
 import { useWorkspaceStore } from "@/stores/workspace";
+import { useNotificationsStore } from "@/stores/notifications";
 import { useToast } from "@/composables/useToast";
 import { ProjectService } from "@/services/project.service";
 import { useGlobalRealtime } from "@/composables/useGlobalRealtime";
@@ -47,10 +50,19 @@ const sidebarStore = useSidebarStore();
 const workspaceStore = useWorkspaceStore();
 const commandStore = useCommandStore();
 const authStore = useAuthStore();
+const notifications = useNotificationsStore();
 const toast = useToast();
 
 const userMenuOpen = ref(false);
 const copiedKey = ref(false);
+
+// Rotate-key dialog: replacing the previous "toast only" flow that left
+// users without a way to copy the freshly-issued key. Closes the §9 gap
+// in `docs/User-Lifecycle-Flow-Audit.md`.
+const rotatedKey = ref<string | null>(null);
+const rotatedDialogOpen = ref(false);
+const rotatedCopied = ref(false);
+const rotating = ref(false);
 
 // ── Workspace memberships (drives the workspace switcher in the sidebar)
 // The query is reactive on auth.user.id so when a new user signs in the
@@ -103,13 +115,47 @@ const userInitial = computed(() => {
 });
 
 async function onRotateKey() {
-  const newKey = await authStore.rotateKey();
   userMenuOpen.value = false;
-  if (newKey) {
-    toast.success("New API key generated. The old one is now invalid.");
-  } else {
-    toast.error(`Failed to rotate key: ${authStore.error ?? "unknown error"}`);
+  rotating.value = true;
+  try {
+    const newKey = await authStore.rotateKey();
+    if (newKey) {
+      rotatedKey.value = newKey;
+      rotatedDialogOpen.value = true;
+      notifications.push({
+        id: `api-key-rotated:${Date.now()}`,
+        source: "ApiKeyRotated",
+        level: "warning",
+        title: "API key rotated",
+        body: "Your old key is now invalid. Store the new key shown on screen.",
+        link: "/settings/api-keys",
+      });
+      toast.info("API key rotated — copy the new one before closing.", {
+        duration: 5000,
+      });
+    } else {
+      toast.error(`Failed to rotate key: ${authStore.error ?? "unknown error"}`);
+    }
+  } finally {
+    rotating.value = false;
   }
+}
+
+async function copyRotatedKey() {
+  if (!rotatedKey.value) return;
+  try {
+    await navigator.clipboard.writeText(rotatedKey.value);
+    rotatedCopied.value = true;
+    setTimeout(() => (rotatedCopied.value = false), 1500);
+  } catch {
+    toast.error("Could not copy key to clipboard.");
+  }
+}
+
+function dismissRotatedDialog() {
+  rotatedKey.value = null;
+  rotatedDialogOpen.value = false;
+  rotatedCopied.value = false;
 }
 
 async function onCopyKey() {
@@ -627,6 +673,47 @@ watch(
         <RouterView />
       </main>
     </div>
+
+    <!-- Rotate key confirmation dialog. Reuses the warning callout /
+    copy button shape from SettingsApiKeys.vue so the UX is identical
+    across both rotate entry points. -->
+    <LDialog
+      v-model:show="rotatedDialogOpen"
+      title="Your new API key"
+      width="520px"
+      @close="dismissRotatedDialog"
+    >
+      <div class="space-y-3">
+        <div
+          class="flex items-start gap-2 rounded-md border border-accent-warning/30 bg-accent-warning/10 p-3 text-xs"
+        >
+          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-warning" />
+          <div>
+            <div class="font-medium">Copy this key now — the old one is already invalid.</div>
+            <div class="text-fg-tertiary">
+              Any running SDK processes still using the old key will start
+              receiving 401s on the next <code class="font-mono">log()</code> call.
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 rounded-md border border-border bg-canvas p-2 font-mono text-xs">
+          <span class="min-w-0 flex-1 truncate">{{ rotatedKey }}</span>
+          <LTooltip content="Copy">
+            <LIconButton aria-label="Copy new API key" @click="copyRotatedKey">
+              <Check v-if="rotatedCopied" class="h-3.5 w-3.5 text-accent-success" />
+              <Copy v-else class="h-3.5 w-3.5" />
+            </LIconButton>
+          </LTooltip>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end">
+          <LButton :loading="rotating" @click="dismissRotatedDialog">
+            I've stored it
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
   </div>
 </template>
 

@@ -73,6 +73,14 @@ export async function buildTestApp(
     ? options.prisma()
     : options.prisma ?? {}) as PrismaClient;
 
+  // If the fake prisma exposes __setTraceStorage, wire the test app's
+  // in-memory traceStorage so the §11 workspace guard can see rows the
+  // handler wrote through the public API (see fake-prisma.ts comment).
+  const setter = (prisma as unknown as { __setTraceStorage?: (s: MemoryTraceStorage | undefined) => void }).__setTraceStorage;
+  if (typeof setter === "function") {
+    setter(traceStorage);
+  }
+
   app.decorate("prisma", prisma);
   app.decorate("metricStorage", metricStorage);
   app.decorate("timeSeriesStorage", timeSeriesStorage);
@@ -83,6 +91,12 @@ export async function buildTestApp(
   app.decorate("telemetry", telemetry as never);
   app.decorate("storage", storage);
   app.decorate("realtime", { addConnection: () => {}, broadcast: () => {} } as never);
+
+  // Decorate `req.workspaceId` with a default so handlers that use
+  // `assertOwns*` don't 404 every request. The real workspaceContext
+  // plugin reads the user's first membership; for tests we just pin every
+  // request to the default workspace unless overridden per-test.
+  app.decorateRequest("workspaceId", TEST_CONFIG.defaultWorkspaceId);
 
   // Default workspace seed only if the mock supports it.
   if (options.seedDefaultWorkspace !== false) {

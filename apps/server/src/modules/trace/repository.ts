@@ -46,10 +46,15 @@ export class TraceRepository {
    * Workspace-wide paginated trace list. Delegates to the storage layer's
    * `listTracesPaginated` so both Postgres and ClickHouse backends can
    * honour `limit` / `offset` consistently.
+   *
+   * `projectIds` is forwarded as-is — it's how callers (typically the
+   * `listAllTraces` handler) translate `workspaceId` into a filter the
+   * storage backends can apply without modelling the workspace relation.
    */
-  async list(params: ListTracesQuery): Promise<{ items: TraceRow[]; total: number }> {
+  async list(params: ListTracesQuery & { projectIds?: string[] }): Promise<{ items: TraceRow[]; total: number }> {
     return this.storage.listTracesPaginated({
       ...(params.projectId ? { projectId: params.projectId } : {}),
+      ...(params.projectIds ? { projectIds: params.projectIds } : {}),
       limit: params.limit,
       offset: params.offset,
       orderByStartedAt: "desc",

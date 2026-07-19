@@ -1,5 +1,6 @@
 import type { PrismaClient } from "../../src/generated/prisma/index.js";
 import { uuidv7 } from "../../src/shared/uuid7.js";
+import type { MemoryTraceStorage } from "../../src/infra/memory/memory-trace-storage.js";
 
 interface FakeProjectRow {
   id: string;
@@ -162,6 +163,13 @@ export function createFakePrisma(options: {
     status?: string;
     metadata?: Record<string, unknown>;
   }>;
+  /**
+   * Optional back-references to the in-memory storage instances. Lets the
+   * fake-prisma `trace` / `span` models resolve rows that the handler wrote
+   * through `traceStorage` — keeps the §11 workspace guard happy when tests
+   * create traces via the public API and then exercise detail routes.
+   */
+  traceStorage?: MemoryTraceStorage;
 } = {}): PrismaClient {
   const runsByRunId = new Map<string, FakeRunRow>();
   const runsById = new Map<string, FakeRunRow>();
@@ -299,9 +307,19 @@ export function createFakePrisma(options: {
   }
 
   const runModel = {
-    findUnique: async ({ where }: { where: { runId?: string; id?: string } }) => {
+    findUnique: async ({ where, select }: { where: { runId?: string; id?: string }; select?: { project?: { select?: { workspaceId?: boolean } } } }) => {
       const row = where.runId ? runsByRunId.get(where.runId) : where.id ? runsById.get(where.id) : undefined;
-      return row ?? null;
+      if (!row) return null;
+      if (select?.project?.select?.workspaceId) {
+        const project = projectsById.get(row.projectId);
+        // When the test seeds a run without seeding its parent project,
+        // assume the default workspace so legacy tests pass without
+        // backfilling the project fixture.
+        return {
+          project: { workspaceId: project?.workspaceId ?? "default" },
+        } as unknown as FakeRunRow;
+      }
+      return row;
     },
     create: async ({ data }: { data: Partial<FakeRunRow> }) => {
       const id = data.id ?? uuidv7();
@@ -348,10 +366,11 @@ export function createFakePrisma(options: {
   };
 
   const projectModel = {
-    findUnique: async ({ where }: { where: { id?: string; workspaceId_name?: { workspaceId: string; name: string } } }) => {
-      if (where.id) return projectsById.get(where.id) ?? null;
-      if (where.workspaceId_name) {
-        return (
+    findUnique: async ({ where, select }: { where: { id?: string; workspaceId_name?: { workspaceId: string; name: string } }; select?: { workspaceId?: boolean } }) => {
+      let row: FakeProjectRow | null = null;
+      if (where.id) row = projectsById.get(where.id) ?? null;
+      else if (where.workspaceId_name) {
+        row = (
           Array.from(projectsById.values()).find(
             (p) =>
               p.workspaceId === where.workspaceId_name!.workspaceId &&
@@ -359,7 +378,11 @@ export function createFakePrisma(options: {
           ) ?? null
         );
       }
-      return null;
+      if (!row) return null;
+      if (select?.workspaceId) {
+        return { workspaceId: row.workspaceId } as unknown as FakeProjectRow;
+      }
+      return row;
     },
     findFirst: async ({ where }: { where?: { workspaceId?: string } } = {}) => {
       const all = Array.from(projectsById.values());
@@ -378,7 +401,14 @@ export function createFakePrisma(options: {
       projectsById.set(row.id, row);
       return row;
     },
-    findMany: async () => Array.from(projectsById.values()),
+    findMany: async ({ where, select }: { where?: { workspaceId?: string }; select?: { id?: boolean } } = {}) => {
+      const all = Array.from(projectsById.values());
+      const filtered = where?.workspaceId
+        ? all.filter((p) => p.workspaceId === where.workspaceId)
+        : all;
+      if (select?.id) return filtered.map((p) => ({ id: p.id })) as unknown as FakeProjectRow[];
+      return filtered;
+    },
     count: async () => projectsById.size,
     update: async ({ where, data }: { where: { id: string }; data: Partial<FakeProjectRow> }) => {
       const row = projectsById.get(where.id);
@@ -394,16 +424,22 @@ export function createFakePrisma(options: {
   };
 
   const artifactModel = {
-    findUnique: async ({ where }: { where: { id?: string; projectId_name?: { projectId: string; name: string } } }) => {
-      if (where.id) return artifactsById.get(where.id) ?? null;
-      if (where.projectId_name) {
-        return (
-          Array.from(artifactsById.values()).find(
-            (a) => a.projectId === where.projectId_name!.projectId && a.name === where.projectId_name!.name,
-          ) ?? null
-        );
+    findUnique: async ({ where, select }: { where: { id?: string; projectId_name?: { projectId: string; name: string } }; select?: { project?: { select?: { workspaceId?: boolean } } } }) => {
+      let row: FakeArtifactRow | null = null;
+      if (where.id) row = artifactsById.get(where.id) ?? null;
+      else if (where.projectId_name) {
+        row = Array.from(artifactsById.values()).find(
+          (a) => a.projectId === where.projectId_name!.projectId && a.name === where.projectId_name!.name,
+        ) ?? null;
       }
-      return null;
+      if (!row) return null;
+      if (select?.project?.select?.workspaceId) {
+        const project = projectsById.get(row.projectId);
+        return {
+          project: { workspaceId: project?.workspaceId ?? "default" },
+        } as unknown as FakeArtifactRow;
+      }
+      return row;
     },
     findFirst: async ({ where }: { where?: { projectId?: string; name?: string } } = {}) => {
       const all = Array.from(artifactsById.values());
@@ -451,9 +487,18 @@ export function createFakePrisma(options: {
       versionsById.set(row.id, row);
       return row;
     },
-    findUnique: async ({ where, include }: { where: { id?: string }; include?: unknown }) => {
+    findUnique: async ({ where, include, select }: { where: { id?: string }; include?: unknown; select?: { artifact?: { select?: { project?: { select?: { workspaceId?: boolean } } } } } }) => {
       const row = where.id ? versionsById.get(where.id) : null;
       if (!row) return null;
+      if (select?.artifact?.select?.project?.select?.workspaceId) {
+        const artifact = artifactsById.get(row.artifactId);
+        const project = artifact ? projectsById.get(artifact.projectId) : undefined;
+        return {
+          artifact: {
+            project: { workspaceId: project?.workspaceId ?? "default" },
+          },
+        } as unknown as FakeArtifactVersionRow;
+      }
       if (include) return attachVersionIncludes(row, include);
       return row;
     },
@@ -590,9 +635,15 @@ export function createFakePrisma(options: {
       sweepsById.set(id, row);
       return row;
     },
-    findUnique: async ({ where, include }: { where: { id?: string }; include?: unknown }) => {
+    findUnique: async ({ where, include, select }: { where: { id?: string }; include?: unknown; select?: { project?: { select?: { workspaceId?: boolean } } } }) => {
       const row = where.id ? sweepsById.get(where.id) : null;
       if (!row) return null;
+      if (select?.project?.select?.workspaceId) {
+        const project = projectsById.get(row.projectId);
+        return {
+          project: { workspaceId: project?.workspaceId ?? "default" },
+        } as unknown as FakeSweepRow;
+      }
       if (include) {
         const inc = include as { runs?: { orderBy?: { createdAt: "asc" | "desc" } } };
         const runs = sweepRuns
@@ -641,7 +692,7 @@ export function createFakePrisma(options: {
       launchQueuesById.set(id, row);
       return row;
     },
-    findUnique: async ({ where, include }: { where: { id?: string; projectId_name?: { projectId: string; name: string } }; include?: unknown }) => {
+    findUnique: async ({ where, include, select }: { where: { id?: string; projectId_name?: { projectId: string; name: string } }; include?: unknown; select?: { project?: { select?: { workspaceId?: boolean } } } }) => {
       let row: FakeLaunchQueueRow | undefined;
       if (where.id) row = launchQueuesById.get(where.id);
       else if (where.projectId_name) {
@@ -650,6 +701,12 @@ export function createFakePrisma(options: {
         );
       }
       if (!row) return null;
+      if (select?.project?.select?.workspaceId) {
+        const project = projectsById.get(row.projectId);
+        return {
+          project: { workspaceId: project?.workspaceId ?? "default" },
+        } as unknown as FakeLaunchQueueRow;
+      }
       if (include) {
         const inc = include as { runs?: { orderBy?: { createdAt: "asc" | "desc" } } };
         const runs = Array.from(launchRunsById.values())
@@ -687,7 +744,7 @@ export function createFakePrisma(options: {
       launchJobsById.set(id, row);
       return row;
     },
-    findUnique: async ({ where, include }: { where: { id?: string; projectId_name?: { projectId: string; name: string } }; include?: unknown }) => {
+    findUnique: async ({ where, include, select }: { where: { id?: string; projectId_name?: { projectId: string; name: string } }; include?: unknown; select?: { project?: { select?: { workspaceId?: boolean } } } }) => {
       let row: FakeLaunchJobRow | undefined;
       if (where.id) row = launchJobsById.get(where.id);
       else if (where.projectId_name) {
@@ -696,6 +753,12 @@ export function createFakePrisma(options: {
         );
       }
       if (!row) return null;
+      if (select?.project?.select?.workspaceId) {
+        const project = projectsById.get(row.projectId);
+        return {
+          project: { workspaceId: project?.workspaceId ?? "default" },
+        } as unknown as FakeLaunchJobRow;
+      }
       if (include) {
         const inc = include as { runs?: { orderBy?: { createdAt: "asc" | "desc" } } };
         const runs = Array.from(launchRunsById.values())
@@ -732,9 +795,18 @@ export function createFakePrisma(options: {
       launchRunsById.set(id, row);
       return row;
     },
-    findUnique: async ({ where, include }: { where: { id?: string }; include?: unknown }) => {
+    findUnique: async ({ where, include, select }: { where: { id?: string }; include?: unknown; select?: { queue?: { select?: { project?: { select?: { workspaceId?: boolean } } } } } }) => {
       const row = where.id ? launchRunsById.get(where.id) : null;
       if (!row) return null;
+      if (select?.queue?.select?.project?.select?.workspaceId) {
+        const queue = launchQueuesById.get(row.queueId);
+        const project = queue ? projectsById.get(queue.projectId) : undefined;
+        return {
+          queue: {
+            project: { workspaceId: project?.workspaceId ?? "default" },
+          },
+        } as unknown as FakeLaunchRunRow;
+      }
       if (include) {
         const inc = include as { queue?: unknown; job?: unknown; run?: unknown };
         const result: Record<string, unknown> = { ...row };
@@ -838,7 +910,7 @@ export function createFakePrisma(options: {
   }
 
   // We return a cast object; only the methods above are accessed.
-  const exposed = {
+  const baseExposed = {
     run: runModel,
     workspace: workspaceModel,
     project: projectModel,
@@ -855,6 +927,94 @@ export function createFakePrisma(options: {
     $queryRaw: () => Promise.resolve([{ "?column?": 1 }]),
     __test: { runWithSweep: runWithSweepModel },
   };
+
+  // Trace / span model — reads through to traceStorage if provided so the
+  // §11 workspace guard can see rows the handler wrote via the public API.
+  // The storage is read lazily through a getter so `buildTestApp` can
+  // attach it after `createFakePrisma` has already returned the fake
+  // prisma object — see the matching edit in `tests/helpers/build-app.ts`.
+  let mutableTraceStorage: MemoryTraceStorage | undefined = options.traceStorage;
+  const traceModel = {
+    findUnique: async ({ where, select }: { where: { traceId?: string }; select?: { project?: { select?: { workspaceId?: boolean } } } }) => {
+      if (!mutableTraceStorage || !where.traceId) return null;
+      const row = await mutableTraceStorage.findTrace(where.traceId);
+      if (!row) return null;
+      if (select?.project?.select?.workspaceId) {
+        const project = projectsById.get(row.projectId);
+        return {
+          project: project ? { workspaceId: project.workspaceId } : { workspaceId: null },
+        };
+      }
+      return row;
+    },
+  };
+  const spanModel = {
+    findUnique: async ({ where, select }: { where: { id?: string; spanId?: string }; select?: { trace?: { select?: { project?: { select?: { workspaceId?: boolean } } } } } }) => {
+      if (!mutableTraceStorage) return null;
+      const spanId = where.spanId ?? where.id;
+      if (!spanId) return null;
+      const span = await mutableTraceStorage.findSpan(spanId);
+      if (!span) return null;
+      if (select?.trace?.select?.project?.select?.workspaceId) {
+        const trace = await mutableTraceStorage.findTrace(span.traceId);
+        if (!trace) return { trace: { project: { workspaceId: null } } };
+        const project = projectsById.get(trace.projectId);
+        return {
+          trace: {
+            project: project ? { workspaceId: project.workspaceId } : { workspaceId: null },
+          },
+        };
+      }
+      return span;
+    },
+  };
+
+  const extended: Record<string, unknown> = {
+    ...baseExposed,
+    trace: traceModel,
+    span: spanModel,
+    // Test hook so buildTestApp can wire the in-memory traceStorage onto
+    // the fake prisma after construction. The traceStorage isn't known at
+    // createFakePrisma call time — see fake-prisma.ts header for context.
+    __setTraceStorage: (s: MemoryTraceStorage | undefined) => {
+      mutableTraceStorage = s;
+    },
+  };
+
+  // Auto-stub any model the handler touches that we haven't explicitly
+  // modelled above. Returning a "findUnique that yields null" Proxy means
+  // `assertOwns*` calls gracefully 404 instead of crashing the handler when
+  // a test only seeds a subset of the graph. This keeps existing tests
+  // working without retro-fitting a stub for every model.
+  const makeStubModel = () => {
+    const stub: Record<string, unknown> = {};
+    const handler: ProxyHandler<Record<string, unknown>> = {
+      get(target, prop) {
+        if (prop in target) return target[prop as string];
+        if (
+          typeof prop === "string" &&
+          ["findUnique", "findFirst", "findMany", "create", "update", "updateMany", "delete", "deleteMany", "upsert", "count"].includes(prop)
+        ) {
+          if (prop === "findUnique" || prop === "findFirst") return async () => null;
+          if (prop === "findMany") return async () => [];
+          if (prop === "count") return async () => 0;
+          return async () => ({ count: 0 });
+        }
+        return undefined;
+      },
+    };
+    return new Proxy(stub, handler);
+  };
+
+  const exposed = new Proxy(extended, {
+    get(target, prop) {
+      if (typeof prop === "string" && prop in target) {
+        return (target as Record<string, unknown>)[prop];
+      }
+      return makeStubModel();
+    },
+  });
+
   return exposed as unknown as PrismaClient;
 }
 

@@ -7,6 +7,10 @@ import {
   ListReportsQuerySchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
+import {
+  assertOwnsProject,
+  assertOwnsReport,
+} from "../../core/authz/assert-workspace.js";
 
 const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
 const ReportParamsSchema = z.object({ reportId: z.string().uuid() });
@@ -19,18 +23,15 @@ export class ReportHandler {
 
   async createReport(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
+    if (!(await assertOwnsProject(req.server.prisma, req, reply, projectId))) return;
     const data = CreateReportSchema.parse(req.body);
-    const project = await this.projectService.findById(projectId);
-    if (!project) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
-    }
     const report = await this.reportService.createReport(projectId, data);
     reply.status(201).send(report);
   }
 
   async listReports(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
+    if (!(await assertOwnsProject(req.server.prisma, req, reply, projectId))) return;
     const reports = await this.reportService.listByProject(projectId);
     reply.send({ items: reports });
   }
@@ -38,16 +39,21 @@ export class ReportHandler {
   /**
    * Workspace-wide report list. Backed by `GET /reports`. Same wire shape as
    * `/runs` (`{ items, total }`) so the dashboard's top-level Reports view
-   * can paginate without extra plumbing.
+   * can paginate without extra plumbing. Always scoped to the requestor's
+   * workspace.
    */
   async listAllReports(req: FastifyRequest, reply: FastifyReply) {
     const query = ListReportsQuerySchema.parse(req.query);
-    const result = await this.reportService.list(query);
+    const result = await this.reportService.list({
+      ...query,
+      workspaceId: req.workspaceId,
+    });
     reply.send(result);
   }
 
   async getReport(req: FastifyRequest, reply: FastifyReply) {
     const { reportId } = ReportParamsSchema.parse(req.params);
+    if (!(await assertOwnsReport(req.server.prisma, req, reply, reportId))) return;
     const report = await this.reportService.findById(reportId);
     if (!report) {
       reply.status(404).send({ error: "Report not found" });
@@ -58,6 +64,7 @@ export class ReportHandler {
 
   async patchReport(req: FastifyRequest, reply: FastifyReply) {
     const { reportId } = ReportParamsSchema.parse(req.params);
+    if (!(await assertOwnsReport(req.server.prisma, req, reply, reportId))) return;
     const data = PatchReportSchema.parse(req.body);
     const report = await this.reportService.updateReport(reportId, data);
     reply.send(report);
@@ -65,6 +72,7 @@ export class ReportHandler {
 
   async deleteReport(req: FastifyRequest, reply: FastifyReply) {
     const { reportId } = ReportParamsSchema.parse(req.params);
+    if (!(await assertOwnsReport(req.server.prisma, req, reply, reportId))) return;
     await this.reportService.deleteReport(reportId);
     reply.status(204).send();
   }

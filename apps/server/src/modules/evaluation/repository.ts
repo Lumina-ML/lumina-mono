@@ -50,10 +50,17 @@ export class EvaluationRepository {
    * Workspace-wide evaluation list. Returns a paginated `{ items, total }`
    * response WITHOUT the heavy nested `include` used by `listByProject` — the
    * detail handler still returns the full shape for individual rows.
+   *
+   * `workspaceId` is enforced when supplied — added as a relation filter on
+   * the owning project so the result is scoped to one tenant. The handler
+   * always threads `req.workspaceId` here.
    */
-  async list(params: ListEvaluationsQuery) {
+  async list(params: ListEvaluationsQuery & { workspaceId?: string }) {
     const where: Prisma.EvaluationWhereInput = {};
     if (params.projectId) where.projectId = params.projectId;
+    if (params.workspaceId) {
+      where.project = { workspaceId: params.workspaceId };
+    }
     const [items, total] = await Promise.all([
       this.prisma.evaluation.findMany({
         where,

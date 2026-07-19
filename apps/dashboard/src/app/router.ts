@@ -57,7 +57,7 @@ const router = createRouter({
             {
               path: "",
               name: "Settings",
-              component: () => import("@/modules/workspace/pages/Settings.vue"),
+              component: () => import("@/modules/workspace/pages/SettingsProfile.vue"),
             },
             {
               path: "members",

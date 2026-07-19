@@ -2,6 +2,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { MetricService } from "./service.js";
 import { ListMetricsQuerySchema, LogMetricsSchema, type ListMetricsQuery } from "./schema.js";
 import { RunService } from "../run/service.js";
+import { assertOwnsRun } from "../../core/authz/assert-workspace.js";
 
 export class MetricHandler {
   constructor(
@@ -13,6 +14,7 @@ export class MetricHandler {
     req: FastifyRequest<{ Params: { runId: string } }>,
     reply: FastifyReply,
   ) {
+    if (!(await assertOwnsRun(req.server.prisma, req, reply, req.params.runId))) return;
     const data = LogMetricsSchema.parse(req.body);
     const run = await this.runService.getByRunId(req.params.runId);
     if (!run) {
@@ -27,13 +29,21 @@ export class MetricHandler {
     req: FastifyRequest<{ Params: { runId: string }; Querystring: ListMetricsQuery }>,
     reply: FastifyReply,
   ) {
+    if (!(await assertOwnsRun(req.server.prisma, req, reply, req.params.runId))) return;
     const query = ListMetricsQuerySchema.parse(req.query);
     const run = await this.runService.getByRunId(req.params.runId);
     if (!run) {
       reply.status(404).send({ error: "Run not found" });
       return;
     }
-    const keys = query.keys ? query.keys.split(",") : undefined;
+    // Accept both `?keys=a,b,c` (comma-separated) and `?keys=a&keys=b&keys=c`
+    // (repeated). Normalise to an array before handing off to the service.
+    let keys: string[] | undefined;
+    if (Array.isArray(query.keys)) {
+      keys = query.keys.flatMap((k) => k.split(",")).map((k) => k.trim()).filter(Boolean);
+    } else if (typeof query.keys === "string" && query.keys.length > 0) {
+      keys = query.keys.split(",").map((k) => k.trim()).filter(Boolean);
+    }
     const result = await this.metricService.list(run.runId, {
       keys,
       limit: query.limit,

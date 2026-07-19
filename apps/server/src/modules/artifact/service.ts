@@ -40,7 +40,7 @@ export class ArtifactService {
     return this.repository.listArtifactsByProject(projectId);
   }
 
-  async listArtifacts(params: ListArtifactsQuery) {
+  async listArtifacts(params: ListArtifactsQuery & { workspaceId?: string }) {
     return this.repository.list(params);
   }
 
