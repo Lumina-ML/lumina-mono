@@ -20,7 +20,9 @@ export function useWorkspaceMemberships() {
 export function useWorkspaceUsers() {
   return useQuery({
     queryKey: ["workspace-users"],
-    queryFn: () => WorkspaceService.listUsers(),
+    // Server returns `{ items: User[] }` since the listing was promoted
+    // to a paginated endpoint. Flatten here so view code stays clean.
+    queryFn: async () => (await WorkspaceService.listUsers()).items,
   });
 }
 

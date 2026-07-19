@@ -11,8 +11,11 @@ export class UserHandler {
 
   async createUser(req: FastifyRequest, reply: FastifyReply) {
     const data = CreateUserSchema.parse(req.body);
-    const user = await this.userService.createUser(data);
-    reply.status(201).send(user);
+    const { user, apiKey } = await this.userService.createUser(data);
+    // Return both so the open-source onboarding flow can sign the
+    // user in immediately. The SDK still receives a usable user
+    // record (apiKey is an additional field, not a breaking change).
+    reply.status(201).send({ ...user, apiKey });
   }
 
   async listUsers(req: FastifyRequest, reply: FastifyReply) {
