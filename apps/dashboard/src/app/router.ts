@@ -33,6 +33,16 @@ const router = createRouter({
           props: true,
         },
         {
+          path: "launch",
+          name: "LaunchMonitor",
+          component: () => import("@/modules/launch/pages/LaunchMonitor.vue"),
+        },
+        {
+          path: "monitoring",
+          name: "Monitoring",
+          component: () => import("@/modules/monitoring/pages/Monitoring.vue"),
+        },
+        {
           path: "settings",
           component: SettingsLayout,
           children: [
