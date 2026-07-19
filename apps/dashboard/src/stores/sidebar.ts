@@ -3,8 +3,7 @@ import { computed, ref } from "vue";
 import {
   LayoutDashboard,
   FolderKanban,
-  Box,
-  Search,
+  Play,
   GitBranch,
   ClipboardCheck,
   Activity,
@@ -12,8 +11,7 @@ import {
   Settings,
   Database,
   Rocket,
-  Users,
-  KeyRound,
+  Box,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -32,6 +30,14 @@ export interface NavGroup {
   pinFirst?: boolean;
 }
 
+/**
+ * Workspace-level navigation. Items that previously lived here as
+ * top-level links to global stub pages (Reports / Traces / Monitoring /
+ * Launch / Sweeps / Artifacts / Evaluations) have been removed — those
+ * concepts are project-scoped and reachable from the project tab bar.
+ * The Settings entry is a single link; sub-pages (members, api-keys,
+ * billing) are navigated via the SettingsLayout's left rail.
+ */
 const NAV_GROUPS: NavGroup[] = [
   {
     key: "overview",
@@ -53,34 +59,38 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    key: "insights",
-    label: "INSIGHTS",
-    items: [
-      { label: "Reports", to: "/reports", icon: FileText, description: "Run reports" },
-      { label: "Traces", to: "/traces", icon: Activity, description: "LLM & agent traces" },
-      { label: "Monitoring", to: "/monitoring", icon: Search, description: "System metrics" },
-    ],
-  },
-  {
-    key: "execution",
-    label: "EXECUTION",
-    items: [
-      { label: "Launch", to: "/launch", icon: Rocket, description: "Job queue" },
-      { label: "Sweeps", to: "/sweeps", icon: ClipboardCheck, description: "Hyperparameter sweeps" },
-      { label: "Artifacts", to: "/artifacts", icon: Box, description: "Artifact browser" },
-      { label: "Evaluations", to: "/evaluations", icon: ClipboardCheck, description: "Evaluation runs" },
-    ],
-  },
-  {
-    key: "admin",
-    label: "ADMIN",
+    key: "settings",
     items: [
       { label: "Settings", to: "/settings", icon: Settings, description: "Workspace settings" },
-      { label: "Members", to: "/settings/members", icon: Users, description: "Team members" },
-      { label: "API Keys", to: "/settings/api-keys", icon: KeyRound, description: "Personal access tokens" },
     ],
   },
 ];
+
+/**
+ * Build the project-scoped sidebar group for the currently active
+ * project. Returned by the store as `currentProjectGroup` and rendered
+ * inline when the route carries a `:projectId`. The label is rendered
+ * as "PROJECT · <name>" by AppLayout to disambiguate from the static
+ * workspace-level group labels.
+ */
+function projectNavGroup(projectId: string, _projectName: string): NavGroup {
+  const base = `/projects/${projectId}`;
+  return {
+    key: "current-project",
+    label: "PROJECT",
+    items: [
+      { label: "Overview", to: base, icon: LayoutDashboard },
+      { label: "Runs", to: `${base}/runs`, icon: Play },
+      { label: "Sweeps", to: `${base}/sweeps`, icon: ClipboardCheck },
+      { label: "Artifacts", to: `${base}/artifacts`, icon: Box },
+      { label: "Reports", to: `${base}/reports`, icon: FileText },
+      { label: "Evaluations", to: `${base}/evaluations`, icon: Activity },
+      { label: "Traces", to: `${base}/traces`, icon: Activity },
+      { label: "Launch", to: `${base}/launch`, icon: Rocket },
+      { label: "Settings", to: `${base}/settings`, icon: Settings },
+    ],
+  };
+}
 
 const PINNED_KEY = "lumina:sidebar:pinned";
 
@@ -111,13 +121,21 @@ export const useSidebarStore = defineStore("sidebar", () => {
   // Capped to keep the sidebar compact.
   const recentProjects = ref<DynamicProject[]>([]);
 
+  // The project currently active in the URL. Driven by AppLayout's route
+  // watcher (same place that calls touchProject). Used to render a
+  // project-scoped navigation block when the user is inside a project.
+  const activeProjectId = ref<string | null>(null);
+  const activeProjectName = ref<string | null>(null);
+
   const navGroups = computed<NavGroup[]>(() => NAV_GROUPS);
 
   /**
    * Group rendered between "EXPERIMENTS" and "MODELS": the user's most
-   * recently visited projects as quick links.
+   * recently visited projects as quick links. Hidden when inside a
+   * project — the project context group replaces it (see below).
    */
   const projectGroup = computed<NavGroup | null>(() => {
+    if (activeProjectId.value) return null;
     if (recentProjects.value.length === 0) return null;
     return {
       key: "recent-projects",
@@ -129,6 +147,17 @@ export const useSidebarStore = defineStore("sidebar", () => {
         description: p.description ?? undefined,
       })),
     };
+  });
+
+  /**
+   * Project-scoped navigation block, rendered when the user is inside a
+   * project route. Replaces the workspace-level "RECENT PROJECTS" group
+   * so the sidebar reflects the current context (Roadmap §MVP-1).
+   */
+  const currentProjectGroup = computed<NavGroup | null>(() => {
+    if (!activeProjectId.value) return null;
+    const name = activeProjectName.value ?? activeProjectId.value;
+    return projectNavGroup(activeProjectId.value, name);
   });
 
   const pinnedItems = computed<NavItem[]>(() => {
@@ -148,6 +177,12 @@ export const useSidebarStore = defineStore("sidebar", () => {
       // Insert the dynamic project group right after "experiments".
       const idx = groups.findIndex((g) => g.key === "experiments");
       groups.splice(idx + 1, 0, projectGroup.value);
+    }
+    if (currentProjectGroup.value) {
+      // Project context replaces the recent-projects slot and sits
+      // between "experiments" and "models".
+      const idx = groups.findIndex((g) => g.key === "experiments");
+      groups.splice(idx + 1, 0, currentProjectGroup.value);
     }
     if (collapsed.value) return groups;
     return groups
@@ -202,6 +237,15 @@ export const useSidebarStore = defineStore("sidebar", () => {
     recentProjects.value = next;
   }
 
+  /**
+   * Mark which project the user is currently inside. Called from the
+   * AppLayout route watcher whenever the URL matches `/projects/:id`.
+   */
+  function setActiveProject(id: string | null, name?: string | null) {
+    activeProjectId.value = id;
+    activeProjectName.value = name ?? null;
+  }
+
   return {
     collapsed,
     mobileOpen,
@@ -212,11 +256,15 @@ export const useSidebarStore = defineStore("sidebar", () => {
     isPinned,
     recentProjects,
     projectGroup,
+    currentProjectGroup,
+    activeProjectId,
+    activeProjectName,
     togglePin,
     toggle,
     setCollapsed,
     toggleMobile,
     setMobileOpen,
     touchProject,
+    setActiveProject,
   };
 });

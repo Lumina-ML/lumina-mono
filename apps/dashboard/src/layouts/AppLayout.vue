@@ -192,7 +192,27 @@ function onLogout() {
   router.replace({ name: "Login" });
 }
 
-const activeKey = computed(() => route.path);
+/**
+ * Resolve whether a sidebar entry should be in its "active" state.
+ *
+ * Replaces the previous `route.path === item.to` strict equality that
+ * broke highlighting on nested routes (Roadmap §1.1 bug #1):
+ *   - `/` only matches `/` exactly (everything starts with `/`).
+ *   - Other entries match their own path *and* any descendant path
+ *     so `/projects` highlights when on `/projects/abc/runs/xyz`.
+ *
+ * Keeping this as a function (instead of an inline expression) is what
+ * lets the desktop sidebar and mobile drawer share the rule from one
+ * place — bug #6 fix.
+ */
+function isItemActive(to: string): boolean {
+  if (to === "/") return route.path === "/";
+  return route.path === to || route.path.startsWith(to + "/");
+}
+
+function isCurrentProjectGroup(groupKey: string): boolean {
+  return groupKey === "current-project";
+}
 
 const breadcrumbs = computed(() => {
   const crumbs: Array<{ label: string; to?: string }> = [{ label: "Lumina", to: "/" }];
@@ -266,15 +286,20 @@ function onItemClick() {
 
 // ── Track recent projects for the sidebar ─────────────────────────────
 // Whenever the user lands on a project page, push that project onto
-// the sidebar's "recent projects" list. Errors are swallowed — a stale
-// project name in the sidebar is harmless.
+// the sidebar's "recent projects" list and mark it as the active
+// project context so the sidebar can render a project-scoped nav block.
+// Errors are swallowed — a stale project name in the sidebar is harmless.
 watch(
   () => route.params.projectId,
   async (id) => {
-    if (typeof id !== "string") return;
+    if (typeof id !== "string") {
+      sidebarStore.setActiveProject(null);
+      return;
+    }
     try {
       const p = await ProjectService.get(id);
       sidebarStore.touchProject({ id: p.id, name: p.name, description: p.description });
+      sidebarStore.setActiveProject(p.id, p.name);
     } catch {
       /* ignore — sidebar recent-projects is best-effort */
     }
@@ -318,7 +343,7 @@ watch(
             >
               <LSidebarItem
                 :to="item.to"
-                :active="activeKey === item.to"
+                :active="isItemActive(item.to)"
                 @click="onItemClick"
               >
                 <template #icon>
@@ -345,7 +370,10 @@ watch(
             v-if="group.label && !sidebarStore.collapsed"
             class="px-2 pt-2 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary"
           >
-            {{ group.label }}
+            <template v-if="isCurrentProjectGroup(group.key) && sidebarStore.activeProjectName">
+              {{ group.label }} · {{ sidebarStore.activeProjectName }}
+            </template>
+            <template v-else>{{ group.label }}</template>
           </div>
           <div
             v-for="item in group.items"
@@ -354,7 +382,7 @@ watch(
           >
             <LSidebarItem
               :to="item.to"
-              :active="activeKey === item.to"
+              :active="isItemActive(item.to)"
               @click="onItemClick"
             >
               <template #icon>
@@ -491,7 +519,7 @@ watch(
               v-for="item in sidebarStore.pinnedItems"
               :key="`pin-${item.to}`"
               :to="item.to"
-              :active="activeKey === item.to"
+              :active="isItemActive(item.to)"
               @click="onItemClick"
             >
               <template #icon>
@@ -505,13 +533,16 @@ watch(
               v-if="group.label"
               class="px-2 pt-2 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary"
             >
-              {{ group.label }}
+              <template v-if="isCurrentProjectGroup(group.key) && sidebarStore.activeProjectName">
+                {{ group.label }} · {{ sidebarStore.activeProjectName }}
+              </template>
+              <template v-else>{{ group.label }}</template>
             </div>
             <LSidebarItem
               v-for="item in group.items"
               :key="item.to"
               :to="item.to"
-              :active="activeKey === item.to"
+              :active="isItemActive(item.to)"
               @click="onItemClick"
             >
               <template #icon>
