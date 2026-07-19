@@ -4,7 +4,7 @@ import { RouterLink } from "vue-router";
 import { LCard, LButton, LSkeleton, LEmpty, LTag } from "@lumina/ui";
 import { useRuns } from "@/modules/run/composables/useRuns";
 import { useCurrentProject } from "@/composables/useCurrentProject";
-import { RunStatusBadge } from "@/widgets/run-status-badge/RunStatusBadge.vue";
+import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 
 const projectId = useCurrentProject();

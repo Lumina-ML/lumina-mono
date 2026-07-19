@@ -62,7 +62,7 @@ const apiBase = import.meta.env.VITE_LUMINA_API_URL || "(default — same origin
         <BrandMark :size="24" :show-wordmark="true" />
       </RouterLink>
       <a
-        href="https://github.com/Lumina-ML/lumina"
+        href="https://github.com/Lumina-ML/lumina-mono"
         target="_blank"
         rel="noreferrer noopener"
         class="inline-flex items-center gap-1 text-xs text-fg-tertiary hover:text-fg-primary"
