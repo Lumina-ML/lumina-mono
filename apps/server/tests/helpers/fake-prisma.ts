@@ -850,6 +850,9 @@ export function createFakePrisma(options: {
     launchQueue: launchQueueModel,
     launchJob: launchJobModel,
     launchRun: launchRunModel,
+    // Liveness probe — returns a placeholder row so the /readyz check
+    // can verify the connection path without spinning up real Postgres.
+    $queryRaw: () => Promise.resolve([{ "?column?": 1 }]),
     __test: { runWithSweep: runWithSweepModel },
   };
   return exposed as unknown as PrismaClient;

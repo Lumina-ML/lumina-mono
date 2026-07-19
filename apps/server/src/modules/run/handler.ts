@@ -8,8 +8,6 @@ import {
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
 
-const DEFAULT_WORKSPACE_ID = "default";
-
 export class RunHandler {
   constructor(
     private readonly runService: RunService,
@@ -20,7 +18,7 @@ export class RunHandler {
     const data = CreateRunSchema.parse(req.body);
 
     const project = await this.projectService.findOrCreate(
-      DEFAULT_WORKSPACE_ID,
+      req.workspaceId,
       { name: data.project },
     );
 
@@ -37,7 +35,7 @@ export class RunHandler {
     let projectId: string | undefined;
     if (query.project) {
       const project = await this.projectService.findByName(
-        DEFAULT_WORKSPACE_ID,
+        req.workspaceId,
         query.project,
       );
       projectId = project?.id;

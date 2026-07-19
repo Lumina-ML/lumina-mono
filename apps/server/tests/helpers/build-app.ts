@@ -44,6 +44,7 @@ export const TEST_CONFIG: ServerConfig = {
   s3SecretAccessKey: "",
   s3ForcePathStyle: false,
   clickhouseDatabase: "default",
+  defaultWorkspaceId: "default",
 };
 
 /**

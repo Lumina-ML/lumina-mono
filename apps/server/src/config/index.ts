@@ -34,6 +34,13 @@ const serverConfigSchema = z.object({
   s3AccessKeyId: z.string().default(""),
   s3SecretAccessKey: z.string().default(""),
   s3ForcePathStyle: z.coerce.boolean().default(false),
+
+  // Workspace
+  // Single-tenant deployments keep the workspace id pinned to a single
+  // value. Multi-tenant deployments override via
+  // `LUMINA_DEFAULT_WORKSPACE_ID` so seeded users land somewhere
+  // meaningful instead of an arbitrary slug.
+  defaultWorkspaceId: z.string().min(1).default("default"),
 });
 
 export type ServerConfig = z.infer<typeof serverConfigSchema>;
@@ -63,6 +70,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     s3AccessKeyId: env.S3_ACCESS_KEY_ID,
     s3SecretAccessKey: env.S3_SECRET_ACCESS_KEY,
     s3ForcePathStyle: env.S3_FORCE_PATH_STYLE,
+    defaultWorkspaceId: env.LUMINA_DEFAULT_WORKSPACE_ID,
   });
 
   if (!parsed.success) {

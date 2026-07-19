@@ -12,6 +12,9 @@ import { cachePlugin } from "./plugins/cache.js";
 import { queuePlugin } from "./plugins/queue.js";
 import { observabilityPlugin } from "./plugins/observability.js";
 import { websocketPlugin } from "./plugins/websocket.js";
+import { healthPlugin } from "./plugins/health.js";
+import { otelPlugin } from "./plugins/otel.js";
+import { workspaceContextPlugin } from "./plugins/workspace-context.js";
 import { artifactRoutes } from "./modules/artifact/routes.js";
 import { evaluationRoutes } from "./modules/evaluation/routes.js";
 import { logLineRoutes } from "./modules/log-line/routes.js";
@@ -31,7 +34,9 @@ import { systemMetricRoutes } from "./modules/system-metric/routes.js";
 import { tagRoutes } from "./modules/tag/routes.js";
 import { storageLocalRoutes } from "./infra/storage/routes.js";
 
-const DEFAULT_WORKSPACE_ID = "default";
+// `defaultWorkspaceId` is read from `LUMINA_DEFAULT_WORKSPACE_ID` via
+// `loadConfig()` and reused everywhere we previously hardcoded "default".
+// See `apps/server/src/config/index.ts`.
 
 export async function buildApp() {
   const app = fastify({
@@ -59,9 +64,18 @@ export async function buildApp() {
   await app.register(queuePlugin);
 
   // 3. Cross-cutting concerns
+  // Observability must come before OTel so the request id is set on
+  // every request — the otel plugin uses it as a span attribute.
   await app.register(authPlugin);
   await app.register(observabilityPlugin);
+  await app.register(otelPlugin);
+  // Workspace context runs after auth so it can read req.user.id and
+  // resolve the user's default workspace from their memberships.
+  await app.register(workspaceContextPlugin);
   await app.register(websocketPlugin);
+  // Health endpoints are unauthenticated and live outside /api/v1 so
+  // orchestrators can probe them without an API key.
+  await app.register(healthPlugin);
 
   // 4. Business modules
   await app.register(userRoutes, { prefix: "/api/v1" });
@@ -83,12 +97,16 @@ export async function buildApp() {
   await app.register(launchRoutes, { prefix: "/api/v1" });
   await app.register(storageLocalRoutes, { prefix: "/api/v1" });
 
-  // 5. Default workspace seed
+  // 5. Default workspace seed. Single-tenant deployments keep the
+  // workspace id pinned via `LUMINA_DEFAULT_WORKSPACE_ID` (default
+  // "default"); the seed idempotently ensures it exists so the first
+  // user can be attached without the caller having to pre-create it.
+  const defaultWorkspaceId = app.config.defaultWorkspaceId;
   await app.prisma.workspace.upsert({
-    where: { id: DEFAULT_WORKSPACE_ID },
+    where: { id: defaultWorkspaceId },
     create: {
-      id: DEFAULT_WORKSPACE_ID,
-      name: "default",
+      id: defaultWorkspaceId,
+      name: defaultWorkspaceId,
       displayName: "Default Workspace",
     },
     update: {},
