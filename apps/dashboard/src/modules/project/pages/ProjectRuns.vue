@@ -6,6 +6,7 @@ import { LCard, LButton, LSelect, LEmpty } from "@lumina/ui";
 import { useProject } from "@/modules/project/composables/useProjects";
 import { useRuns } from "@/modules/run/composables/useRuns";
 import { useToast } from "@/composables/useToast";
+import QueryBoundary from "@/components/QueryBoundary.vue";
 import RunTable from "@/widgets/run-table/RunTable.vue";
 import type { RunStatus } from "@/types/run";
 
@@ -27,7 +28,7 @@ const runsQuery = computed(() => ({
   offset: (page.value - 1) * pageSize.value,
 }));
 
-const { data: runsResponse, isLoading, refetch } = useRuns(runsQuery);
+const { data: runsResponse, isLoading, isError, error, refetch } = useRuns(runsQuery);
 
 watch(projectId, () => {
   page.value = 1;
@@ -77,24 +78,31 @@ function onCompare(ids: string[]) {
     </div>
 
     <LCard class="p-0">
-      <RunTable
-        :runs="runsResponse?.items ?? []"
-        :loading="isLoading"
-        v-model:page="page"
-        v-model:page-size="pageSize"
-        :total="runsResponse?.total ?? 0"
-        @bulk="onBulk"
-        @compare="onCompare"
-      />
-      <div
-        v-if="!isLoading && (runsResponse?.items.length ?? 0) === 0"
-        class="px-4 pb-4"
+      <QueryBoundary
+        :is-error="isError"
+        :error="error"
+        title="Couldn't load runs"
+        @retry="refetch()"
       >
-        <LEmpty
-          title="No runs match these filters"
-          description="Adjust the status filter or start a new run."
+        <RunTable
+          :runs="runsResponse?.items ?? []"
+          :loading="isLoading"
+          v-model:page="page"
+          v-model:page-size="pageSize"
+          :total="runsResponse?.total ?? 0"
+          @bulk="onBulk"
+          @compare="onCompare"
         />
-      </div>
+        <div
+          v-if="!isLoading && (runsResponse?.items.length ?? 0) === 0"
+          class="px-4 pb-4"
+        >
+          <LEmpty
+            title="No runs match these filters"
+            description="Adjust the status filter or start a new run."
+          />
+        </div>
+      </QueryBoundary>
     </LCard>
   </div>
 </template>

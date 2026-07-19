@@ -7,6 +7,7 @@ import type { ColumnDef } from "@tanstack/vue-table";
 import { useEvaluations } from "@/modules/evaluation/composables/useEvaluations";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
+import QueryBoundary from "@/components/QueryBoundary.vue";
 import type { Evaluation } from "@/types/evaluation";
 
 const { formatDate } = useDateFormat();
@@ -15,7 +16,7 @@ const queryClient = useQueryClient();
 const page = ref(1);
 const pageSize = ref(20);
 
-const { data: evaluations, isLoading } = useEvaluations(
+const { data: evaluations, isLoading, isError, error, refetch } = useEvaluations(
   ref({ limit: pageSize.value, offset: (page.value - 1) * pageSize.value }),
 );
 
@@ -89,14 +90,21 @@ void LTag;
     </div>
 
     <LCard class="p-0">
-      <LDataTable
-        :data="evaluations?.items ?? []"
-        :columns="columns"
-        :loading="isLoading"
-        v-model:page="page"
-        v-model:page-size="pageSize"
-        :total="evaluations?.total ?? 0"
-      />
+      <QueryBoundary
+        :is-error="isError"
+        :error="error"
+        title="Couldn't load evaluations"
+        @retry="refetch()"
+      >
+        <LDataTable
+          :data="evaluations?.items ?? []"
+          :columns="columns"
+          :loading="isLoading"
+          v-model:page="page"
+          v-model:page-size="pageSize"
+          :total="evaluations?.total ?? 0"
+        />
+      </QueryBoundary>
     </LCard>
   </div>
 </template>

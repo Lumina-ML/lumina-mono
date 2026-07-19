@@ -24,11 +24,13 @@ import {
 } from "@/modules/workspace/composables/useWorkspaceSettings";
 import { WorkspaceService, type WorkspaceRole } from "@/services/workspace.service";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
 import { useDateFormat } from "@/composables/useDateFormat";
 import InviteByEmailDialog from "@/modules/workspace/components/InviteByEmailDialog.vue";
 
 const queryClient = useQueryClient();
 const toast = useToast();
+const { confirm } = useConfirm();
 const { formatDate } = useDateFormat();
 
 const { data: memberships, isLoading } = useWorkspaceMemberships();
@@ -98,10 +100,14 @@ function onChangeRole(membershipId: string, role: WorkspaceRole) {
   roleMutation.mutate({ membershipId, role });
 }
 
-function onRemove(membershipId: string, name: string) {
-  if (window.confirm(`Remove ${name} from this workspace?`)) {
-    removeMutation.mutate(membershipId);
-  }
+async function onRemove(membershipId: string, name: string) {
+  const ok = await confirm({
+    title: "Remove member?",
+    message: `Remove ${name} from this workspace? They will lose access to its runs, sweeps, and reports.`,
+    confirmText: "Remove",
+    tone: "danger",
+  });
+  if (ok) removeMutation.mutate(membershipId);
 }
 
 const roleColor: Record<WorkspaceRole, "default" | "info" | "primary" | "warning"> = {

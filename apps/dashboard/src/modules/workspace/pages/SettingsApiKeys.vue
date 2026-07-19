@@ -14,11 +14,13 @@ import { Copy, Check, Key, RotateCw, AlertTriangle } from "lucide-vue-next";
 import { WorkspaceService } from "@/services/workspace.service";
 import { useWorkspaceUsers } from "@/modules/workspace/composables/useWorkspaceSettings";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useApiUrl } from "@/composables/useApiUrl";
 
 const queryClient = useQueryClient();
 const toast = useToast();
+const { confirm } = useConfirm();
 const { formatDate } = useDateFormat();
 void formatDate;
 const { baseUrl } = useApiUrl();
@@ -76,15 +78,16 @@ async function copyEnvSnippet() {
   setTimeout(() => (envCopied.value = false), 1500);
 }
 
-function revoke() {
+async function revoke() {
   if (!currentUserId.value) return;
-  if (
-    !window.confirm(
-      "Revoke this API key? Any active clients using it will start receiving 401s immediately.",
-    )
-  ) {
-    return;
-  }
+  const ok = await confirm({
+    title: "Revoke this API key?",
+    message:
+      "Any active clients using it will start receiving 401s immediately.",
+    confirmText: "Revoke key",
+    tone: "danger",
+  });
+  if (!ok) return;
   // Backend has no list/revoke endpoints yet — surface intent + rotate by
   // re-generating.
   toast.warning("Revoke isn't wired yet — generating a new key as a stopgap.");

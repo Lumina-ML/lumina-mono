@@ -2,6 +2,9 @@
 import { computed, type Component } from "vue";
 import { X, GitCompare } from "lucide-vue-next";
 import { LButton, LTag } from "@lumina/ui";
+import { useConfirm } from "@/composables/useConfirm";
+
+const { confirm } = useConfirm();
 
 interface BulkAction {
   key: string;
@@ -28,11 +31,14 @@ const tooMany = computed(() => {
   return props.selectedCount > threshold;
 });
 
-function onAction(action: BulkAction) {
+async function onAction(action: BulkAction) {
   if (action.danger && tooMany.value) {
-    const ok = window.confirm(
-      `${action.label} ${props.selectedCount} items? This cannot be undone.`,
-    );
+    const ok = await confirm({
+      title: `${action.label} ${props.selectedCount} items?`,
+      message: "This cannot be undone.",
+      confirmText: action.label,
+      tone: "danger",
+    });
     if (!ok) return;
   }
   emit("action", action.key);

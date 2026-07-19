@@ -6,6 +6,9 @@ import {
   LButton,
 } from "@lumina/ui";
 import ChartPanel, { type ChartPanelConfig } from "@/widgets/chart-panel/ChartPanel.vue";
+import { useConfirm } from "@/composables/useConfirm";
+
+const { confirm } = useConfirm();
 
 export interface WorkspacePanel {
   id: string;
@@ -49,8 +52,14 @@ function hide() {
   patch({ hidden: true });
 }
 
-function deleteSection() {
-  if (window.confirm(`Delete section "${props.section.name}"?`)) emit("remove");
+async function deleteSection() {
+  const ok = await confirm({
+    title: "Delete section?",
+    message: `Delete section "${props.section.name}"? Its panels will be removed.`,
+    confirmText: "Delete",
+    tone: "danger",
+  });
+  if (ok) emit("remove");
 }
 
 function removePanel(panelId: string) {

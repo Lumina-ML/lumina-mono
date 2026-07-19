@@ -41,6 +41,7 @@ import { useRunTags } from "@/modules/run/composables/useTags";
 import MetricChart from "@/widgets/metric-chart/MetricChart.vue";
 import LogViewer from "@/widgets/log-viewer/LogViewer.vue";
 import TagList from "@/widgets/tag-list/TagList.vue";
+import QueryBoundary from "@/components/QueryBoundary.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useAutoRefresh } from "@/composables/useAutoRefresh";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
@@ -57,7 +58,7 @@ const router = useRouter();
 const queryClient = useQueryClient();
 const runId = computed(() => route.params.runId as string);
 
-const { data: run, isLoading: isRunLoading, refetch: refetchRun } = useRun(runId);
+const { data: run, isLoading: isRunLoading, isError: isRunError, error: runError, refetch: refetchRun } = useRun(runId);
 const { data: metrics, isLoading: isMetricsLoading, refetch: refetchMetrics } = useMetrics(runId);
 const { data: systemMetrics, isLoading: isSystemMetricsLoading, refetch: refetchSystemMetrics } = useSystemMetrics(runId);
 const { data: logLines, isLoading: isLogsLoading, refetch: refetchLogs } = useLogLines(runId);
@@ -114,15 +115,71 @@ const metricKeys = computed(() =>
   metrics.value ? Object.keys(metrics.value.metrics) : [],
 );
 const selectedKeys = ref<string[]>([]);
+
+// Persist the user's metric selection per project/run so reopening a run
+// restores the chart they were looking at.
+const METRIC_KEYS_STORAGE_PREFIX = "lumina:run-metric-keys:";
+const metricStorageKey = computed(() =>
+  run.value
+    ? `${METRIC_KEYS_STORAGE_PREFIX}${run.value.projectId}:${run.value.runId}`
+    : null,
+);
+
+function readPersistedKeys(): string[] | null {
+  if (!metricStorageKey.value) return null;
+  try {
+    const raw = localStorage.getItem(metricStorageKey.value);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((k): k is string => typeof k === "string")
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+// Default selection: keys that appear in the run's summary (the metrics the
+// SDK flagged as "the ones that matter") come first, then the remaining keys
+// alphabetically, capped at 5. Falls back to plain alphabetical when there's
+// no summary.
+function defaultKeys(keys: string[]): string[] {
+  const summary = (run.value?.summary ?? {}) as Record<string, unknown>;
+  const summaryKeys = Object.keys(summary).filter((k) => keys.includes(k));
+  const rest = keys
+    .filter((k) => !summaryKeys.includes(k))
+    .sort((a, b) => a.localeCompare(b));
+  return [...summaryKeys, ...rest].slice(0, 5);
+}
+
+// Initialize the selection once per run, once its metrics have loaded — a
+// persisted choice (filtered to keys that still exist) wins, otherwise the
+// summary-first default. `initializedFor` stops later metric updates for the
+// same run from clobbering the user's toggles.
+const initializedFor = ref<string | null>(null);
 watch(
-  metricKeys,
-  (keys) => {
-    if (selectedKeys.value.length === 0 && keys.length > 0) {
-      selectedKeys.value = keys.slice(0, 5);
-    }
+  [metricKeys, () => run.value?.runId, isMetricsLoading],
+  ([keys, currentRunId, loading]) => {
+    if (!currentRunId || loading || keys.length === 0) return;
+    if (initializedFor.value === currentRunId) return;
+
+    const persisted =
+      readPersistedKeys()?.filter((k) => keys.includes(k)) ?? [];
+    selectedKeys.value = persisted.length > 0 ? persisted : defaultKeys(keys);
+    initializedFor.value = currentRunId;
   },
   { immediate: true },
 );
+
+// Persist toggles (after the initial hydrate) so they survive a refresh.
+watch(selectedKeys, (keys) => {
+  if (!metricStorageKey.value || initializedFor.value === null) return;
+  try {
+    localStorage.setItem(metricStorageKey.value, JSON.stringify(keys));
+  } catch {
+    // storage unavailable / over quota — non-fatal, selection stays in-memory
+  }
+});
 
 const filteredMetrics = computed(() => {
   if (!metrics.value) return {};
@@ -362,6 +419,14 @@ const canDelete = computed(
   <div v-if="isRunLoading" class="space-y-6">
     <LSkeleton text :repeat="3" />
   </div>
+
+  <QueryBoundary
+    v-else-if="isRunError"
+    is-error
+    :error="runError"
+    title="Couldn't load this run"
+    @retry="refetchRun()"
+  />
 
   <div v-else-if="!run" class="py-12 text-center">
     <p class="text-muted-foreground">Run not found.</p>

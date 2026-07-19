@@ -30,6 +30,7 @@ import { useSweep } from "@/modules/sweep/composables/useSweeps";
 import { RunService } from "@/services/run.service";
 import { SweepService } from "@/services/sweep.service";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
 import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
@@ -41,6 +42,7 @@ const projectId = computed(() => route.params.projectId as string);
 const sweepId = computed(() => route.params.sweepId as string);
 const { formatDate, formatDurationMs } = useDateFormat();
 const toast = useToast();
+const { confirm } = useConfirm();
 const queryClient = useQueryClient();
 
 const { data: sweep, isLoading } = useSweep(sweepId);
@@ -113,8 +115,15 @@ const stateMutation = useMutation({
 
 function pause() {
   if (!sweep.value) return;
-  if (!window.confirm("Pause this sweep? Pending runs will keep going but no new trials will start.")) return;
-  stateMutation.mutate("cancelled");
+  void confirm({
+    title: "Pause this sweep?",
+    message:
+      "Pending runs will keep going but no new trials will start.",
+    confirmText: "Pause sweep",
+    tone: "warning",
+  }).then((ok) => {
+    if (ok) stateMutation.mutate("cancelled");
+  });
 }
 function resume() {
   if (!sweep.value) return;
@@ -122,8 +131,14 @@ function resume() {
 }
 function stop() {
   if (!sweep.value) return;
-  if (!window.confirm("Stop this sweep permanently? This sets state to 'cancelled' and is irreversible.")) return;
-  stateMutation.mutate("cancelled");
+  void confirm({
+    title: "Stop this sweep permanently?",
+    message: "This sets state to 'cancelled' and is irreversible.",
+    confirmText: "Stop sweep",
+    tone: "danger",
+  }).then((ok) => {
+    if (ok) stateMutation.mutate("cancelled");
+  });
 }
 
 // ── Suggest next run ─────────────────────────────────────────────────

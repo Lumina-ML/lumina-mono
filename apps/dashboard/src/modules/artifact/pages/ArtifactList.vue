@@ -5,6 +5,7 @@ import { LCard, LTag, LDataTable, LButton } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { useArtifacts } from "@/modules/artifact/composables/useArtifacts";
 import { useDateFormat } from "@/composables/useDateFormat";
+import QueryBoundary from "@/components/QueryBoundary.vue";
 import type { Artifact, ArtifactType } from "@/types/artifact";
 
 const { formatDate } = useDateFormat();
@@ -12,7 +13,7 @@ const { formatDate } = useDateFormat();
 const page = ref(1);
 const pageSize = ref(20);
 
-const { data: artifacts, isLoading } = useArtifacts(
+const { data: artifacts, isLoading, isError, error, refetch } = useArtifacts(
   ref({ limit: pageSize.value, offset: (page.value - 1) * pageSize.value }),
 );
 
@@ -79,14 +80,21 @@ const columns: ColumnDef<Artifact>[] = [
     </div>
 
     <LCard class="p-0">
-      <LDataTable
-        :data="artifacts?.items ?? []"
-        :columns="columns"
-        :loading="isLoading"
-        v-model:page="page"
-        v-model:page-size="pageSize"
-        :total="artifacts?.total ?? 0"
-      />
+      <QueryBoundary
+        :is-error="isError"
+        :error="error"
+        title="Couldn't load artifacts"
+        @retry="refetch()"
+      >
+        <LDataTable
+          :data="artifacts?.items ?? []"
+          :columns="columns"
+          :loading="isLoading"
+          v-model:page="page"
+          v-model:page-size="pageSize"
+          :total="artifacts?.total ?? 0"
+        />
+      </QueryBoundary>
     </LCard>
   </div>
 </template>
