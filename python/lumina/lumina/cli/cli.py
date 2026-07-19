@@ -40,6 +40,7 @@ from lumina.sdk.launch.sweeps.scheduler import Scheduler
 from lumina.sdk.lib import filesystem, settings_file
 from lumina.sync import TFEVENT_SUBSTRING, SyncManager, get_run_from_path, get_runs
 from .beta import beta
+from .demo import demo as _demo_subcommand  # noqa: F401  — registers `lumina demo`
 from .leet import leet
 
 def _get_wandb_dir(root_dir: str | None=None) -> str:
@@ -2087,6 +2088,7 @@ def purge_cache(age: str, force: bool):
     lumina.termlog(f'Deleted {purged_count} file(s) ({util.to_human_size(data_deleted)})')
 cli.add_command(beta)
 cli.add_command(leet)
+cli.add_command(_demo_subcommand)  # `lumina demo <scenario>` (Roadmap §MVP-2)
 
 
 # ── Lumina backend CLI subcommands ──────────────────────────────────────

@@ -24,6 +24,7 @@ import { reportRoutes } from "./modules/report/routes.js";
 import { runMediaRoutes } from "./modules/run-media/routes.js";
 import { launchRoutes } from "./modules/launch/routes.js";
 import { publicRoutes } from "./modules/public/routes.js";
+import { sandboxRoutes } from "./modules/sandbox/routes.js";
 import { metricRoutes } from "./modules/metric/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
 import { registryModelRoutes } from "./modules/registry-model/routes.js";
@@ -108,6 +109,11 @@ export async function buildApp() {
   // the rest of /api/v1 but bypasses the internal handlers so the shape
   // stays stable for external consumers.
   await app.register(publicRoutes, { prefix: "/api/v1" });
+  // Sandbox endpoints back the dashboard's "Try it" demo cards
+  // (Roadmap §MVP-2 / M1-1). Authenticated like the rest of /api/v1;
+  // does not require a project in the URL — the demo project is resolved
+  // by name inside the active workspace.
+  await app.register(sandboxRoutes, { prefix: "/api/v1" });
 
   // 5. Default workspace seed. Single-tenant deployments keep the
   // workspace id pinned via `LUMINA_DEFAULT_WORKSPACE_ID` (default
@@ -123,6 +129,25 @@ export async function buildApp() {
     },
     update: {},
   });
+
+  // 6. Demo project seed. Always ensure the `__demo__` project exists
+  // in the default workspace so the dashboard's "Try it" cards have a
+  // stable target and new users land on something other than a blank
+  // page. See `apps/server/src/core/seed/demo-seed.ts`. Errors here are
+  // logged but non-fatal — a freshly-installed DB with permission
+  // issues shouldn't prevent the server from starting.
+  try {
+    const { ensureDemoProject } = await import("./core/seed/demo-seed.js");
+    const seeded = await ensureDemoProject(app.prisma, defaultWorkspaceId);
+    if (seeded.created) {
+      app.log.info(
+        { projectId: seeded.projectId },
+        "Seeded __demo__ project in default workspace",
+      );
+    }
+  } catch (err) {
+    app.log.warn({ err }, "Demo project seed failed; continuing without it");
+  }
 
   return app;
 }
