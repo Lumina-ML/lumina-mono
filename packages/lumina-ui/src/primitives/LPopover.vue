@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<LPopoverProps>(), {
   trigger: "click",
 });
 
-const emit = defineEmits<{
+defineEmits<{
   "update:show": [value: boolean];
 }>();
 </script>

@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<LMenuProps>(), {
   indent: 24,
 });
 
-const emit = defineEmits<{
+defineEmits<{
   "update:value": [value: string];
 }>();
 </script>

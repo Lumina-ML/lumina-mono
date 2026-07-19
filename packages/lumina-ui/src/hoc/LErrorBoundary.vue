@@ -7,7 +7,7 @@ export interface LErrorBoundaryProps {
   description?: string;
 }
 
-const props = withDefaults(defineProps<LErrorBoundaryProps>(), {
+withDefaults(defineProps<LErrorBoundaryProps>(), {
   title: "Something went wrong",
   description: "An unexpected error occurred in this component.",
 });

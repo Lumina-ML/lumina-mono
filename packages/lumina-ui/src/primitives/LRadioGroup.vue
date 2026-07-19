@@ -17,7 +17,7 @@ export interface LRadioGroupProps {
 
 const props = defineProps<LRadioGroupProps>();
 
-const emit = defineEmits<{
+defineEmits<{
   "update:value": [value: string | number | boolean | null];
 }>();
 </script>

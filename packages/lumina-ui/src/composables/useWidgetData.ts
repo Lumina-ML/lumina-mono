@@ -1,4 +1,4 @@
-import { ref, computed } from "vue";
+import { ref, computed, type Ref, type ComputedRef } from "vue";
 
 export interface UseWidgetDataOptions<T> {
   /** 初始数据 */
@@ -9,13 +9,21 @@ export interface UseWidgetDataOptions<T> {
   immediate?: boolean;
 }
 
+export interface UseWidgetDataReturn<T> {
+  data: Ref<T | undefined>;
+  loading: Ref<boolean>;
+  error: Ref<Error | null>;
+  hasData: ComputedRef<boolean>;
+  refresh: () => Promise<void>;
+}
+
 /**
  * Widget 数据获取 Composable。
  *
  * 封装 loading / error / data 状态，适合在 Widget 内部统一使用。
  */
-export function useWidgetData<T>(options: UseWidgetDataOptions<T> = {}) {
-  const data = ref<T | undefined>(options.initialData);
+export function useWidgetData<T>(options: UseWidgetDataOptions<T> = {}): UseWidgetDataReturn<T> {
+  const data = ref<T | undefined>(options.initialData) as Ref<T | undefined>;
   const loading = ref(false);
   const error = ref<Error | null>(null);
   const hasData = computed(() => data.value !== undefined && data.value !== null);

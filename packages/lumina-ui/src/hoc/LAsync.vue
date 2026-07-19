@@ -1,13 +1,12 @@
-<script setup lang="ts" generic="T">
-import { watchEffect } from "vue";
+<script setup lang="ts">
+import { ref, watch } from "vue";
 import LSpinner from "../primitives/LSpinner.vue";
 import LEmpty from "../primitives/LEmpty.vue";
 import LResult from "../primitives/LResult.vue";
-import { useWidgetData } from "../composables/useWidgetData";
 
-export interface LAsyncProps<T> {
+export interface LAsyncProps {
   /** 异步任务，返回数据 */
-  task?: () => Promise<T>;
+  task?: () => Promise<unknown>;
   /** 是否立即执行 */
   immediate?: boolean;
   /** 加载中显示文本 */
@@ -18,30 +17,45 @@ export interface LAsyncProps<T> {
   errorTitle?: string;
 }
 
-const props = withDefaults(defineProps<LAsyncProps<T>>(), {
+const props = withDefaults(defineProps<LAsyncProps>(), {
   immediate: true,
   emptyDescription: "No data",
   errorTitle: "Failed to load",
 });
 
 const emit = defineEmits<{
-  loaded: [data: T];
+  loaded: [data: unknown];
   error: [error: Error];
 }>();
 
-const { data, loading, error, refresh } = useWidgetData<T>({
-  fetcher: props.task,
-  immediate: props.immediate,
-});
+const data = ref<unknown | undefined>(undefined);
+const loading = ref(false);
+const error = ref<Error | null>(null);
 
-watchEffect(() => {
-  if (data.value !== undefined) {
-    emit("loaded", data.value as T);
-  }
-  if (error.value) {
+async function refresh() {
+  if (!props.task) return;
+  loading.value = true;
+  error.value = null;
+  try {
+    data.value = await props.task();
+    emit("loaded", data.value);
+  } catch (err) {
+    error.value = err instanceof Error ? err : new Error(String(err));
     emit("error", error.value);
+  } finally {
+    loading.value = false;
   }
-});
+}
+
+watch(
+  () => props.task,
+  () => {
+    if (props.immediate) {
+      refresh();
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <template>

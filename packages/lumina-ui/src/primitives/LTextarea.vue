@@ -17,7 +17,7 @@ export interface LTextareaProps {
 
 const props = defineProps<LTextareaProps>();
 
-const emit = defineEmits<{
+defineEmits<{
   "update:value": [value: string | null];
   blur: [event: FocusEvent];
   focus: [event: FocusEvent];

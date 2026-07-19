@@ -27,7 +27,7 @@ const props = withDefaults(defineProps<LDropdownProps>(), {
   trigger: "click",
 });
 
-const emit = defineEmits<{
+defineEmits<{
   "update:show": [value: boolean];
   select: [key: string | number];
 }>();

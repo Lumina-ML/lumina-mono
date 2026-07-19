@@ -1,26 +1,27 @@
-<script setup lang="ts" generic="T">
+<script setup lang="ts">
 import LSpinner from "../primitives/LSpinner.vue";
 import LEmpty from "../primitives/LEmpty.vue";
 
-export interface LListProps<T> {
-  items?: T[];
+export interface LListProps {
+  items?: unknown[];
   loading?: boolean;
   emptyDescription?: string;
   loadingText?: string;
-  /** 唯一键字段名或 getter */
-  keyProp?: keyof T | ((item: T) => string | number);
+  /** 唯一键字段名 */
+  keyProp?: string;
 }
 
-const props = withDefaults(defineProps<LListProps<T>>(), {
+const props = withDefaults(defineProps<LListProps>(), {
   items: () => [],
   emptyDescription: "No items",
 });
 
-function getKey(item: T, index: number): string | number {
+function getKey(item: unknown, index: number): string | number {
   if (!props.keyProp) return index;
-  if (typeof props.keyProp === "function") return props.keyProp(item);
-  const value = item[props.keyProp];
-  return value as string | number;
+  if (item && typeof item === "object" && props.keyProp in item) {
+    return (item as Record<string, unknown>)[props.keyProp] as string | number;
+  }
+  return index;
 }
 </script>
 

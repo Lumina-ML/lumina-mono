@@ -17,7 +17,7 @@ export interface LInputProps {
 
 const props = defineProps<LInputProps>();
 
-const emit = defineEmits<{
+defineEmits<{
   "update:value": [value: string | null];
   blur: [event: FocusEvent];
   focus: [event: FocusEvent];
