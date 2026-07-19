@@ -7,11 +7,12 @@ backend instead of Wandb.
 
 from __future__ import annotations
 
+import os
 import warnings
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, TextIO
 
-from lumina.backend.client import LuminaClient
+from lumina.backend.client import LuminaClient, LuminaClientError
 from lumina.backend.run_context import get_run_context
 from lumina.sdk.wandb_alerts import AlertLevel
 
@@ -498,18 +499,54 @@ class LuminaRun:
         )
 
     # ------------------------------------------------------------------
-    # Wandb-compatible stubs (not yet backed by Lumina backend)
+    # Save / restore (backed by /api/v1/runs/:runId/files)
     # ------------------------------------------------------------------
     def save(
         self,
-        glob_str: str,
-        base_path: str | None = None,
+        glob_str: str | os.PathLike,
+        base_path: str | os.PathLike | None = None,
         policy: str = "live",
         glob: bool = True,
-    ) -> bool | list[str]:
-        """Save files to the run. (Stub)"""
-        warnings.warn("lumina.Run.save() is not yet backed by the Lumina backend.")
-        return []
+    ) -> list[str]:
+        """Upload one or more files matching ``glob_str`` to the Lumina backend.
+
+        With ``glob=True`` (default), ``glob_str`` is interpreted as a glob
+        pattern relative to ``base_path`` (or the cwd). With ``glob=False``,
+        ``glob_str`` is treated as a single file path.
+
+        Returns the list of uploaded relative paths.
+        """
+        import glob as _glob
+        import os as _os
+        from pathlib import Path
+
+        base = Path(_os.fspath(base_path)) if base_path is not None else Path.cwd()
+        glob_str_str = _os.fspath(glob_str)
+        pattern = str(base / glob_str_str) if base_path is not None else glob_str_str
+
+        if glob:
+            # pathlib.rglob matches the pattern recursively under `base`,
+            # which matches wandb semantics for `save("*.txt", base_path=...)`.
+            # Strip the base prefix so the saved paths are relative.
+            matches = sorted(str(p) for p in base.rglob(glob_str_str) if p.is_file())
+        else:
+            matches = [pattern]
+
+        if not matches:
+            warnings.warn(f"lumina.Run.save() matched no files for {pattern!r}")
+            return []
+
+        uploaded: list[str] = []
+        for full_path in matches:
+            full_path_p = Path(full_path)
+            if not full_path_p.is_file():
+                continue
+            rel_path = str(full_path_p.relative_to(base)) if base_path is not None else full_path_p.name
+            with open(full_path_p, "rb") as fh:
+                content = fh.read()
+            self._client.save_run_file(self._run_id, rel_path, content, policy=policy)
+            uploaded.append(rel_path)
+        return uploaded
 
     def restore(
         self,
@@ -518,9 +555,40 @@ class LuminaRun:
         replace: bool = False,
         root: str | None = None,
     ) -> TextIO | None:
-        """Restore a file from a run. (Stub)"""
-        warnings.warn("lumina.Run.restore() is not yet backed by the Lumina backend.")
-        return None
+        """Restore a file previously saved with :meth:`save` from another run.
+
+        ``name`` is the path within the run. ``run_path`` may be either
+        ``"<project>/<run_id>"`` or just the run id; if omitted, the file
+        is restored from the current run.
+        """
+        import io
+        import os as _os
+        import tempfile as _tempfile
+
+        target_run_id = self._run_id
+        if run_path:
+            # Accept "project/runId" or "runId"
+            parts = run_path.split("/")
+            target_run_id = parts[-1] if len(parts) > 1 else run_path
+
+        try:
+            data = self._client.restore_run_file(target_run_id, name)
+        except LuminaClientError as exc:
+            warnings.warn(f"lumina.Run.restore() failed: {exc}")
+            return None
+
+        dest = _os.path.join(root or _os.getcwd(), name)
+        dest_dir = _os.path.dirname(dest)
+        if dest_dir:
+            _os.makedirs(dest_dir, exist_ok=True)
+        mode = "wb" if replace or not _os.path.exists(dest) else "xb"
+        try:
+            with open(dest, mode) as fh:
+                fh.write(data)
+        except FileExistsError:
+            # File exists and replace=False: leave it untouched.
+            pass
+        return io.BytesIO(data)
 
     def watch(
         self,
@@ -584,8 +652,22 @@ class LuminaRun:
         return definition
 
     def mark_preempting(self) -> None:
-        """Mark the run as preempting. (Stub)"""
-        warnings.warn("lumina.Run.mark_preempting() is not yet backed by the Lumina backend.")
+        """Mark the run as preempting. Backed by the Lumina backend."""
+        try:
+            self._client.mark_preempting(self._run_id)
+        except LuminaClientError as exc:
+            warnings.warn(f"lumina.Run.mark_preempting() failed: {exc}")
+
+    def pin_config_keys(self, *keys: str) -> None:
+        """Pin one or more config keys so they show up first in summaries.
+
+        Backed by ``PATCH /api/v1/runs/{runId}`` with
+        ``metadata.pinnedConfigKeys``.
+        """
+        try:
+            self._client.pin_config_keys(self._run_id, list(keys))
+        except LuminaClientError as exc:
+            warnings.warn(f"lumina.Run.pin_config_keys() failed: {exc}")
 
     def alert(
         self,
@@ -627,7 +709,3 @@ class LuminaRun:
             level_str, "INFO"
         )
         self.log_line(f"[ALERT {level_str}] {title}: {text}", level=log_level)
-
-    def pin_config_keys(self, keys: list[str] = ()) -> None:
-        """Pin config keys. (Stub)"""
-        warnings.warn("lumina.Run.pin_config_keys() is not yet backed by the Lumina backend.")

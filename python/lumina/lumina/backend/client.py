@@ -144,6 +144,45 @@ class LuminaClient:
             payload["color"] = color
         self._request("POST", f"/api/v1/runs/{run_id}/tags", payload)
 
+    def mark_preempting(self, run_id: str) -> dict[str, Any]:
+        return self._request("PATCH", f"/api/v1/runs/{run_id}", {"status": "preempting"})
+
+    def pin_config_keys(self, run_id: str, keys: list[str]) -> dict[str, Any]:
+        return self._request(
+            "PATCH",
+            f"/api/v1/runs/{run_id}",
+            {"metadata": {"pinnedConfigKeys": list(keys)}},
+        )
+
+    def save_run_file(
+        self,
+        run_id: str,
+        path: str,
+        content: bytes,
+        policy: str = "live",
+    ) -> dict[str, Any]:
+        """Upload a file to a run's object storage. Backed by the
+        `POST /api/v1/runs/{runId}/files` endpoint."""
+        import base64
+
+        payload = {
+            "path": path,
+            "contentBase64": base64.b64encode(content).decode("ascii"),
+            "policy": policy,
+        }
+        return self._request("POST", f"/api/v1/runs/{run_id}/files", payload)
+
+    def list_run_files(self, run_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/runs/{run_id}/files")
+
+    def restore_run_file(self, run_id: str, path: str) -> bytes:
+        """Download a previously saved file from a run. Backed by the
+        `GET /api/v1/runs/{runId}/file?path=...` endpoint."""
+        import base64
+
+        result = self._request("GET", f"/api/v1/runs/{run_id}/file?path={path}")
+        return base64.b64decode(result["contentBase64"])
+
     def list_projects(self) -> dict[str, Any]:
         return self._request("GET", "/api/v1/projects")
 

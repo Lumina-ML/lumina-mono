@@ -164,6 +164,13 @@ def _serialize_media(key: str, value: Any, type: str) -> tuple[str, str, str]:
                 os.remove(temp_path)
                 raise
             return temp_path, f"{key}{suffix}", content_type
+        if cls_name == "JoinedTable":
+            # JoinedTable is a wandb Media that joins two or more Tables on
+            # a shared key column. Emit a manifest JSON plus a CSV per
+            # input table so the dashboard can reconstruct the join.
+            return _serialize_joined_table(key, value)
+        if cls_name == "Histogram":
+            return _serialize_histogram(key, value)
         else:
             path = getattr(value, "_path", None)
             if path and os.path.isfile(path):
@@ -277,6 +284,83 @@ def _serialize_wandb_table(value: Any) -> bytes:
     return output.getvalue().encode("utf-8")
 
 
+def _serialize_joined_table(key: str, value: Any) -> tuple[str, str, str]:
+    """Serialize a wandb JoinedTable to a manifest JSON file.
+
+    The manifest describes the join key and lists each constituent table by
+    its columns/data. We intentionally avoid trying to render the joined
+    result server-side; instead, we ship the inputs so the dashboard can
+    run the join lazily.
+    """
+    join_key = getattr(value, "join_key", None)
+    tables = getattr(value, "tables", None) or []
+    manifest: dict[str, Any] = {
+        "kind": "JoinedTable",
+        "join_key": join_key,
+        "tables": [],
+    }
+    for idx, table in enumerate(tables):
+        manifest["tables"].append({
+            "index": idx,
+            "columns": getattr(table, "columns", []) or [],
+            "data": getattr(table, "data", []) or [],
+        })
+
+    suffix = ".json"
+    data = json.dumps(manifest, default=str).encode("utf-8")
+    content_type = "application/json"
+    fd, temp_path = tempfile.mkstemp(suffix=suffix)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+    except Exception:
+        os.remove(temp_path)
+        raise
+    return temp_path, f"{key}{suffix}", content_type
+
+
+def _serialize_histogram(key: str, value: Any) -> tuple[str, str, str]:
+    """Serialize a wandb Histogram to a JSON file with bins + edges.
+
+    wandb's Histogram stores ``np_histogram`` as a ``(hist, bin_edges)``
+    tuple (or two such tuples in newer versions). We serialize whatever we
+    can find; downstream code can rebuild the histogram from these arrays.
+    """
+    np_histogram = getattr(value, "np_histogram", None)
+    bins: list[float] = []
+    edges: list[float] = []
+    if np_histogram is not None:
+        try:
+            hist_arr, edges_arr = np_histogram
+            bins = [float(x) for x in hist_arr]
+            edges = [float(x) for x in edges_arr]
+        except Exception:
+            # Older versions stored a single ndarray; fall back to treating
+            # it as just the bin counts with auto edges.
+            try:
+                bins = [float(x) for x in np_histogram[0]]  # type: ignore[index]
+            except Exception:
+                bins = [float(x) for x in np_histogram]  # type: ignore[union-attr]
+    manifest = {
+        "kind": "Histogram",
+        "bins": bins,
+        "bin_edges": edges,
+        "num_bins": len(bins),
+    }
+
+    suffix = ".json"
+    data = json.dumps(manifest).encode("utf-8")
+    content_type = "application/json"
+    fd, temp_path = tempfile.mkstemp(suffix=suffix)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+    except Exception:
+        os.remove(temp_path)
+        raise
+    return temp_path, f"{key}{suffix}", content_type
+
+
 def _is_media_value(value: Any) -> bool:
     """Detect whether a value is a media object that should be logged as RunMedia."""
     if isinstance(value, LuminaTable):
@@ -317,6 +401,8 @@ def _wandb_media_type(value: Any) -> str | None:
         "Html": "html",
         "Table": "table",
         "EvalTable": "table",
+        "JoinedTable": "table",
+        "Histogram": "histogram",
         "Object3D": "file",
         "Molecule": "file",
     }
@@ -329,6 +415,12 @@ def _infer_media_type(value: Any) -> str:
         return "table"
     if _is_wandb_media(value):
         return _wandb_media_type(value) or "file"
+    # Fallback: some users construct duck-typed media objects without
+    # extending wandb's Media base. Match on class name so JoinedTable /
+    # Histogram serialize correctly even from third-party wrappers.
+    mapped = _wandb_media_type(value)
+    if mapped:
+        return mapped
     cls = type(value)
     module = getattr(cls, "__module__", "")
     name = cls.__name__
