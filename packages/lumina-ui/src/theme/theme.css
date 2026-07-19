@@ -1,7 +1,6 @@
 /**
  * Lumina Design Language — Theme Variables
  *
- * 参考：Linear（Precision）+ Cursor（Developer Dark）+ Vercel（Minimal）。
  * 所有语义化颜色以 HSL 格式定义，便于运行时 light/dark 切换。
  * 如需新增 token，请同步更新 tokens/colors.ts。
  */
@@ -10,49 +9,49 @@
   /* Radius */
   --radius: 0.5rem;
 
-  /* Foreground / Text — Linear 式层级 */
-  --foreground: 220 20% 6%;
-  --foreground-muted: 220 10% 45%;
-  --foreground-disabled: 220 10% 62%;
+  /* Foreground / Text — 中性灰阶层级 */
+  --foreground: 0 0% 9%;
+  --foreground-muted: 0 0% 40%;
+  --foreground-disabled: 0 0% 58%;
 
-  /* Background / Layers — 极干净，层级靠亮度差 */
-  --background: 220 14% 98.5%;
-  --canvas: 220 14% 98.5%;
+  /* Background / Layers — 中性,层级靠亮度差 */
+  --background: 0 0% 99%;
+  --canvas: 0 0% 99%;
   --surface: 0 0% 100%;
-  --panel: 220 14% 98.5%;
-  --panel-hover: 220 14% 94%;
+  --panel: 0 0% 98%;
+  --panel-hover: 0 0% 96%;
   --card: 0 0% 100%;
-  --card-hover: 220 14% 97%;
-  --card-foreground: 220 20% 6%;
-  --overlay: 220 20% 6% / 0.24;
+  --card-hover: 0 0% 96%;
+  --card-foreground: 0 0% 9%;
+  --overlay: 0 0% 0% / 0.3;
   --floating: 0 0% 100%;
 
   /* Borders & Dividers — 极淡 */
-  --border: 220 12% 90%;
-  --input: 220 12% 90%;
-  --divider: 220 12% 90%;
-  --selection: 220 14% 93%;
+  --border: 0 0% 90%;
+  --input: 0 0% 90%;
+  --divider: 0 0% 92%;
+  --selection: 0 0% 94%;
 
-  /* Brand / Accent — 低饱和 Indigo，专业不刺眼 */
-  --primary: 245 58% 51%;
+  /* Brand / Accent — 低饱和青绿 暗背景反差用更深值 */
+  --primary: 184 68% 36%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 220 14% 94%;
-  --secondary-foreground: 220 20% 6%;
-  --accent: 245 58% 51%;
+  --secondary: 0 0% 95%;
+  --secondary-foreground: 0 0% 9%;
+  --accent: 184 68% 36%;
   --accent-foreground: 0 0% 100%;
 
   /* States */
-  --muted: 220 14% 94%;
-  --muted-foreground: 220 10% 45%;
-  --destructive: 0 72% 51%;
+  --muted: 0 0% 95%;
+  --muted-foreground: 0 0% 40%;
+  --destructive: 0 72% 48%;
   --destructive-foreground: 0 0% 100%;
-  --info: 215 80% 52%;
-  --success: 160 60% 38%;
-  --warning: 38 92% 50%;
-  --error: 0 72% 51%;
+  --info: 200 80% 42%;
+  --success: 158 60% 34%;
+  --warning: 38 92% 45%;
+  --error: 0 72% 48%;
 
   /* Focus / Ring */
-  --ring: 245 58% 51%;
+  --ring: 184 68% 36%;
 
   /* Legacy LDL aliases — 与 Dashboard 变量对齐，保持向下兼容 */
   --ldl-foreground: var(--foreground);
@@ -92,49 +91,49 @@
 }
 
 .dark {
-  /* Foreground / Text — Cursor 式高对比 */
-  --foreground: 220 10% 96%;
-  --foreground-muted: 220 10% 58%;
-  --foreground-disabled: 220 10% 42%;
+  /* Foreground / Text — 高对比,中性白阶 93/60/40 */
+  --foreground: 0 0% 93%;
+  --foreground-muted: 0 0% 60%;
+  --foreground-disabled: 0 0% 40%;
 
-  /* Background / Layers — 接近纯黑，靠亮度差建立层级 */
-  --background: 220 15% 5%;
-  --canvas: 220 15% 5%;
-  --surface: 220 12% 8%;
-  --panel: 220 15% 5%;
-  --panel-hover: 220 12% 12%;
-  --card: 220 12% 8%;
-  --card-hover: 220 12% 11%;
-  --card-foreground: 220 10% 96%;
-  --overlay: 220 15% 5% / 0.6;
-  --floating: 220 12% 10%;
+  /* Background / Layers — 中性近黑(无色相),层级靠亮度差 */
+  --background: 0 0% 5%;
+  --canvas: 0 0% 5%;
+  --surface: 0 0% 8%;
+  --panel: 0 0% 6.5%;
+  --panel-hover: 0 0% 12%;
+  --card: 0 0% 8%;
+  --card-hover: 0 0% 11%;
+  --card-foreground: 0 0% 93%;
+  --overlay: 0 0% 0% / 0.6;
+  --floating: 0 0% 11%;
 
-  /* Borders & Dividers — 极淡 */
-  --border: 220 12% 16%;
-  --input: 220 12% 16%;
-  --divider: 220 12% 16%;
-  --selection: 220 12% 14%;
+  /* Borders & Dividers — 极淡(≈ 白 8–15% 叠加近黑) */
+  --border: 0 0% 15%;
+  --input: 0 0% 15%;
+  --divider: 0 0% 12%;
+  --selection: 0 0% 18%;
 
-  /* Brand / Accent — 暗色模式下更亮的 Indigo */
-  --primary: 245 75% 62%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 220 12% 14%;
-  --secondary-foreground: 220 10% 96%;
-  --accent: 245 75% 62%;
-  --accent-foreground: 0 0% 100%;
+  /* Brand / Accent — 低饱和青绿*/
+  --primary: 184 62% 47%;
+  --primary-foreground: 0 0% 8%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 93%;
+  --accent: 184 62% 47%;
+  --accent-foreground: 0 0% 8%;
 
   /* States */
-  --muted: 220 12% 14%;
-  --muted-foreground: 220 10% 58%;
-  --destructive: 0 65% 54%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 0 0% 60%;
+  --destructive: 0 70% 55%;
   --destructive-foreground: 0 0% 100%;
-  --info: 215 85% 60%;
-  --success: 160 55% 45%;
-  --warning: 38 92% 50%;
-  --error: 0 65% 54%;
+  --info: 200 80% 55%;
+  --success: 158 55% 48%;
+  --warning: 38 92% 55%;
+  --error: 0 70% 55%;
 
   /* Focus / Ring */
-  --ring: 245 75% 62%;
+  --ring: 184 62% 47%;
 }
 
 * {

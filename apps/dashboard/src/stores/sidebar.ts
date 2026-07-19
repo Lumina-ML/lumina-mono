@@ -111,6 +111,16 @@ export const useSidebarStore = defineStore("sidebar", () => {
 
   const isPinned = (to: string): boolean => pinned.value.includes(to);
 
+  // 折叠态没有 PINNED 区,显示全部(纯图标);展开态把已 pin 的项从分组里去掉,
+  // 避免与顶部 PINNED 区重复渲染。空分组自动隐藏。
+  const displayGroups = computed<NavGroup[]>(() => {
+    if (collapsed.value) return NAV_GROUPS;
+    return NAV_GROUPS.map((g) => ({
+      ...g,
+      items: g.items.filter((i) => !pinned.value.includes(i.to)),
+    })).filter((g) => g.items.length > 0);
+  });
+
   function togglePin(to: string) {
     const idx = pinned.value.indexOf(to);
     if (idx >= 0) {
@@ -151,6 +161,7 @@ export const useSidebarStore = defineStore("sidebar", () => {
     mobileOpen,
     pinned,
     navGroups,
+    displayGroups,
     pinnedItems,
     isPinned,
     togglePin,

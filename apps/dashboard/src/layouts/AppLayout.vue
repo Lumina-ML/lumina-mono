@@ -94,7 +94,7 @@ function onItemClick() {
   <div class="flex min-h-screen bg-background">
     <!-- Desktop sidebar -->
     <LSidebar :collapsed="sidebarStore.collapsed">
-      <div class="flex h-14 items-center justify-between border-b border-border px-4">
+      <div class="flex h-12 items-center justify-between border-b border-border px-4">
         <span class="truncate text-lg font-semibold">Lumina</span>
         <LIconButton
           v-if="!sidebarStore.collapsed"
@@ -106,7 +106,7 @@ function onItemClick() {
         </LIconButton>
       </div>
 
-      <nav class="flex-1 space-y-3 overflow-auto p-3">
+      <nav class="flex-1 space-y-2 overflow-auto p-2">
         <!-- Pinned -->
         <div v-if="sidebarStore.pinnedItems.length > 0 && !sidebarStore.collapsed">
           <div class="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
@@ -142,7 +142,7 @@ function onItemClick() {
         </div>
 
         <!-- Groups -->
-        <div v-for="group in sidebarStore.navGroups" :key="group.key" class="space-y-1">
+        <div v-for="group in sidebarStore.displayGroups" :key="group.key" class="space-y-1">
           <div
             v-if="group.label && !sidebarStore.collapsed"
             class="px-2 pt-2 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary"
@@ -234,7 +234,7 @@ function onItemClick() {
     <!-- Main content -->
     <div class="flex min-w-0 flex-1 flex-col">
       <header
-        class="flex h-14 items-center justify-between gap-3 border-b border-border bg-card px-4"
+        class="flex h-12 items-center justify-between gap-3 border-b border-border bg-card px-4"
       >
         <div class="flex min-w-0 items-center gap-3">
           <LIconButton

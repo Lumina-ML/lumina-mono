@@ -62,6 +62,9 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Motion (组件使用 duration-fast,取自 theme/tokens/motion.ts) */
+  /* Motion (对齐 theme/tokens/motion.ts:fast/normal/slow + ease-out) */
   --transition-duration-fast: 80ms;
+  --transition-duration-normal: 150ms;
+  --transition-duration-slow: 220ms;
+  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
 }

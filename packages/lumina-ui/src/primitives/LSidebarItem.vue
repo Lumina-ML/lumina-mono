@@ -14,7 +14,7 @@ defineProps<Props>();
     :is="to ? RouterLink : 'button'"
     :to="to"
     :class="[
-      'group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors duration-fast',
+      'group relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-fast',
       active
         ? 'bg-muted font-medium text-foreground'
         : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',

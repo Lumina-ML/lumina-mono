@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from "vue";
-import { NConfigProvider, type GlobalThemeOverrides } from "naive-ui";
+import { NConfigProvider, darkTheme, type GlobalThemeOverrides } from "naive-ui";
 import { luminaThemeOverrides, resolveThemeOverrides } from "../naive-theme";
 
 interface Props {
@@ -34,7 +34,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <NConfigProvider :theme-overrides="resolvedOverrides">
+  <NConfigProvider :theme="props.dark ? darkTheme : null" :theme-overrides="resolvedOverrides">
     <slot />
   </NConfigProvider>
 </template>
