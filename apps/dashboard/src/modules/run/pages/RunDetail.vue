@@ -12,7 +12,6 @@ import {
   LButton,
   LEmpty,
   LJsonView,
-  LLogViewer,
   LTraceTimeline,
 } from "@lumina/ui";
 import type { TraceSpan } from "@lumina/ui";
@@ -33,6 +32,7 @@ import { useSystemMetrics } from "@/modules/metric/composables/useSystemMetrics"
 import { useLogLines } from "@/modules/log-line/composables/useLogLines";
 import { useRunTags } from "@/modules/run/composables/useTags";
 import MetricChart from "@/widgets/metric-chart/MetricChart.vue";
+import LogViewer from "@/widgets/log-viewer/LogViewer.vue";
 import TagList from "@/widgets/tag-list/TagList.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useAutoRefresh } from "@/composables/useAutoRefresh";
@@ -425,17 +425,11 @@ const summaryEntries = computed(() => {
 
       <!-- ── Logs ────────────────────────────────────────────────────── -->
       <LTabPane name="logs" tab="Logs">
-        <LLogViewer
-          :logs="
-            (logLines?.logs ?? []).map((l) => ({
-              id: `${l.timestamp}-${l.message.slice(0, 16)}`,
-              timestamp: l.timestamp,
-              level: l.level,
-              message: l.message,
-              step: l.step ?? undefined,
-            }))
-          "
+        <LogViewer
+          :logs="logLines?.logs ?? []"
           :loading="isLogsLoading"
+          :height="600"
+          redact-secrets
           v-model:level="logLevelFilter"
         />
       </LTabPane>

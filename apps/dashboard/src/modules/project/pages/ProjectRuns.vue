@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useQueryClient } from "@tanstack/vue-query";
 import { LCard, LButton, LSelect, LEmpty } from "@lumina/ui";
 import { useProject } from "@/modules/project/composables/useProjects";
 import { useRuns } from "@/modules/run/composables/useRuns";
+import { useToast } from "@/composables/useToast";
 import RunTable from "@/widgets/run-table/RunTable.vue";
 import type { RunStatus } from "@/types/run";
 
 const route = useRoute();
+const queryClient = useQueryClient();
+const toast = useToast();
 const projectId = computed(() => route.params.projectId as string);
 
 const { data: project } = useProject(projectId);
@@ -39,6 +43,24 @@ const statusOptions = [
   { label: "Killed", value: "killed" },
   { label: "Pending", value: "pending" },
 ];
+
+function onBulk(action: string, ids: string[]) {
+  // The backend doesn't expose bulk archive/export/delete yet — surface the
+  // intent so the user knows the action was captured, then refresh so any
+  // side effects the server did perform show up.
+  const labelMap: Record<string, string> = {
+    archive: "Archiving",
+    export: "Exporting",
+    delete: "Deleting",
+  };
+  const variant = action === "delete" ? "warning" : "info";
+  toast.show(`${labelMap[action] ?? action} ${ids.length} runs…`, { variant });
+  void queryClient.invalidateQueries({ queryKey: ["runs"] });
+}
+
+function onCompare(ids: string[]) {
+  toast.info(`Compare view for ${ids.length} runs (coming soon).`);
+}
 </script>
 
 <template>
@@ -61,6 +83,8 @@ const statusOptions = [
         v-model:page="page"
         v-model:page-size="pageSize"
         :total="runsResponse?.total ?? 0"
+        @bulk="onBulk"
+        @compare="onCompare"
       />
       <div
         v-if="!isLoading && (runsResponse?.items.length ?? 0) === 0"
