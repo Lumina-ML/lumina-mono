@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, h } from "vue";
+import { ref, h, computed } from "vue";
 import { useRouter, RouterLink } from "vue-router";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import {
@@ -13,7 +13,7 @@ import {
   LSkeleton,
 } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
-import { Plus, FolderOpen } from "lucide-vue-next";
+import { Plus, FolderOpen, Sparkles, X } from "lucide-vue-next";
 import { useProjects } from "@/modules/project/composables/useProjects";
 import { ProjectService } from "@/services/project.service";
 import { useToast } from "@/composables/useToast";
@@ -33,6 +33,29 @@ const pageSize = ref(20);
 const params = ref({ limit: pageSize.value, offset: (page.value - 1) * pageSize.value });
 
 const { data: projects, isLoading } = useProjects(params);
+
+// ── "Try our demo project" banner (Roadmap §MVP-3 / M2-3) ────────────
+// Highlights the pre-seeded __demo__ project on the project list so
+// users who land here directly can find their way to the playground.
+// Dismissible per-browser; the dismissal is sticky so the banner
+// doesn't come back on every reload.
+const DEMO_BANNER_DISMISS_KEY = "lumina:demo-banner-dismissed";
+const bannerDismissed = ref(
+  typeof window !== "undefined" &&
+    window.localStorage.getItem(DEMO_BANNER_DISMISS_KEY) === "1",
+);
+const demoProject = computed(() =>
+  projects.value?.items.find((p) => p.name === "__demo__") ?? null,
+);
+const showDemoBanner = computed(() => !!demoProject.value && !bannerDismissed.value);
+function dismissDemoBanner() {
+  bannerDismissed.value = true;
+  try {
+    window.localStorage.setItem(DEMO_BANNER_DISMISS_KEY, "1");
+  } catch {
+    /* ignore quota */
+  }
+}
 
 // ── Create dialog ─────────────────────────────────────────────────────
 const createOpen = ref(false);
@@ -138,6 +161,38 @@ const columns: ColumnDef<Project>[] = [
         <Plus class="mr-1 h-3 w-3" />
         New project
       </LButton>
+    </div>
+
+    <!-- "Try our demo project" banner. Roadmap §MVP-3. -->
+    <div
+      v-if="showDemoBanner"
+      class="flex items-center justify-between gap-3 rounded-md border border-accent-primary/30 bg-accent-primary/5 px-4 py-3 text-sm"
+    >
+      <div class="flex items-center gap-2">
+        <Sparkles class="h-4 w-4 text-accent-primary" />
+        <span class="font-medium">Try our demo project.</span>
+        <span class="text-fg-tertiary">
+          The <code class="font-mono">__demo__</code> project ships
+          pre-seeded so you can explore Lumina with realistic data.
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <RouterLink
+          v-if="demoProject"
+          :to="`/projects/${demoProject.id}/runs`"
+          class="text-accent-primary hover:underline"
+        >
+          Open it →
+        </RouterLink>
+        <LButton
+          size="xs"
+          quaternary
+          aria-label="Dismiss"
+          @click="dismissDemoBanner"
+        >
+          <X class="h-3 w-3" />
+        </LButton>
+      </div>
     </div>
 
     <LCard class="p-0">

@@ -27,6 +27,7 @@ import {
 } from "@/services/sandbox.service";
 import { ProjectService } from "@/services/project.service";
 import { useToast } from "@/composables/useToast";
+import OnboardingChecklist from "@/modules/workspace/components/OnboardingChecklist.vue";
 
 const STORAGE_KEY = "lumina:workspace-layout";
 
@@ -208,8 +209,11 @@ const resetMutation = useMutation({
       </div>
     </div>
 
+    <!-- Onboarding checklist (Roadmap §MVP-3 / M2-1). -->
+    <OnboardingChecklist />
+
     <!-- Demo cards: the show-floor centerpiece (Roadmap §MVP-2). -->
-    <section class="space-y-3">
+    <section id="demo-cards" class="space-y-3 scroll-mt-4">
       <header class="flex items-end justify-between">
         <div>
           <h2 class="flex items-center gap-2 text-lg font-semibold">
