@@ -1,0 +1,14 @@
+# Local-only override for running the SDK examples/benchmarks from the HOST.
+#
+# The default S3_ENDPOINT (http://minio:9000) only resolves inside the docker
+# network, so presigned upload URLs handed to a host-side SDK client are
+# unreachable (and on machines with a fake-IP VPN/proxy, `minio` resolves to a
+# proxy address that returns 502). Pointing the presign endpoint at the host's
+# LAN IP makes the signed URLs reachable from BOTH the container and the host.
+#
+# This IP is machine-specific — change it to your host's LAN IP
+# (`ipconfig getifaddr en0` on macOS). Not intended to be committed.
+services:
+  server:
+    environment:
+      S3_ENDPOINT: http://192.168.1.102:9000
