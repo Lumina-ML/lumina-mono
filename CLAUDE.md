@@ -217,11 +217,46 @@ Research-driven design language (LDL). Phases per `How-To-Design.md`. Current st
 - Widget additions: register in `apps/dashboard/src/widgets/registry.ts`, never inside page components.
 - Build outputs are gitignored (`dist/`, `src/generated/`, `.turbo/`, `uploads/`). `pnpm clean` + reinstall is the canonical reset.
 
+## Frontend component baseline
+
+**Hard rule**: `apps/dashboard/**` 必须复用 `@lumina/ui` 的原子组件，**严禁**在 dashboard 内自写 button / input / kbd / card 容器 / popover 容器。
+
+| 需求 | 必须使用 | 禁止写法 |
+|---|---|---|
+| 按钮 | `LButton` / `LIconButton` | `<button type="button">` 自写 |
+| 文本输入 | `LInput` / `LTextarea` | `<input>` / `<textarea>` 自写 |
+| 卡片容器 | `LCard` | `<div class="rounded border p-4">` 自写 |
+| 徽章 / 标签 | `LTag` / `LStatusBadge` | `<kbd>` / `<span class="rounded ...">` 自写 |
+| 下拉 / 浮层 | `LPopover` / `LDropdown` / `LDialog` | 自己写 Teleport + absolute 定位 |
+| 表单控件 | `LCheckbox` / `LRadio` / `LSelect` / `LSwitch` / `LSlider` | 裸 `<input type="checkbox">` 等 |
+| 工具提示 | `LTooltip` | title 属性 / 自写悬浮 |
+| 加载态 | `LSpinner` / `LSkeleton` | 自写 spinner div |
+| 空态 | `LEmpty` / `LResult` | 自写空态文案 |
+| 菜单/侧栏 | `LSidebar` / `LSidebarItem` / `LMenu` | 自写 nav 列表 |
+| 表/分页 | `LTable` / `LPagination` | 裸 table 元素（datalist 例外） |
+
+**例外**（允许的裸元素 / 自写样式）：
+
+- 顶层布局骨架：`flex / min-h-screen / grid` 等结构性 class
+- 自定义定位的遮罩 / backdrop（`fixed inset-0 bg-black/50` 等）
+- 颜色 / 字号 / 间距 token 的微调（`text-sm text-fg-tertiary` 等）
+- 业务专属 widget 内部的展示元素（如 `RunTable.vue` 内部可自由组合）
+- Lucide 图标直接使用（`@lumina/ui` 也基于 lucide-vue-next）
+
+**遇到原子组件无法满足的需求**：
+
+1. 先查 `@lumina/ui` 是否有更合适的组件（40 个 primitives + display + business + hoc + widgets + chart 全库）
+2. 库内确实没有 → 在 `apps/dashboard/src/components/` 下新建**业务专属组件**，封装复用
+3. 跨 workspace 通用 → 上提到 `packages/lumina-ui/src/primitives/` 扩展原子组件
+
+**为什么**：dashboard 自写 button/input 会出现 hit target 不一致、暗色模式穿帮、a11y 缺失（aria-label / focus ring）、与 Naive UI 组件混用时样式冲突。原子组件层是这层问题的统一收口。
+
 ## Documentation references
 
 - `docs/MasterPlan.md` — feature progress against WandB parity (P0/P1 checklist)
 - `docs/DataModel.md` — Prisma schema notes
 - `docs/服务端架构.md`, `docs/服务端架构Gap.md` — backend architecture and remaining gaps
 - `docs/前端架构.md` — frontend architecture
+- `docs/前端设计-v1.md` — frontend product design baseline (Layout / Routing / Pages / Interactions)
 - `docs/服务端SDK-Wandb能力Gap.md` — server+SDK feature parity gaps vs WandB
 - `lumina-design/How-To-Design.md` — design system phases

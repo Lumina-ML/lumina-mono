@@ -1,3 +1,5 @@
+import './theme/theme.css';
+
 export * from './theme';
 export * from './primitives';
 export * from './chart';
