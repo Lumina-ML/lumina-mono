@@ -1,12 +1,92 @@
 <script setup lang="ts">
-import { LCard } from "@lumina/ui";
+import { ref, h } from "vue";
+import { RouterLink } from "vue-router";
+import { LCard, LTag, LDataTable, LButton } from "@lumina/ui";
+import type { ColumnDef } from "@tanstack/vue-table";
+import { useArtifacts } from "@/modules/artifact/composables/useArtifacts";
+import { useDateFormat } from "@/composables/useDateFormat";
+import type { Artifact, ArtifactType } from "@/types/artifact";
+
+const { formatDate } = useDateFormat();
+
+const page = ref(1);
+const pageSize = ref(20);
+
+const { data: artifacts, isLoading } = useArtifacts(
+  ref({ limit: pageSize.value, offset: (page.value - 1) * pageSize.value }),
+);
+
+const typeVariant: Record<ArtifactType, "default" | "primary" | "info" | "success" | "warning"> = {
+  dataset: "info",
+  model: "primary",
+  checkpoint: "success",
+  file: "default",
+  table: "warning",
+};
+
+const columns: ColumnDef<Artifact>[] = [
+  {
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) =>
+      h(
+        RouterLink,
+        { to: `/projects/${row.original.projectId}/artifacts`, class: "font-medium hover:underline" },
+        () => row.original.name,
+      ),
+  },
+  {
+    accessorKey: "type",
+    header: "Type",
+    cell: ({ row }) =>
+      h(LTag, { size: "small", type: typeVariant[row.original.type] }, () => row.original.type),
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => row.original.description || "—",
+  },
+  {
+    accessorKey: "versions",
+    header: "Versions",
+    cell: ({ row }) => row.original._count?.versions ?? 0,
+  },
+  {
+    accessorKey: "updatedAt",
+    header: "Updated",
+    cell: ({ row }) => formatDate(row.original.updatedAt),
+  },
+  {
+    id: "actions",
+    header: "",
+    cell: ({ row }) =>
+      h(
+        RouterLink,
+        { to: `/projects/${row.original.projectId}/artifacts` },
+        () => h(LButton, { size: "sm" }, () => "View"),
+      ),
+  },
+];
 </script>
 
 <template>
   <div class="space-y-6">
-    <h1 class="text-2xl font-bold tracking-tight">Artifacts</h1>
-    <LCard>
-      <p class="text-muted-foreground">Artifact browser will be implemented in Phase 5.</p>
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">Artifacts</h1>
+        <p class="text-muted-foreground">Versioned files, datasets, and models across all projects.</p>
+      </div>
+    </div>
+
+    <LCard class="p-0">
+      <LDataTable
+        :data="artifacts?.items ?? []"
+        :columns="columns"
+        :loading="isLoading"
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :total="artifacts?.total ?? 0"
+      />
     </LCard>
   </div>
 </template>

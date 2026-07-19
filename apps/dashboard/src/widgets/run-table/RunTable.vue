@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { h } from "vue";
 import { RouterLink } from "vue-router";
-import { LButton } from "@lumina/ui";
+import { LButton, LDataTable } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
-import DataTable from "@/components/DataTable.vue";
 import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 import type { Run } from "@/types/run";
@@ -68,7 +67,7 @@ const columns: ColumnDef<Run>[] = [
 </script>
 
 <template>
-  <DataTable
+  <LDataTable
     :data="runs"
     :columns="columns"
     :loading="loading"

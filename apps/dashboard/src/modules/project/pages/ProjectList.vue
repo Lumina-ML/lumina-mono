@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, h } from "vue";
 import { RouterLink } from "vue-router";
-import { LCard, LButton } from "@lumina/ui";
+import { LCard, LButton, LDataTable } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
-import DataTable from "@/components/DataTable.vue";
 import { useProjects } from "@/modules/project/composables/useProjects";
 import { useDateFormat } from "@/composables/useDateFormat";
 import type { Project } from "@/types/project";
@@ -65,8 +64,8 @@ const columns: ColumnDef<Project>[] = [
       </div>
     </div>
 
-    <LCard>
-      <DataTable
+    <LCard class="p-0">
+      <LDataTable
         :data="projects?.items ?? []"
         :columns="columns"
         :loading="isLoading"
