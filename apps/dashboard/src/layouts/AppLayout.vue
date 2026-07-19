@@ -23,6 +23,7 @@ import {
 import { useThemeStore } from "@/stores/theme";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useCommandStore } from "@/stores/command";
+import BrandMark from "@/components/BrandMark.vue";
 
 const route = useRoute();
 const themeStore = useThemeStore();
@@ -95,7 +96,12 @@ function onItemClick() {
     <!-- Desktop sidebar -->
     <LSidebar :collapsed="sidebarStore.collapsed">
       <div class="flex h-12 items-center justify-between border-b border-border px-4">
-        <span class="truncate text-lg font-semibold">Lumina</span>
+        <RouterLink to="/" class="flex min-w-0 items-center gap-2">
+          <BrandMark
+            :size="sidebarStore.collapsed ? 24 : 28"
+            :show-wordmark="!sidebarStore.collapsed"
+          />
+        </RouterLink>
         <LIconButton
           v-if="!sidebarStore.collapsed"
           aria-label="Collapse sidebar"
@@ -192,7 +198,7 @@ function onItemClick() {
         class="fixed left-0 top-0 z-50 flex h-screen w-72 flex-col border-r border-border bg-card md:hidden"
       >
         <div class="flex h-14 items-center justify-between border-b border-border px-4">
-          <span class="text-lg font-semibold">Lumina</span>
+          <BrandMark :size="28" :show-wordmark="true" />
           <LIconButton aria-label="Close menu" @click="sidebarStore.setMobileOpen(false)">
             <span class="text-lg leading-none">×</span>
           </LIconButton>
