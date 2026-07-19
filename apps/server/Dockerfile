@@ -27,7 +27,8 @@ ENV PORT=8000
 ENV HOST=0.0.0.0
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
-RUN apt-get update -y && apt-get install -y openssl python3 make g++ && rm -rf /var/lib/apt/lists/*
+# wget: 供 docker-compose healthcheck 探测 /healthz 使用(node:20-slim 默认不带)。
+RUN apt-get update -y && apt-get install -y openssl python3 make g++ wget && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-lock.yaml ./

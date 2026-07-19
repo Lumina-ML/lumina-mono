@@ -17,6 +17,10 @@ COPY packages/lumina-ui/package.json ./packages/lumina-ui/
 RUN pnpm install --frozen-lockfile
 
 # Copy source code
+# 注意:dashboard 的 vite.config.ts 用 alias 把 @lumina/ui 解析到
+# packages/lumina-ui/src/index.ts,所以这里只需要把 UI 库的源码拷进来即可,
+# 不再需要先 `pnpm --filter @lumina/ui build`(否则会出现 dist 跟源码脱节、
+# 改动 UI 库组件但容器里看不到效果的问题)。
 COPY apps/dashboard ./apps/dashboard
 COPY apps/server ./apps/server
 COPY packages/shared ./packages/shared

@@ -90,6 +90,16 @@ services:
       REDIS_URL: redis://redis:6379
     ports:
       - "8000:8000"
+    # Health endpoint 在 observability 插件里:app.get("/healthz", ...)
+    # 会探测 Prisma + ObjectStorage,两者都 ok 才返回 { status: "ok" }。
+    # 这样 dashboard 可以等服务真正就绪再启动,避免 nginx 反代到
+    # 还没 listen 的 server 上产生 502。
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -108,7 +118,8 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - server
+      server:
+        condition: service_healthy
 
 volumes:
   postgres_data:
