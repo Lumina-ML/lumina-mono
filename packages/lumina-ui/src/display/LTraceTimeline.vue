@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import LEmpty from "../primitives/LEmpty.vue";
+import LIconButton from "../primitives/LIconButton.vue";
 
 export type TraceSpanStatus = "ok" | "success" | "error" | "warning" | "pending" | string;
 
@@ -227,10 +228,9 @@ watch(
               class="flex-1 flex items-center min-w-0"
               :style="{ paddingLeft: `${getVisibleRow(virtualRow.index).depth * indentSize}px` }"
             >
-              <button
+              <LIconButton
                 v-if="getVisibleRow(virtualRow.index).span.children?.length"
-                type="button"
-                class="mr-1 p-0.5 rounded hover:bg-muted text-muted-foreground"
+                class="mr-1 h-6 w-6"
                 :aria-label="isExpanded(getVisibleRow(virtualRow.index).span) ? 'Collapse' : 'Expand'"
                 @click.stop="toggle(getVisibleRow(virtualRow.index).span)"
               >
@@ -249,8 +249,8 @@ watch(
                 >
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
-              </button>
-              <span v-else class="w-5 mr-1 shrink-0"></span>
+              </LIconButton>
+              <span v-else class="w-6 mr-1 shrink-0"></span>
               <span
                 class="w-2 h-2 rounded-full shrink-0 mr-2"
                 :class="statusConfigOf(getVisibleRow(virtualRow.index).span.status).bg"
@@ -281,10 +281,9 @@ watch(
           @click="emit('select', row.span)"
         >
           <div class="flex-1 flex items-center min-w-0" :style="{ paddingLeft: `${row.depth * indentSize}px` }">
-            <button
+            <LIconButton
               v-if="row.span.children?.length"
-              type="button"
-              class="mr-1 p-0.5 rounded hover:bg-muted text-muted-foreground"
+              class="mr-1 h-6 w-6"
               :aria-label="isExpanded(row.span) ? 'Collapse' : 'Expand'"
               @click.stop="toggle(row.span)"
             >
@@ -300,8 +299,8 @@ watch(
               >
                 <polyline points="9 18 15 12 9 6" />
               </svg>
-            </button>
-            <span v-else class="w-5 mr-1 shrink-0"></span>
+            </LIconButton>
+            <span v-else class="w-6 mr-1 shrink-0"></span>
             <span class="w-2 h-2 rounded-full shrink-0 mr-2" :class="statusConfigOf(row.span.status).bg"></span>
             <span class="truncate text-foreground">{{ row.span.name }}</span>
           </div>

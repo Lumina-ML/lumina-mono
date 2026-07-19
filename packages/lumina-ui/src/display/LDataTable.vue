@@ -13,6 +13,7 @@ import { useVirtualizer } from "@tanstack/vue-virtual";
 import LEmpty from "../primitives/LEmpty.vue";
 import LPagination from "../primitives/LPagination.vue";
 import LCheckbox from "../primitives/LCheckbox.vue";
+import LSpinner from "../primitives/LSpinner.vue";
 
 export interface LDataTableProps {
   data: any[];
@@ -150,9 +151,10 @@ function handlePageSizeUpdate(pageSize: number) {
     <template v-if="enableVirtualization">
       <div
         v-if="loading"
-        class="flex items-center justify-center text-sm text-muted-foreground"
+        class="flex items-center justify-center gap-2 text-sm text-muted-foreground"
         :style="{ height: virtualHeightStyle }"
       >
+        <LSpinner size="sm" />
         Loading...
       </div>
       <div
@@ -313,7 +315,10 @@ function handlePageSizeUpdate(pageSize: number) {
                 :colspan="table.getAllColumns().length"
                 class="p-8 text-center text-muted-foreground"
               >
-                Loading...
+                <div class="flex items-center justify-center gap-2">
+                  <LSpinner size="sm" />
+                  Loading...
+                </div>
               </td>
             </tr>
             <tr v-else-if="data.length === 0" class="border-b border-border">
