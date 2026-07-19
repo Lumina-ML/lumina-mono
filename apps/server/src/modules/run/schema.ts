@@ -25,7 +25,10 @@ export const UpdateRunSchema = z.object({
   status: RunStatusSchema.optional(),
   config: z.record(z.unknown()).optional(),
   summary: z.record(z.unknown()).optional(),
-  notes: z.string().optional(),
+  // `null` is accepted so the dashboard can clear existing notes via PATCH.
+  // The repository treats `undefined` as "leave unchanged" and any other
+  // value (including `null` / `""`) as an explicit write.
+  notes: z.string().nullable().optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 

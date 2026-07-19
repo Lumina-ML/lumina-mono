@@ -1,6 +1,7 @@
 import { onScopeDispose } from "vue";
 import { realtime } from "@/services/ws";
 import { useNotificationsStore } from "@/stores/notifications";
+import { useToast } from "@/composables/useToast";
 import type { DomainEvent } from "@/utils/domain-events";
 
 /**
@@ -12,9 +13,14 @@ import type { DomainEvent } from "@/utils/domain-events";
  * Per-resource channels (run:<id>, project:<id>) are still scoped per
  * page via `useRealtimeSubscription`. This composable just deals with
  * the inbox-level notifications.
+ *
+ * Each event is also surfaced as a transient toast so the user notices
+ * it without having to open the bell. The notification inbox keeps the
+ * full history so the user can revisit / link to the resource later.
  */
 export function useGlobalRealtime() {
   const notifications = useNotificationsStore();
+  const toast = useToast();
 
   function handle(event: DomainEvent) {
     switch (event.type) {
@@ -34,6 +40,16 @@ export function useGlobalRealtime() {
           link: `/projects/${projectId}/runs/${runId}`,
           meta: { runId, projectId, status },
         });
+        const variant =
+          status === "finished"
+            ? "success"
+            : status === "preempting"
+              ? "warning"
+              : "error";
+        toast.show(`Run ${runId.slice(0, 12)}… ${status}`, {
+          variant,
+          duration: 5000,
+        });
         return;
       }
       case "ArtifactUploaded": {
@@ -47,6 +63,10 @@ export function useGlobalRealtime() {
           link: `/projects/${projectId}/artifacts`,
           meta: { artifactVersionId, projectId, fileCount },
         });
+        toast.info(
+          `Artifact uploaded (${fileCount} file${fileCount === 1 ? "" : "s"})`,
+          { duration: 4000 },
+        );
         return;
       }
       case "RunCreated": {

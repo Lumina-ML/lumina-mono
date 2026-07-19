@@ -1,20 +1,92 @@
 <script setup lang="ts">
 import { ref, h } from "vue";
-import { RouterLink } from "vue-router";
-import { LCard, LButton, LDataTable } from "@lumina/ui";
+import { useRouter, RouterLink } from "vue-router";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import {
+  LCard,
+  LButton,
+  LDataTable,
+  LDialog,
+  LInput,
+  LTextarea,
+  LEmpty,
+  LSkeleton,
+} from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
+import { Plus, FolderOpen } from "lucide-vue-next";
 import { useProjects } from "@/modules/project/composables/useProjects";
+import { ProjectService } from "@/services/project.service";
+import { useToast } from "@/composables/useToast";
+import { useProjectStore } from "@/stores/project";
 import { useDateFormat } from "@/composables/useDateFormat";
 import type { Project } from "@/types/project";
 
+const router = useRouter();
+const toast = useToast();
+const queryClient = useQueryClient();
+const projectStore = useProjectStore();
 const { formatDate } = useDateFormat();
 
 const page = ref(1);
 const pageSize = ref(20);
 
-const { data: projects, isLoading } = useProjects(
-  ref({ limit: pageSize.value, offset: (page.value - 1) * pageSize.value }),
-);
+const params = ref({ limit: pageSize.value, offset: (page.value - 1) * pageSize.value });
+
+const { data: projects, isLoading } = useProjects(params);
+
+// ── Create dialog ─────────────────────────────────────────────────────
+const createOpen = ref(false);
+const newName = ref("");
+const newDisplayName = ref("");
+const newDescription = ref("");
+const createError = ref<string | null>(null);
+
+const createMutation = useMutation({
+  mutationFn: () =>
+    ProjectService.create({
+      name: newName.value.trim(),
+      ...(newDisplayName.value.trim()
+        ? { displayName: newDisplayName.value.trim() }
+        : {}),
+      ...(newDescription.value.trim()
+        ? { description: newDescription.value.trim() }
+        : {}),
+    }),
+  onSuccess: (created) => {
+    toast.success(`Project "${created.name}" created`);
+    projectStore.setCurrentId(created.id);
+    createOpen.value = false;
+    resetForm();
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+    router.push(`/projects/${created.id}`);
+  },
+  onError: (e) => {
+    const msg = (e as Error).message ?? "Unknown error";
+    createError.value = msg;
+    toast.error(`Failed to create project: ${msg}`);
+  },
+});
+
+function resetForm() {
+  newName.value = "";
+  newDisplayName.value = "";
+  newDescription.value = "";
+  createError.value = null;
+}
+
+function openCreate() {
+  resetForm();
+  createOpen.value = true;
+}
+
+function submit() {
+  createError.value = null;
+  if (!newName.value.trim()) {
+    createError.value = "Name is required";
+    return;
+  }
+  createMutation.mutate();
+}
 
 const columns: ColumnDef<Project>[] = [
   {
@@ -62,10 +134,16 @@ const columns: ColumnDef<Project>[] = [
         <h1 class="text-2xl font-bold tracking-tight">Projects</h1>
         <p class="text-muted-foreground">Manage your ML projects.</p>
       </div>
+      <LButton size="sm" @click="openCreate">
+        <Plus class="mr-1 h-3 w-3" />
+        New project
+      </LButton>
     </div>
 
     <LCard class="p-0">
+      <LSkeleton v-if="isLoading" class="p-8" :repeat="3" />
       <LDataTable
+        v-else-if="(projects?.items.length ?? 0) > 0"
         :data="projects?.items ?? []"
         :columns="columns"
         :loading="isLoading"
@@ -73,6 +151,88 @@ const columns: ColumnDef<Project>[] = [
         v-model:page-size="pageSize"
         :total="projects?.total ?? 0"
       />
+      <LEmpty
+        v-else
+        class="p-12"
+        title="No projects yet"
+        description="Create your first project to start tracking runs, metrics, and artifacts."
+      >
+        <LButton class="mt-2" @click="openCreate">
+          <Plus class="mr-1 h-3 w-3" />
+          Create project
+        </LButton>
+      </LEmpty>
     </LCard>
+
+    <LDialog
+      v-model:show="createOpen"
+      title="New project"
+      width="480px"
+      @close="resetForm"
+    >
+      <form class="space-y-3" @submit.prevent="submit">
+        <div>
+          <label for="project-name" class="mb-1 block text-xs font-medium text-fg-secondary">
+            Name <span class="text-accent-danger">*</span>
+          </label>
+          <LInput
+            id="project-name"
+            v-model:value="newName"
+            placeholder="e.g. image-classifier"
+            autocomplete="off"
+            autofocus
+          />
+          <p class="mt-1 text-[11px] text-fg-tertiary">
+            Used in URLs and SDK calls (e.g. <code class="font-mono">lumina.init(project="{{ newName || 'name' }}")</code>).
+            Letters, digits, dashes, underscores.
+          </p>
+        </div>
+        <div>
+          <label for="project-display" class="mb-1 block text-xs font-medium text-fg-secondary">
+            Display name
+          </label>
+          <LInput
+            id="project-display"
+            v-model:value="newDisplayName"
+            placeholder="e.g. Image Classifier"
+          />
+        </div>
+        <div>
+          <label for="project-desc" class="mb-1 block text-xs font-medium text-fg-secondary">
+            Description
+          </label>
+          <LTextarea
+            id="project-desc"
+            v-model:value="newDescription"
+            placeholder="Optional — what's this project for?"
+            :rows="3"
+          />
+        </div>
+        <div
+          v-if="createError"
+          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+        >
+          {{ createError }}
+        </div>
+      </form>
+      <template #footer>
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[11px] text-fg-tertiary">
+            <FolderOpen class="mr-1 inline h-3 w-3" />
+            Project will be added to the default workspace.
+          </span>
+          <div class="flex gap-2">
+            <LButton quaternary @click="createOpen = false">Cancel</LButton>
+            <LButton
+              :loading="createMutation.isPending.value"
+              :disabled="!newName.trim()"
+              @click="submit"
+            >
+              Create project
+            </LButton>
+          </div>
+        </div>
+      </template>
+    </LDialog>
   </div>
 </template>

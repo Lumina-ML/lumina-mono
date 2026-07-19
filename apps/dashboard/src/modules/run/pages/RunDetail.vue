@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, RouterLink } from "vue-router";
-import { useQuery, useQueryClient } from "@tanstack/vue-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
   LSkeleton,
   LTabs,
@@ -13,6 +13,8 @@ import {
   LEmpty,
   LJsonView,
   LTraceTimeline,
+  LDialog,
+  LTextarea,
 } from "@lumina/ui";
 import type { TraceSpan } from "@lumina/ui";
 import {
@@ -25,6 +27,9 @@ import {
   User as UserIcon,
   Server,
   Box,
+  Pencil,
+  StopCircle,
+  XCircle,
 } from "lucide-vue-next";
 import { useRun } from "@/modules/run/composables/useRuns";
 import { useMetrics } from "@/modules/metric/composables/useMetrics";
@@ -38,8 +43,10 @@ import { useDateFormat } from "@/composables/useDateFormat";
 import { useAutoRefresh } from "@/composables/useAutoRefresh";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
 import { colorForRunId } from "@/composables/useRunColor";
+import { useToast } from "@/composables/useToast";
 import { TraceService } from "@/services/trace.service";
 import { ArtifactService } from "@/services/artifact.service";
+import { RunService } from "@/services/run.service";
 import type { LogLevel } from "@/types/log-line";
 
 const route = useRoute();
@@ -245,6 +252,79 @@ const summaryEntries = computed(() => {
   const s = (run.value?.summary ?? {}) as Record<string, unknown>;
   return Object.entries(s);
 });
+
+// ── Run control: preempt / cancel / edit notes ─────────────────────────
+const toast = useToast();
+
+// A run is "active" if the SDK is still expected to write to it. Finished
+// runs are read-only — the action buttons hide so we don't tempt the user
+// into editing a frozen record.
+const isActive = computed(
+  () =>
+    run.value?.status === "pending" ||
+    run.value?.status === "running" ||
+    run.value?.status === "preempting",
+);
+
+const updateMutation = useMutation({
+  mutationFn: (data: { status?: "preempting" | "killed"; notes?: string | null }) =>
+    RunService.update(runId.value, data),
+  onSuccess: (_, vars) => {
+    if (vars.status === "preempting") {
+      toast.success("Run marked as preempting");
+    } else if (vars.status === "killed") {
+      toast.success("Run cancelled");
+    } else if (vars.notes !== undefined) {
+      toast.success("Notes saved");
+    }
+    queryClient.invalidateQueries({ queryKey: ["run", runId.value] });
+  },
+  onError: (e) => toast.error(`Update failed: ${(e as Error).message}`),
+});
+
+function preempt() {
+  if (!run.value) return;
+  updateMutation.mutate({ status: "preempting" });
+}
+
+function cancel() {
+  if (!run.value) return;
+  // Confirm: cancellation flips the status to `killed` and is recorded in
+  // the audit log. Use LDialog instead of window.confirm so the warning
+  // styling matches the rest of the dashboard.
+  if (
+    !window.confirm(
+      `Cancel run "${run.value.name}"? This stops the run, sets status to "killed", and is irreversible.`,
+    )
+  ) {
+    return;
+  }
+  updateMutation.mutate({ status: "killed" });
+}
+
+// ── Notes editor dialog ─────────────────────────────────────────────────
+const notesOpen = ref(false);
+const notesDraft = ref("");
+const notesError = ref<string | null>(null);
+
+function openNotesEditor() {
+  notesDraft.value = run.value?.notes ?? "";
+  notesError.value = null;
+  notesOpen.value = true;
+}
+
+function saveNotes() {
+  notesError.value = null;
+  const next = notesDraft.value.trim();
+  updateMutation.mutate(
+    { notes: next.length === 0 ? null : next },
+    {
+      onSuccess: () => {
+        notesOpen.value = false;
+      },
+    },
+  );
+}
 </script>
 
 <template>
@@ -325,6 +405,30 @@ const summaryEntries = computed(() => {
           </span>
         </LTooltip>
         <LButton size="sm" @click="refetchRun()">Refresh</LButton>
+        <LButton
+          v-if="isActive"
+          size="sm"
+          quaternary
+          :loading="updateMutation.isPending.value"
+          @click="preempt"
+        >
+          <StopCircle class="mr-1 h-3 w-3" />
+          Preempt
+        </LButton>
+        <LButton
+          v-if="isActive"
+          size="sm"
+          quaternary
+          :loading="updateMutation.isPending.value"
+          @click="cancel"
+        >
+          <XCircle class="mr-1 h-3 w-3" />
+          Cancel
+        </LButton>
+        <LButton size="sm" quaternary @click="openNotesEditor">
+          <Pencil class="mr-1 h-3 w-3" />
+          {{ run.notes ? "Edit notes" : "Add notes" }}
+        </LButton>
       </div>
     </div>
 
@@ -366,6 +470,13 @@ const summaryEntries = computed(() => {
                 Config
               </h3>
               <LJsonView :data="run.config" :deep="2" :show-line-number="false" />
+            </LCard>
+
+            <LCard v-if="run.notes" class="p-4">
+              <h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-fg-tertiary">
+                Notes
+              </h3>
+              <p class="whitespace-pre-wrap text-sm">{{ run.notes }}</p>
             </LCard>
           </div>
         </div>
@@ -539,5 +650,48 @@ const summaryEntries = computed(() => {
         </LCard>
       </LTabPane>
     </LTabs>
+
+    <!-- Notes editor -->
+    <LDialog
+      v-model:show="notesOpen"
+      title="Run notes"
+      width="540px"
+      @close="notesError = null"
+    >
+      <div class="space-y-3">
+        <p class="text-xs text-fg-tertiary">
+          Free-form notes for this run. Visible to everyone with access to the
+          project. Markdown is rendered as plain text.
+        </p>
+        <LTextarea
+          v-model:value="notesDraft"
+          :rows="8"
+          placeholder="Why did this run produce these metrics? What was tried?"
+          @keydown.meta.enter="saveNotes"
+          @keydown.ctrl.enter="saveNotes"
+        />
+        <div
+          v-if="notesError"
+          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+        >
+          {{ notesError }}
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-fg-tertiary">
+          <span>{{ notesDraft.length }} characters</span>
+          <span>Press ⌘+Enter to save</span>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton quaternary @click="notesOpen = false">Cancel</LButton>
+          <LButton
+            :loading="updateMutation.isPending.value"
+            @click="saveNotes"
+          >
+            Save notes
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
   </div>
 </template>
