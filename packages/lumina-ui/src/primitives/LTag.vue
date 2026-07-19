@@ -10,11 +10,22 @@ interface Props {
   color?: { color?: string; textColor?: string; borderColor?: string };
 }
 
-defineProps<Props>();
+withDefaults(defineProps<Props>(), {
+  round: true,
+});
 </script>
 
 <template>
-  <NTag v-bind="$props">
+  <NTag v-bind="$props" class="l-tag">
     <slot />
   </NTag>
 </template>
+
+<style scoped>
+.l-tag {
+  --n-color: hsl(var(--muted));
+  --n-text-color: hsl(var(--foreground));
+  --n-border: 1px solid transparent;
+  --n-border-radius: 9999px;
+}
+</style>

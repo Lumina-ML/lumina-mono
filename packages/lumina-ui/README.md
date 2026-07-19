@@ -4,10 +4,52 @@ Lumina 内部 UI 组件库，面向 Dashboard 与后续客户端复用。
 
 ## 设计原则
 
-- **基于 Naive UI 封装**：MVP 阶段复用成熟组件，保持一致性与可访问性。
-- **Tailwind v4 + CSS Variables**：颜色、间距、圆角等通过 token 管理，支持 light/dark 切换。
+- **设计语言**：参考 Linear（Precision）+ Cursor（Developer Dark）+ Vercel（Minimal），沉淀 Lumina 自己的气质。
+- **Design Tokens**：颜色、间距、圆角、动效全部 token 化，运行时切换 light/dark 只需切换 class。
+- **Layer System**：Canvas → Surface → Panel → Overlay → Floating，统一层级语义。
 - **Control Plane 语义**：组件命名与 API 贴近 VSCode / Grafana 式的仪表盘体验。
 - **Widget 优先**：提供 Widget Registry、Grid Layout、Chart Renderer 等 Dashboard 核心抽象。
+
+## Design Tokens
+
+所有视觉值收敛到 `src/theme/tokens/`，并在 `theme.css` 中以 CSS Variables 暴露：
+
+```
+tokens/
+├── colors.ts      # 颜色 token（引用 CSS 变量）
+├── spacing.ts     # 4px 栅格间距
+├── radius.ts      # xs / sm / md / lg / xl
+├── shadow.ts      # 极淡阴影，层级靠边框和背景差
+├── motion.ts      # fast 80ms / normal 150ms / slow 220ms
+├── typography.ts  # Display / Title / Heading / Body / Caption / Mono
+├── icon.ts        # 图标尺寸与线宽
+└── breakpoints.ts # 响应式断点
+```
+
+### 颜色层级（Layer System）
+
+参考 Linear：背景极干净，层级靠微弱灰度和 1px 边框区分。
+
+```css
+--background    /* 页面背景，接近纯白或极深黑 */
+--canvas        /* 与 background 一致 */
+--surface       /* 卡片/浮层面板 */
+--panel         /* Sidebar / Inspector 面板 */
+--panel-hover   /* 极淡 hover 遮罩 */
+--card          /* 卡片背景 */
+--border        /* 极淡边框 */
+--foreground    /* 主文字 */
+--foreground-muted /* 次要文字 */
+--primary       /* 低饱和 Indigo */
+```
+
+### 动效
+
+```css
+--duration-fast: 80ms;    /* Hover / Scale */
+--duration-normal: 150ms; /* Menu / Dropdown / Tooltip */
+--duration-slow: 220ms;   /* Dialog / Panel */
+```
 
 ## 安装
 
