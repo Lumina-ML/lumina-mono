@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { Pencil, X } from "lucide-vue-next";
 import { LCard, LSpinner, LTooltip, LIconButton, LTag, ChartRenderer } from "@lumina/ui";
@@ -9,11 +9,35 @@ import { RunService } from "@/services/run.service";
 import { colorForRunId } from "@/composables/useRunColor";
 import { useDateFormat } from "@/composables/useDateFormat";
 import type { Run } from "@/types/run";
+import ChartConfigModal from "@/widgets/chart-panel/ChartConfigModal.vue";
 
 export interface ChartPanelConfig {
   title: string;
   metricKeys: string[];
   smoothing?: number;
+  /** Optional opaque overrides from the config modal (axis, sampling, etc.). */
+  data?: {
+    xAxis?: "step" | "wall" | "relative" | "metric";
+    yAxis?: "linear" | "log";
+    chartType?: "line" | "bar" | "scatter";
+    smoothing?: number;
+    sampling?: "raw" | "lttb" | "average";
+    samplingThreshold?: number;
+    outlierClip?: boolean;
+  };
+  chart?: {
+    title?: string;
+    xAxisTitle?: string;
+    yAxisTitle?: string;
+    legendVisible?: boolean;
+    legendPosition?: "top" | "bottom" | "left" | "right";
+  };
+  grouping?: {
+    groupBy?: string | null;
+    aggregation?: "min" | "max" | "mean" | "none";
+  };
+  expressions?: Array<{ name: string; expression: string }>;
+  colorOverrides?: Record<string, string>;
 }
 
 const props = defineProps<{
@@ -23,10 +47,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   remove: [];
-  edit: [];
+  /** Emitted when the modal saves a new config (caller persists). */
+  "update:config": [config: ChartPanelConfig];
 }>();
 
 const { formatDate } = useDateFormat();
+
+const configOpen = ref(false);
 
 interface PanelSeries {
   run: Run;
@@ -140,7 +167,7 @@ const summary = computed(() => {
         <div class="flex items-center gap-1.5">
           <h3 class="truncate text-sm font-medium">{{ config.title }}</h3>
           <LTooltip content="Configure panel">
-            <LIconButton aria-label="Configure" @click="emit('edit')">
+            <LIconButton aria-label="Configure" @click="configOpen = true">
               <Pencil class="h-3 w-3" />
             </LIconButton>
           </LTooltip>
@@ -187,5 +214,13 @@ const summary = computed(() => {
       </div>
       <ChartRenderer v-else :config="chartConfig" height="100%" />
     </div>
+
+    <ChartConfigModal
+      v-model:open="configOpen"
+      :config="config"
+      :run-ids="series.map((s) => s.run.runId)"
+      :run-names="Object.fromEntries(series.map((s) => [s.run.runId, s.run.name]))"
+      @save="(next) => emit('update:config', next)"
+    />
   </LCard>
 </template>
