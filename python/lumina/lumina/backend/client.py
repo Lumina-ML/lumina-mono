@@ -12,6 +12,7 @@ class LuminaClientError(Exception):
 
 
 _API_KEY: Optional[str] = None
+_WORKSPACE_ID: Optional[str] = None
 
 
 def set_api_key(api_key: Optional[str]) -> None:
@@ -24,12 +25,37 @@ def get_api_key() -> Optional[str]:
     return _API_KEY or os.getenv("LUMINA_API_KEY")
 
 
+def set_workspace_id(workspace_id: Optional[str]) -> None:
+    """Set the global workspace selection used by all LuminaClient instances.
+
+    Sent as the ``X-Lumina-Workspace`` header so the server scopes reads and
+    writes to it. Mirrors :func:`set_api_key` so a bare ``LuminaClient()``
+    anywhere in the SDK picks up the selection without threading it through.
+    """
+    global _WORKSPACE_ID
+    _WORKSPACE_ID = workspace_id
+
+
+def get_workspace_id() -> Optional[str]:
+    return _WORKSPACE_ID or os.getenv("LUMINA_WORKSPACE_ID")
+
+
 class LuminaClient:
     """A thin HTTP client that talks to the Lumina backend."""
 
-    def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+    ):
         self.base_url = (base_url or os.getenv("LUMINA_API_URL", "http://localhost:8000")).rstrip("/")
         self.api_key = api_key or get_api_key()
+        # Explicit workspace selection. Sent as the `X-Lumina-Workspace`
+        # header so the server scopes reads/writes to it (the server verifies
+        # the key's user is a member and 403s otherwise). When unset, the
+        # server falls back to the user's first workspace membership.
+        self.workspace_id = workspace_id or get_workspace_id()
 
     def _request(
         self,
@@ -41,6 +67,8 @@ class LuminaClient:
         headers: dict[str, str] = {}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        if self.workspace_id:
+            headers["X-Lumina-Workspace"] = self.workspace_id
         if data is not None:
             headers["Content-Type"] = "application/json"
         body = json.dumps(data).encode("utf-8") if data is not None else None

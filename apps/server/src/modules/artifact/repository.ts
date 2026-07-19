@@ -88,7 +88,12 @@ export class ArtifactRepository {
   async findVersionById(id: string) {
     return this.prisma.artifactVersion.findUnique({
       where: { id },
-      include: { files: true, artifact: true },
+      include: {
+        files: true,
+        artifact: {
+          include: { project: { select: { workspaceId: true } } },
+        },
+      },
     });
   }
 

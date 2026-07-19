@@ -26,14 +26,22 @@ export class RunRepository {
   async findByRunId(runId: string) {
     return this.prisma.run.findUnique({
       where: { runId },
-      include: { _count: { select: { metrics: true } } },
+      include: {
+        _count: { select: { metrics: true } },
+        // `project.workspaceId` is required by callers that publish
+        // domain events (WS fanout scopes channels per workspace).
+        project: { select: { workspaceId: true } },
+      },
     });
   }
 
   async findById(id: string) {
     return this.prisma.run.findUnique({
       where: { id },
-      include: { _count: { select: { metrics: true } } },
+      include: {
+        _count: { select: { metrics: true } },
+        project: { select: { workspaceId: true } },
+      },
     });
   }
 
@@ -86,6 +94,9 @@ export class RunRepository {
 
     return this.prisma.run.update({
       where: { runId },
+      include: {
+        project: { select: { workspaceId: true } },
+      },
       data: updateData,
     });
   }

@@ -27,6 +27,7 @@ import {
   useLaunchQueues,
   useLaunchJobs,
 } from "@/modules/launch/composables/useLaunch";
+import { useWorkspaceChannel } from "@/composables/useWorkspaceChannel";
 import { LaunchService } from "@/services/launch.service";
 import { useToast } from "@/composables/useToast";
 import { useDateFormat } from "@/composables/useDateFormat";
@@ -49,7 +50,7 @@ const selectedProjectId = ref<string | null>(null);
 // claims or completes a run. MetricLogged is ignored — too chatty for
 // a list that only shows counts and last-activity.
 useRealtimeSubscription(
-  computed(() => "workspace:default"),
+  useWorkspaceChannel(),
   () => {
     // Any run-lifecycle event can flip queue depth or job activity, so
     // invalidate both tables together rather than try to model the

@@ -38,7 +38,7 @@ import { useNotificationsStore } from "@/stores/notifications";
 import { useToast } from "@/composables/useToast";
 import { ProjectService } from "@/services/project.service";
 import { useGlobalRealtime } from "@/composables/useGlobalRealtime";
-import { useQuery } from "@tanstack/vue-query";
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { WorkspaceService } from "@/services/workspace.service";
 import NotificationBell from "@/components/Notifications/NotificationBell.vue";
 import BrandMark from "@/components/BrandMark.vue";
@@ -52,6 +52,7 @@ const commandStore = useCommandStore();
 const authStore = useAuthStore();
 const notifications = useNotificationsStore();
 const toast = useToast();
+const queryClient = useQueryClient();
 
 const userMenuOpen = ref(false);
 const copiedKey = ref(false);
@@ -90,12 +91,28 @@ const workspaceOptions = computed(() => {
   }));
 });
 
+// Keep the persisted selection valid for this user: if the stored workspace
+// isn't one they belong to (fresh user whose default ≠ "default", or a
+// revoked membership), snap to their first available workspace. This keeps
+// the `X-Lumina-Workspace` header we send acceptable to the server.
+watch(
+  memberships,
+  (list) => {
+    const ids = (list ?? []).map((m) => m.workspaceId);
+    workspaceStore.syncToMemberships(ids);
+  },
+  { immediate: true },
+);
+
 function selectWorkspace(id: string) {
   if (id === workspaceStore.currentId) return;
   workspaceStore.setCurrentId(id);
   toast.info(`Switched to workspace "${id}"`);
-  // Force a refresh of project-scoped queries so the sidebar / project
-  // lists reflect the new workspace without a hard reload.
+  // Every workspace-scoped query is now stale — drop them all so lists,
+  // details, and the sidebar refetch under the new workspace. Identity
+  // queries (memberships / me) are sent with skipWorkspace so they're
+  // unaffected and keep the switcher populated.
+  void queryClient.invalidateQueries();
   refetchMemberships();
 }
 

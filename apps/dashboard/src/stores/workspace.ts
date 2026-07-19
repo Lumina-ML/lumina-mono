@@ -34,7 +34,22 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     }
   }
 
+  /**
+   * Reconcile the persisted selection with the workspaces the signed-in user
+   * can actually access. If the stored id isn't among their memberships
+   * (fresh user whose default isn't "default", or a membership that was
+   * revoked), fall back to the first available workspace. Keeping `currentId`
+   * always valid means the `X-Lumina-Workspace` header we send is one the
+   * server will accept, so the strict 403 path stays an edge case.
+   */
+  function syncToMemberships(validIds: string[]) {
+    if (validIds.length === 0) return;
+    if (!validIds.includes(currentId.value)) {
+      setCurrentId(validIds[0]!);
+    }
+  }
+
   const isDefault = computed(() => currentId.value === DEFAULT_WORKSPACE_ID);
 
-  return { currentId, setCurrentId, isDefault };
+  return { currentId, setCurrentId, syncToMemberships, isDefault };
 });

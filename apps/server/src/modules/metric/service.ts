@@ -10,7 +10,12 @@ export class MetricService {
     private readonly queue: Queue,
   ) {}
 
-  async log(runId: string, projectId: string, data: LogMetricsInput) {
+  async log(
+    runId: string,
+    projectId: string,
+    workspaceId: string,
+    data: LogMetricsInput,
+  ) {
     const records = data.metrics.map((m) => ({
       key: m.key,
       step: m.step,
@@ -24,6 +29,7 @@ export class MetricService {
       payload: {
         runId,
         projectId,
+        workspaceId,
         keys: records.map((r) => r.key),
         count: records.length,
       },

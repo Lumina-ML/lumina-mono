@@ -1,3 +1,5 @@
+import { useWorkspaceStore } from "@/stores/workspace";
+
 const API_BASE_URL = import.meta.env.VITE_LUMINA_API_URL || "";
 
 export interface FetchOptions {
@@ -5,6 +7,13 @@ export interface FetchOptions {
   params?: any;
   body?: unknown;
   headers?: Record<string, string>;
+  /**
+   * Skip the `X-Lumina-Workspace` header for this call. Used by identity /
+   * discovery endpoints (`/users/me`, `/users/:id/memberships`) that are
+   * workspace-agnostic — sending a stale selection there would 403 and break
+   * the very flow that lets the UI recover a valid workspace.
+   */
+  skipWorkspace?: boolean;
 }
 
 export class ApiError extends Error {
@@ -37,6 +46,21 @@ function resolveApiKey(): string | null {
   return typeof v === "string" && v.length > 0 ? v : null;
 }
 
+/**
+ * Resolve the current workspace selection at call time so switching
+ * workspaces takes effect immediately. Reads the Pinia workspace store;
+ * returns null when unavailable (tests / SSR) so the header is simply
+ * omitted and the server falls back to the user's first membership.
+ */
+function resolveWorkspaceId(): string | null {
+  try {
+    const id = useWorkspaceStore().currentId;
+    return id && id.length > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchApi<T = unknown>(path: string, options: FetchOptions = {}): Promise<T> {
   const apiKey = resolveApiKey();
 
@@ -56,6 +80,13 @@ export async function fetchApi<T = unknown>(path: string, options: FetchOptions 
 
   if (apiKey) {
     headers.Authorization = `Bearer ${apiKey}`;
+  }
+
+  if (!options.skipWorkspace) {
+    const workspaceId = resolveWorkspaceId();
+    if (workspaceId) {
+      headers["X-Lumina-Workspace"] = workspaceId;
+    }
   }
 
   const init: RequestInit = {

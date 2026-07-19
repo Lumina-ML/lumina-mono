@@ -33,6 +33,7 @@ import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
+import { useWorkspaceChannel } from "@/composables/useWorkspaceChannel";
 import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
 import type { Run } from "@/types/run";
 import type { SweepState } from "@/types/sweep";
@@ -52,7 +53,7 @@ const { data: sweep, isLoading } = useSweep(sweepId);
 // client-side, so a single invalidation covers both the sweep's
 // `bestRunId` and the table of child runs.
 useRealtimeSubscription(
-  computed(() => "workspace:default"),
+  useWorkspaceChannel(),
   (event) => {
     if (
       event.type === "RunCreated" ||

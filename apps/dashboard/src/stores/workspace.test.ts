@@ -58,4 +58,28 @@ describe("workspace store", () => {
     expect(store.currentId).toBe("persisted");
     expect(store.isDefault).toBe(false);
   });
+
+  describe("syncToMemberships", () => {
+    it("keeps the current id when it's among the user's workspaces", () => {
+      const store = useWorkspaceStore();
+      store.setCurrentId("acme");
+      store.syncToMemberships(["acme", "beta"]);
+      expect(store.currentId).toBe("acme");
+    });
+
+    it("snaps to the first workspace when the current id isn't a membership", () => {
+      const store = useWorkspaceStore();
+      store.setCurrentId("stale-ws");
+      store.syncToMemberships(["acme", "beta"]);
+      expect(store.currentId).toBe("acme");
+      expect(storage.getItem("lumina:workspace:currentId")).toBe("acme");
+    });
+
+    it("is a no-op when the membership list is empty", () => {
+      const store = useWorkspaceStore();
+      store.setCurrentId("default");
+      store.syncToMemberships([]);
+      expect(store.currentId).toBe("default");
+    });
+  });
 });

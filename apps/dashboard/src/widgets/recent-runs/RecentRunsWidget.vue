@@ -6,6 +6,7 @@ import { LCard, LButton, LSkeleton, LEmpty, LTag } from "@lumina/ui";
 import { useRuns } from "@/modules/run/composables/useRuns";
 import { useCurrentProject } from "@/composables/useCurrentProject";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
+import { useWorkspaceChannel } from "@/composables/useWorkspaceChannel";
 import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 
@@ -18,7 +19,7 @@ const queryClient = useQueryClient();
 // in `docs/User-Lifecycle-Flow-Audit.md` — WorkspaceOverview was the
 // only top-level view still offline after Phase 2.
 useRealtimeSubscription(
-  computed(() => "workspace:default"),
+  useWorkspaceChannel(),
   (event) => {
     if (event.type === "RunCreated" || event.type === "RunFinished") {
       queryClient.invalidateQueries({ queryKey: ["runs"] });

@@ -37,9 +37,13 @@ function channelsForEvent(
   }
   // Workspace-wide channel so cross-page UI (notifications, sidebar
   // counters) gets a single subscription per browser session instead
-  // of having to subscribe to every project. The dashboard reads this
-  // id from `useWorkspaceStore.currentId`.
-  out.push(`workspace:${defaultWorkspaceId}`);
+  // of having to subscribe to every project. Uses the event's own
+  // workspaceId so the same broadcast doesn't leak into other
+  // workspaces' sessions. Falls back to the server default when the
+  // event payload omits it (shouldn't happen post A4, but keeps the
+  // plugin from silently dropping the channel).
+  const wsId = event.payload.workspaceId || defaultWorkspaceId;
+  if (wsId) out.push(`workspace:${wsId}`);
   return out;
 }
 

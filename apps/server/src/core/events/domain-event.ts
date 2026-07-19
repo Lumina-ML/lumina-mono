@@ -9,6 +9,10 @@ export interface MetricLoggedEvent extends DomainEvent {
   payload: {
     runId: string;
     projectId: string;
+    /** Workspace that owns the run — used by the WS fanout to scope
+     *  channels per workspace, so the same event doesn't leak across
+     *  tenants. */
+    workspaceId: string;
     keys: string[];
     count: number;
   };
@@ -19,6 +23,7 @@ export interface RunCreatedEvent extends DomainEvent {
   payload: {
     runId: string;
     projectId: string;
+    workspaceId: string;
   };
 }
 
@@ -27,6 +32,7 @@ export interface RunFinishedEvent extends DomainEvent {
   payload: {
     runId: string;
     projectId: string;
+    workspaceId: string;
     status: string;
   };
 }
@@ -36,6 +42,7 @@ export interface ArtifactUploadedEvent extends DomainEvent {
   payload: {
     artifactVersionId: string;
     projectId: string;
+    workspaceId: string;
     fileCount: number;
   };
 }

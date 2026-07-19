@@ -102,7 +102,7 @@ export const WorkspaceService = {
   },
 
   getCurrentUser(): Promise<User> {
-    return fetchApi("/api/v1/users/me");
+    return fetchApi("/api/v1/users/me", { skipWorkspace: true });
   },
 
   createUser(data: CreateUserInput): Promise<CreateUserResult> {
@@ -121,7 +121,9 @@ export const WorkspaceService = {
   },
 
   listUserMemberships(userId: string): Promise<WorkspaceMembership[]> {
-    return fetchApi(`/api/v1/users/${userId}/memberships`);
+    return fetchApi(`/api/v1/users/${userId}/memberships`, {
+      skipWorkspace: true,
+    });
   },
 
   generateApiKey(userId: string): Promise<{ apiKey: string }> {

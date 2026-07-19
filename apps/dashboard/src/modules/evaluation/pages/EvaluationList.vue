@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, h, computed } from "vue";
+import { ref, h } from "vue";
 import { RouterLink } from "vue-router";
 import { useQueryClient } from "@tanstack/vue-query";
 import { LCard, LTag, LDataTable, LButton, LStatusBadge } from "@lumina/ui";
@@ -7,6 +7,7 @@ import type { ColumnDef } from "@tanstack/vue-table";
 import { useEvaluations } from "@/modules/evaluation/composables/useEvaluations";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
+import { useWorkspaceChannel } from "@/composables/useWorkspaceChannel";
 import QueryBoundary from "@/components/QueryBoundary.vue";
 import type { Evaluation } from "@/types/evaluation";
 
@@ -25,7 +26,7 @@ const { data: evaluations, isLoading, isError, error, refetch } = useEvaluations
 // flip an evaluation's status). MetricLogged is intentionally ignored
 // here — it's noisy and doesn't change the list shape.
 useRealtimeSubscription(
-  computed(() => "workspace:default"),
+  useWorkspaceChannel(),
   (event) => {
     if (
       event.type === "RunCreated" ||

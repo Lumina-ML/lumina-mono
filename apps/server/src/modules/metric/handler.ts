@@ -21,7 +21,14 @@ export class MetricHandler {
       reply.status(404).send({ error: "Run not found" });
       return;
     }
-    await this.metricService.log(run.runId, run.projectId, data);
+    await this.metricService.log(
+      run.runId,
+      run.projectId,
+      // `findByRunId` now includes the project so the WS fanout can
+      // scope MetricLogged to the right workspace channel.
+      run.project?.workspaceId ?? req.workspaceId,
+      data,
+    );
     reply.status(201).send({ success: true });
   }
 

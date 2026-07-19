@@ -35,6 +35,7 @@ import { RegistryService } from "@/services/registry.service";
 import { useToast } from "@/composables/useToast";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
+import { useWorkspaceChannel } from "@/composables/useWorkspaceChannel";
 import { ApiError } from "@/services/api";
 import type { ArtifactVersion } from "@/types/artifact";
 
@@ -52,7 +53,7 @@ const artifactId = computed(() => route.params.artifactId as string);
 // itself rarely changes, but we invalidate it too for consistency with
 // alias edits elsewhere.
 useRealtimeSubscription(
-  computed(() => "workspace:default"),
+  useWorkspaceChannel(),
   (event) => {
     if (event.type === "ArtifactUploaded") {
       queryClient.invalidateQueries({ queryKey: ["artifact", artifactId.value] });
