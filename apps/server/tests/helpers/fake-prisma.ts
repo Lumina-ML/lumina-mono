@@ -66,6 +66,40 @@ interface FakeSweepRow {
   updatedAt: Date;
 }
 
+interface FakeLaunchQueueRow {
+  id: string;
+  projectId: string;
+  name: string;
+  config: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface FakeLaunchJobRow {
+  id: string;
+  projectId: string;
+  name: string;
+  image: string | null;
+  command: string[];
+  args: string[];
+  env: Record<string, unknown>;
+  config: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface FakeLaunchRunRow {
+  id: string;
+  projectId: string;
+  queueId: string;
+  jobId: string;
+  runId: string | null;
+  status: string;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface FakeRunWithSweep {
   id: string;
   runId: string;
@@ -107,6 +141,26 @@ export function createFakePrisma(options: {
     method?: string;
     config?: Record<string, unknown>;
     state?: string;
+  }>;
+  launchQueues?: Array<{ id?: string; projectId: string; name: string; config?: Record<string, unknown> }>;
+  launchJobs?: Array<{
+    id?: string;
+    projectId: string;
+    name: string;
+    image?: string;
+    command?: string[];
+    args?: string[];
+    env?: Record<string, unknown>;
+    config?: Record<string, unknown>;
+  }>;
+  launchRuns?: Array<{
+    id?: string;
+    projectId: string;
+    queueId: string;
+    jobId: string;
+    runId?: string;
+    status?: string;
+    metadata?: Record<string, unknown>;
   }>;
 } = {}): PrismaClient {
   const runsByRunId = new Map<string, FakeRunRow>();
@@ -199,6 +253,50 @@ export function createFakePrisma(options: {
   // the runModel by stamping a sweepId field. To keep things simple we
   // expose sweep-attached runs through the sweepModel itself.
   const sweepRuns: FakeRunWithSweep[] = [];
+
+  const launchQueuesById = new Map<string, FakeLaunchQueueRow>();
+  for (const q of options.launchQueues ?? []) {
+    const id = q.id ?? uuidv7();
+    launchQueuesById.set(id, {
+      id,
+      projectId: q.projectId,
+      name: q.name,
+      config: q.config ?? {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+  const launchJobsById = new Map<string, FakeLaunchJobRow>();
+  for (const j of options.launchJobs ?? []) {
+    const id = j.id ?? uuidv7();
+    launchJobsById.set(id, {
+      id,
+      projectId: j.projectId,
+      name: j.name,
+      image: j.image ?? null,
+      command: j.command ?? [],
+      args: j.args ?? [],
+      env: j.env ?? {},
+      config: j.config ?? {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+  const launchRunsById = new Map<string, FakeLaunchRunRow>();
+  for (const r of options.launchRuns ?? []) {
+    const id = r.id ?? uuidv7();
+    launchRunsById.set(id, {
+      id,
+      projectId: r.projectId,
+      queueId: r.queueId,
+      jobId: r.jobId,
+      runId: r.runId ?? null,
+      status: r.status ?? "pending",
+      metadata: r.metadata ?? {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
 
   const runModel = {
     findUnique: async ({ where }: { where: { runId?: string; id?: string } }) => {
@@ -529,6 +627,177 @@ export function createFakePrisma(options: {
     findBySweep: (sweepId: string) => sweepRuns.filter((r) => r.sweepId === sweepId),
   };
 
+  const launchQueueModel = {
+    create: async ({ data }: { data: Partial<FakeLaunchQueueRow> }) => {
+      const id = data.id ?? uuidv7();
+      const row: FakeLaunchQueueRow = {
+        id,
+        projectId: data.projectId!,
+        name: data.name!,
+        config: data.config ?? {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      launchQueuesById.set(id, row);
+      return row;
+    },
+    findUnique: async ({ where, include }: { where: { id?: string; projectId_name?: { projectId: string; name: string } }; include?: unknown }) => {
+      let row: FakeLaunchQueueRow | undefined;
+      if (where.id) row = launchQueuesById.get(where.id);
+      else if (where.projectId_name) {
+        row = Array.from(launchQueuesById.values()).find(
+          (q) => q.projectId === where.projectId_name!.projectId && q.name === where.projectId_name!.name,
+        );
+      }
+      if (!row) return null;
+      if (include) {
+        const inc = include as { runs?: { orderBy?: { createdAt: "asc" | "desc" } } };
+        const runs = Array.from(launchRunsById.values())
+          .filter((r) => r.queueId === row!.id)
+          .sort((a, b) => {
+            const dir = inc.runs?.orderBy?.createdAt === "asc" ? 1 : -1;
+            return dir * (a.createdAt.getTime() - b.createdAt.getTime());
+          });
+        return { ...row, runs };
+      }
+      return row;
+    },
+    findMany: async ({ where }: { where?: { projectId?: string } } = {}) => {
+      const all = Array.from(launchQueuesById.values());
+      const filtered = where?.projectId ? all.filter((q) => q.projectId === where.projectId) : all;
+      return filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+  };
+
+  const launchJobModel = {
+    create: async ({ data }: { data: Partial<FakeLaunchJobRow> }) => {
+      const id = data.id ?? uuidv7();
+      const row: FakeLaunchJobRow = {
+        id,
+        projectId: data.projectId!,
+        name: data.name!,
+        image: data.image ?? null,
+        command: data.command ?? [],
+        args: data.args ?? [],
+        env: data.env ?? {},
+        config: data.config ?? {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      launchJobsById.set(id, row);
+      return row;
+    },
+    findUnique: async ({ where, include }: { where: { id?: string; projectId_name?: { projectId: string; name: string } }; include?: unknown }) => {
+      let row: FakeLaunchJobRow | undefined;
+      if (where.id) row = launchJobsById.get(where.id);
+      else if (where.projectId_name) {
+        row = Array.from(launchJobsById.values()).find(
+          (j) => j.projectId === where.projectId_name!.projectId && j.name === where.projectId_name!.name,
+        );
+      }
+      if (!row) return null;
+      if (include) {
+        const inc = include as { runs?: { orderBy?: { createdAt: "asc" | "desc" } } };
+        const runs = Array.from(launchRunsById.values())
+          .filter((r) => r.jobId === row!.id)
+          .sort((a, b) => {
+            const dir = inc.runs?.orderBy?.createdAt === "asc" ? 1 : -1;
+            return dir * (a.createdAt.getTime() - b.createdAt.getTime());
+          });
+        return { ...row, runs };
+      }
+      return row;
+    },
+    findMany: async ({ where }: { where?: { projectId?: string } } = {}) => {
+      const all = Array.from(launchJobsById.values());
+      const filtered = where?.projectId ? all.filter((j) => j.projectId === where.projectId) : all;
+      return filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+  };
+
+  const launchRunModel = {
+    create: async ({ data }: { data: Partial<FakeLaunchRunRow> }) => {
+      const id = data.id ?? uuidv7();
+      const row: FakeLaunchRunRow = {
+        id,
+        projectId: data.projectId!,
+        queueId: data.queueId!,
+        jobId: data.jobId!,
+        runId: data.runId ?? null,
+        status: data.status ?? "pending",
+        metadata: data.metadata ?? {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      launchRunsById.set(id, row);
+      return row;
+    },
+    findUnique: async ({ where, include }: { where: { id?: string }; include?: unknown }) => {
+      const row = where.id ? launchRunsById.get(where.id) : null;
+      if (!row) return null;
+      if (include) {
+        const inc = include as { queue?: unknown; job?: unknown; run?: unknown };
+        const result: Record<string, unknown> = { ...row };
+        if (inc.queue) result.queue = launchQueuesById.get(row.queueId) ?? null;
+        if (inc.job) result.job = launchJobsById.get(row.jobId) ?? null;
+        if (inc.run) result.run = runsByRunId.get(row.runId ?? "") ?? null;
+        return result;
+      }
+      return row;
+    },
+    findFirst: async ({ where, include, orderBy }: { where: { queueId: string; status: string }; include?: unknown; orderBy?: { createdAt: "asc" | "desc" } }) => {
+      const matches = Array.from(launchRunsById.values()).filter(
+        (r) => r.queueId === where.queueId && r.status === where.status,
+      );
+      const dir = orderBy?.createdAt === "asc" ? 1 : -1;
+      matches.sort((a, b) => dir * (a.createdAt.getTime() - b.createdAt.getTime()));
+      const head = matches[0];
+      if (!head) return null;
+      if (include) {
+        const inc = include as { job?: unknown };
+        const result: Record<string, unknown> = { ...head };
+        if (inc.job) result.job = launchJobsById.get(head.jobId) ?? null;
+        return result;
+      }
+      return head;
+    },
+    findMany: async ({ where, include }: { where?: { queueId?: string; projectId?: string }; include?: unknown } = {}) => {
+      const all = Array.from(launchRunsById.values()).filter((r) => {
+        if (where?.queueId && r.queueId !== where.queueId) return false;
+        if (where?.projectId && r.projectId !== where.projectId) return false;
+        return true;
+      });
+      const sorted = all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      return sorted.map((r) => {
+        if (!include) return r;
+        const inc = include as { job?: unknown; run?: unknown };
+        const result: Record<string, unknown> = { ...r };
+        if (inc.job) result.job = launchJobsById.get(r.jobId) ?? null;
+        if (inc.run) result.run = runsByRunId.get(r.runId ?? "") ?? null;
+        return result;
+      });
+    },
+    update: async ({ where, data, include }: { where: { id: string }; data: Partial<FakeLaunchRunRow>; include?: unknown }) => {
+      const row = launchRunsById.get(where.id);
+      if (!row) throw new Error(`LaunchRun ${where.id} not found`);
+      Object.assign(row, data, { updatedAt: new Date() });
+      if (!include) return row;
+      const inc = include as { queue?: unknown; job?: unknown; run?: unknown };
+      const result: Record<string, unknown> = { ...row };
+      if (inc.queue) result.queue = launchQueuesById.get(row.queueId) ?? null;
+      if (inc.job) result.job = launchJobsById.get(row.jobId) ?? null;
+      if (inc.run) result.run = runsByRunId.get(row.runId ?? "") ?? null;
+      return result;
+    },
+    /** Atomic compare-and-set used by claimNextPendingRun. */
+    updateMany: async ({ where, data }: { where: { id: string; status: string }; data: Partial<FakeLaunchRunRow> }) => {
+      const row = launchRunsById.get(where.id);
+      if (!row || row.status !== where.status) return { count: 0 };
+      Object.assign(row, data, { updatedAt: new Date() });
+      return { count: 1 };
+    },
+  };
+
   function attachVersionIncludes(row: FakeArtifactVersionRow, include: unknown) {
     const result: Record<string, unknown> = { ...row };
     const inc = include as { files?: unknown; artifact?: unknown };
@@ -578,6 +847,9 @@ export function createFakePrisma(options: {
     artifactFile: artifactFileModel,
     artifactLineage: artifactLineageModel,
     sweep: sweepModel,
+    launchQueue: launchQueueModel,
+    launchJob: launchJobModel,
+    launchRun: launchRunModel,
     __test: { runWithSweep: runWithSweepModel },
   };
   return exposed as unknown as PrismaClient;
