@@ -45,7 +45,11 @@ export const RegistryService = {
     return fetchApi(`/api/v1/registry-model-versions/${versionId}`);
   },
 
-  createVersion(modelId: string, artifactVersionId: string, aliases: string[] = []) {
+  createVersion(
+    modelId: string,
+    artifactVersionId: string,
+    aliases: string[] = [],
+  ): Promise<RegistryModelVersion> {
     return fetchApi(`/api/v1/registry-models/${modelId}/versions`, {
       method: "POST",
       body: { artifactVersionId, aliases },

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useQuery } from "@tanstack/vue-query";
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { RouterLink } from "vue-router";
 import { ChartRenderer } from "@lumina/ui";
 import type { ChartConfig } from "@lumina/ui";
@@ -12,36 +12,104 @@ import {
   LInput,
   LSelect,
   LStatusBadge,
+  LTooltip,
 } from "@lumina/ui";
-import { Activity, Cpu, Server, Search } from "lucide-vue-next";
+import {
+  Activity,
+  Cpu,
+  Server,
+  Search,
+  Wifi,
+  WifiOff,
+} from "lucide-vue-next";
 import { RunService } from "@/services/run.service";
 import { SystemMetricService } from "@/services/system-metric.service";
+import { useProjects } from "@/modules/project/composables/useProjects";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useCurrentProject } from "@/composables/useCurrentProject";
+import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
+import { useProjectStore } from "@/stores/project";
 import type { Run } from "@/types/run";
 
 const { formatDate } = useDateFormat();
-const projectId = useCurrentProject();
+const queryClient = useQueryClient();
+const projectStore = useProjectStore();
+
+// `useCurrentProject` returns a Ref<string | undefined> — it picks up
+// the project from the route or the persisted store. We layer a local
+// selector on top so the user can flip projects explicitly here
+// without navigating into a project first.
+const routeProjectId = useCurrentProject();
+const selectedProjectId = computed<string | null>({
+  get: () => routeProjectId.value ?? projectStore.currentId ?? null,
+  set: (id) => {
+    projectStore.setCurrentId(id);
+  },
+});
+
+// LSelect doesn't accept null as a value — translate between the store's
+// nullable representation and the option's "" sentinel for "all projects".
+const selectedProjectOption = computed({
+  get: () => selectedProjectId.value ?? "",
+  set: (v: string) => {
+    selectedProjectId.value = v === "" ? null : v;
+  },
+});
+
+const { data: projects } = useProjects();
+const projectOptions = computed(() => [
+  { label: "All projects", value: "" },
+  ...(projects.value?.items ?? []).map((p) => ({
+    label: p.name,
+    value: p.id,
+  })),
+]);
 
 const search = ref("");
 const statusFilter = ref<string | null>(null);
 
+const queryKey = computed(() => [
+  "monitoring",
+  "recent-runs",
+  selectedProjectId.value ?? "all",
+]);
+
 // ── Pull recent runs (scoped to current project if set) ──────────────
 const { data: runsResp, isLoading: runsLoading } = useQuery({
-  queryKey: computed(() => [
-    "monitoring",
-    "recent-runs",
-    projectId.value ?? "all",
-  ]),
-  queryFn: () =>
-    RunService.list({
+  queryKey,
+  queryFn: () => {
+    if (!selectedProjectId.value) {
+      return RunService.list({ limit: 50, offset: 0 });
+    }
+    // The list endpoint accepts `project` by name; for an id we go via
+    // the project's name. If we only have an id, look it up via
+    // ProjectService.get first.
+    const project = projects.value?.items.find(
+      (p) => p.id === selectedProjectId.value,
+    );
+    return RunService.list({
       limit: 50,
       offset: 0,
-      ...(projectId.value ? { project: projectId.value } : {}),
-    }),
+      ...(project ? { project: project.name } : {}),
+    });
+  },
 });
 
 const recentRuns = computed<Run[]>(() => runsResp.value?.items ?? []);
+
+// ── Live updates via WebSocket ────────────────────────────────────────
+// We listen on workspace:default (the same channel AppLayout subscribes
+// to) and refetch the recent-runs query on any run lifecycle event so
+// the counter / status distribution / noisy list update without a hard
+// refresh.
+const { status: wsStatus } = useRealtimeSubscription(
+  computed(() => "workspace:default"),
+  (event) => {
+    if (event.type === "RunFinished" || event.type === "RunCreated") {
+      queryClient.invalidateQueries({ queryKey: ["monitoring"] });
+    }
+  },
+);
 
 // ── Aggregate: status breakdown + failure rate ────────────────────────
 const statusCounts = computed(() => {
@@ -179,6 +247,7 @@ const statusOptions = [
   { label: "Finished", value: "finished" },
   { label: "Failed", value: "failed" },
   { label: "Crashed", value: "crashed" },
+  { label: "Preempting", value: "preempting" },
 ];
 
 const filteredRuns = computed(() => {
@@ -197,6 +266,13 @@ const filteredRuns = computed(() => {
   <div class="space-y-6">
     <!-- Toolbar -->
     <div class="flex flex-wrap items-center gap-2">
+      <LSelect
+        v-model:value="selectedProjectOption"
+        :options="projectOptions"
+        placeholder="All projects"
+        style="width: 220px"
+        clearable
+      />
       <LInput v-model:value="search" size="small" placeholder="Search runs…" style="width: 240px">
         <template #prefix>
           <Search class="h-3.5 w-3.5 text-fg-tertiary" />
@@ -209,10 +285,34 @@ const filteredRuns = computed(() => {
         clearable
         style="width: 160px"
       />
+      <LTooltip
+        :content="
+          wsStatus === 'open'
+            ? 'Live updates via WebSocket'
+            : wsStatus === 'connecting'
+              ? 'Connecting…'
+              : 'WebSocket offline — refresh manually'
+        "
+      >
+        <span
+          :class="[
+            'flex h-7 w-7 items-center justify-center rounded-full',
+            wsStatus === 'open'
+              ? 'bg-accent-success/15 text-accent-success'
+              : wsStatus === 'connecting'
+                ? 'bg-accent-warning/15 text-accent-warning'
+                : 'bg-canvas text-fg-tertiary',
+          ]"
+          :aria-label="`WebSocket status: ${wsStatus}`"
+        >
+          <Wifi v-if="wsStatus === 'open'" class="h-3.5 w-3.5" />
+          <WifiOff v-else class="h-3.5 w-3.5" />
+        </span>
+      </LTooltip>
     </div>
 
     <!-- Aggregate stats -->
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <LCard class="p-4">
         <div class="flex items-start justify-between">
           <div>
@@ -255,7 +355,6 @@ const filteredRuns = computed(() => {
           <Cpu class="h-5 w-5 text-fg-tertiary" />
         </div>
       </LCard>
-
       <LCard class="p-4">
         <div class="flex items-start justify-between">
           <div>

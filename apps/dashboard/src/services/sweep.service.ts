@@ -3,14 +3,16 @@ import type { Sweep, CreateSweepInput, UpdateSweepInput, ListSweepsQuery } from 
 import type { PaginatedResponse } from "@/types/project";
 
 export interface SweepObservation {
-  trial: string;
-  metric: Record<string, number>;
-  goal?: string;
-  attributes?: Record<string, unknown>;
+  runId: string;
+  params: Record<string, unknown>;
+  metric: number | null;
+  status: string;
+  createdAt: string;
 }
 
 export interface SweepSuggestResponse {
-  parameters: Record<string, unknown>;
+  /** Server returns `{ candidates: [{...param}, ...] }`. */
+  candidates: Array<Record<string, unknown>>;
 }
 
 export const SweepService = {
@@ -54,11 +56,11 @@ export const SweepService = {
 
   shouldTerminate(
     sweepId: string,
-    trialRunId: string,
+    payload: { runId: string; step: number; metric: number },
   ): Promise<{ shouldTerminate: boolean; reason?: string }> {
     return fetchApi(`/api/v1/sweeps/${sweepId}/should-terminate`, {
       method: "POST",
-      body: { trialRunId },
+      body: payload,
     });
   },
 
