@@ -139,7 +139,7 @@ function patchPanel(panelId: string, config: ChartPanelConfig) {
             :config="panel.config"
             :run-ids="runIds"
             @remove="removePanel(panel.id)"
-            @edit="patchPanel(panel.id, panel.config)"
+            @update:config="(next) => patchPanel(panel.id, next)"
           />
         </div>
       </div>

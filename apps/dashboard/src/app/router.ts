@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import ProjectWorkspaceLayout from "@/modules/project/layouts/ProjectWorkspaceLayout.vue";
+import SettingsLayout from "@/modules/workspace/layouts/SettingsLayout.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -33,8 +34,29 @@ const router = createRouter({
         },
         {
           path: "settings",
-          name: "Settings",
-          component: () => import("@/modules/workspace/pages/Settings.vue"),
+          component: SettingsLayout,
+          children: [
+            {
+              path: "",
+              name: "Settings",
+              component: () => import("@/modules/workspace/pages/Settings.vue"),
+            },
+            {
+              path: "members",
+              name: "SettingsMembers",
+              component: () => import("@/modules/workspace/pages/SettingsMembers.vue"),
+            },
+            {
+              path: "api-keys",
+              name: "SettingsApiKeys",
+              component: () => import("@/modules/workspace/pages/SettingsApiKeys.vue"),
+            },
+            {
+              path: "billing",
+              name: "SettingsBilling",
+              component: () => import("@/modules/workspace/pages/SettingsBilling.vue"),
+            },
+          ],
         },
 
         // ─── Project-scoped routes (share ProjectWorkspaceLayout) ────────
