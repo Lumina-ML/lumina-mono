@@ -170,7 +170,7 @@ async function copyEnvSnippet() {
         <LInput
           id="invite-email"
           v-model:value="email"
-          type="email"
+          type="text"
           placeholder="teammate@example.com"
           autocomplete="off"
           spellcheck="false"

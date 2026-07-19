@@ -30,6 +30,8 @@ import {
   Pencil,
   StopCircle,
   XCircle,
+  Trash2,
+  AlertTriangle,
 } from "lucide-vue-next";
 import { useRun } from "@/modules/run/composables/useRuns";
 import { useMetrics } from "@/modules/metric/composables/useMetrics";
@@ -48,8 +50,10 @@ import { TraceService } from "@/services/trace.service";
 import { ArtifactService } from "@/services/artifact.service";
 import { RunService } from "@/services/run.service";
 import type { LogLevel } from "@/types/log-line";
+import { useRouter } from "vue-router";
 
 const route = useRoute();
+const router = useRouter();
 const queryClient = useQueryClient();
 const runId = computed(() => route.params.runId as string);
 
@@ -325,6 +329,25 @@ function saveNotes() {
     },
   );
 }
+
+// ── Delete run ──────────────────────────────────────────────────────────
+const deleteOpen = ref(false);
+const deleteConfirm = ref("");
+const deleteMutation = useMutation({
+  mutationFn: () => RunService.delete(runId.value),
+  onSuccess: () => {
+    toast.success("Run deleted.");
+    deleteOpen.value = false;
+    queryClient.invalidateQueries({ queryKey: ["runs"] });
+    queryClient.invalidateQueries({ queryKey: ["run", runId.value] });
+    router.replace(`/projects/${run.value?.projectId}/runs`);
+  },
+  onError: (e) => toast.error(`Delete failed: ${(e as Error).message}`),
+});
+
+const canDelete = computed(
+  () => !!run.value && deleteConfirm.value.trim() === run.value.name,
+);
 </script>
 
 <template>
@@ -428,6 +451,15 @@ function saveNotes() {
         <LButton size="sm" quaternary @click="openNotesEditor">
           <Pencil class="mr-1 h-3 w-3" />
           {{ run.notes ? "Edit notes" : "Add notes" }}
+        </LButton>
+        <LButton
+          size="sm"
+          type="error"
+          quaternary
+          @click="deleteOpen = true"
+        >
+          <Trash2 class="mr-1 h-3 w-3" />
+          Delete
         </LButton>
       </div>
     </div>
@@ -689,6 +721,72 @@ function saveNotes() {
             @click="saveNotes"
           >
             Save notes
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
+
+    <!-- ── Delete run confirmation ─────────────────────────────────── -->
+    <LDialog
+      v-model:show="deleteOpen"
+      title="Delete this run?"
+      width="480px"
+      @close="deleteConfirm = ''"
+    >
+      <div class="space-y-3">
+        <div
+          class="flex items-start gap-2 rounded-md border border-accent-danger/30 bg-accent-danger/10 p-3 text-xs"
+        >
+          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-danger" />
+          <div>
+            <div class="font-medium">
+              This permanently deletes the run, every metric, log line,
+              system metric, tag, and artifact attached to it.
+            </div>
+            <div class="text-fg-tertiary">
+              There is no undo. Consider preempting or adding notes instead.
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <label
+            for="run-delete-confirm"
+            class="text-xs font-medium text-fg-secondary"
+          >
+            Type the run name
+            <code class="font-mono text-fg-primary">{{ run.name }}</code>
+            to confirm.
+          </label>
+          <LInput
+            id="run-delete-confirm"
+            v-model:value="deleteConfirm"
+            :placeholder="run.name"
+            autocomplete="off"
+            spellcheck="false"
+            :disabled="deleteMutation.isPending.value"
+            @keydown.enter="canDelete && deleteMutation.mutate()"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton
+            quaternary
+            :disabled="deleteMutation.isPending.value"
+            @click="deleteOpen = false"
+          >
+            Cancel
+          </LButton>
+          <LButton
+            type="error"
+            :disabled="!canDelete"
+            :loading="deleteMutation.isPending.value"
+            @click="deleteMutation.mutate()"
+          >
+            <Trash2 class="mr-1 h-3 w-3" />
+            Delete permanently
           </LButton>
         </div>
       </template>
