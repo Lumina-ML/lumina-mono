@@ -127,4 +127,16 @@ export const WorkspaceService = {
   generateApiKey(userId: string): Promise<{ apiKey: string }> {
     return fetchApi(`/api/v1/users/${userId}/api-key`, { method: "POST" });
   },
+
+  /**
+   * Unauthenticated key recovery. Only succeeds for emails the server
+   * allowlists via `LUMINA_ROTATE_KEY_EMAILS`; every other email (and
+   * unknown users) comes back as a 404, so the UI must treat failure
+   * generically rather than confirming whether an email exists.
+   */
+  rotateKeyByEmail(email: string): Promise<{ apiKey: string }> {
+    return fetchApi(`/api/v1/users/${encodeURIComponent(email)}/rotate-key`, {
+      method: "POST",
+    });
+  },
 };

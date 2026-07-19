@@ -26,7 +26,7 @@ import { ApiError } from "@/services/api";
 import { useToast } from "@/composables/useToast";
 import BrandMark from "@/components/BrandMark.vue";
 
-type Mode = "loading" | "first-run" | "sign-in" | "new-user";
+type Mode = "loading" | "first-run" | "sign-in" | "new-user" | "forgot-key";
 
 const router = useRouter();
 const route = useRoute();
@@ -58,6 +58,16 @@ const newName = ref("");
 const newEmail = ref("");
 const newUserError = ref<string | null>(null);
 const creatingUser = ref(false);
+
+// ── "Forgot key" recovery state ──────────────────────────────────────
+// Gated server-side by an email allowlist (LUMINA_ROTATE_KEY_EMAILS).
+// Non-eligible emails come back as a generic 404, so the copy here never
+// confirms whether an email is registered.
+const forgotEmail = ref("");
+const forgotError = ref<string | null>(null);
+const forgotting = ref(false);
+const recoveredKey = ref<string | null>(null);
+const recoveredCopied = ref(false);
 
 /**
  * After signing in (any flow), jump to the redirect target if the
@@ -201,6 +211,57 @@ async function onCreateUser() {
   } finally {
     creatingUser.value = false;
   }
+}
+
+function enterForgotKey() {
+  forgotEmail.value = "";
+  forgotError.value = null;
+  recoveredKey.value = null;
+  recoveredCopied.value = false;
+  mode.value = "forgot-key";
+}
+
+async function onForgotKey() {
+  forgotError.value = null;
+  const email = forgotEmail.value.trim();
+  if (!email) {
+    forgotError.value = "Enter the email tied to your account.";
+    return;
+  }
+  forgotting.value = true;
+  try {
+    const { apiKey: newKey } = await WorkspaceService.rotateKeyByEmail(email);
+    recoveredKey.value = newKey;
+  } catch (err) {
+    // 404 is the server's "not eligible / no such user" — never confirm which.
+    if (err instanceof ApiError && err.status === 404) {
+      forgotError.value =
+        "That email isn't set up for self-service recovery on this server. Ask an admin to rotate your key, or create a new account.";
+    } else if (err instanceof ApiError && err.status === 429) {
+      forgotError.value = "Too many attempts. Please wait a few minutes and try again.";
+    } else {
+      forgotError.value = describeFetchError(err);
+    }
+  } finally {
+    forgotting.value = false;
+  }
+}
+
+async function copyRecoveredKey() {
+  if (!recoveredKey.value) return;
+  try {
+    await navigator.clipboard.writeText(recoveredKey.value);
+    recoveredCopied.value = true;
+    setTimeout(() => (recoveredCopied.value = false), 1500);
+  } catch {
+    toast.error("Couldn't copy — select the key and copy it manually.");
+  }
+}
+
+/** Prefill the recovered key into the sign-in form and switch to it. */
+function useRecoveredKey() {
+  if (recoveredKey.value) apiKey.value = recoveredKey.value;
+  mode.value = "sign-in";
 }
 
 /**
@@ -457,6 +518,17 @@ const apiBase = import.meta.env.VITE_LUMINA_API_URL || "(default — same origin
                 Sign in
                 <ArrowRight class="ml-1 h-4 w-4" />
               </LButton>
+
+              <div class="text-center">
+                <LButton
+                  size="sm"
+                  text
+                  class="!px-0 text-xs"
+                  @click="enterForgotKey"
+                >
+                  Forgot your key?
+                </LButton>
+              </div>
             </form>
           </LCard>
 
@@ -558,6 +630,102 @@ const apiBase = import.meta.env.VITE_LUMINA_API_URL || "(default — same origin
                   @click="onCreateUser"
                 >
                   Create &amp; sign in
+                  <ArrowRight class="ml-1 h-4 w-4" />
+                </LButton>
+              </div>
+            </form>
+          </LCard>
+        </template>
+
+        <!-- ── Forgot key: self-service recovery ────────────────────── -->
+        <template v-else-if="mode === 'forgot-key'">
+          <div class="text-center">
+            <div class="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-accent-primary/15 text-accent-primary">
+              <KeyRound class="h-6 w-6" />
+            </div>
+            <h1 class="text-2xl font-semibold tracking-tight">Recover your API key</h1>
+            <p class="mt-1 text-sm text-fg-tertiary">
+              If your email is enabled for recovery, we'll issue a fresh key.
+            </p>
+          </div>
+
+          <!-- Result: a fresh key was minted. Show once so it can be copied. -->
+          <LCard v-if="recoveredKey" class="p-6">
+            <div class="space-y-3">
+              <LAlert type="warning" :show-icon="true" title="Copy this key now">
+                Your old key stopped working the moment this one was issued.
+                Store it somewhere safe — you won't see it again.
+              </LAlert>
+              <div class="flex items-center gap-2 rounded-md border border-border bg-canvas p-2 font-mono text-xs">
+                <span class="min-w-0 flex-1 truncate">{{ recoveredKey }}</span>
+                <LButton size="sm" @click="copyRecoveredKey">
+                  {{ recoveredCopied ? "Copied" : "Copy" }}
+                </LButton>
+              </div>
+              <LButton
+                type="primary"
+                size="lg"
+                class="!w-full"
+                @click="useRecoveredKey"
+              >
+                Continue to sign in
+                <ArrowRight class="ml-1 h-4 w-4" />
+              </LButton>
+            </div>
+          </LCard>
+
+          <!-- Request form -->
+          <LCard v-else class="p-6">
+            <form class="space-y-4" @submit.prevent="onForgotKey">
+              <div>
+                <label
+                  for="femail"
+                  class="mb-1 block text-xs font-medium text-fg-secondary"
+                >
+                  Email
+                </label>
+                <LInput
+                  id="femail"
+                  v-model:value="forgotEmail"
+                  placeholder="you@example.com"
+                  size="large"
+                  autocomplete="email"
+                  :disabled="forgotting"
+                  @keydown.enter.prevent="onForgotKey"
+                />
+                <p class="mt-1 text-[11px] text-fg-tertiary">
+                  Recovery must be enabled for your email by an admin
+                  (<code class="font-mono">LUMINA_ROTATE_KEY_EMAILS</code>).
+                </p>
+              </div>
+
+              <LAlert
+                v-if="forgotError"
+                type="error"
+                :show-icon="true"
+              >
+                {{ forgotError }}
+              </LAlert>
+
+              <div class="flex gap-2">
+                <LButton
+                  size="lg"
+                  quaternary
+                  class="!flex-1"
+                  :disabled="forgotting"
+                  @click="mode = 'sign-in'"
+                >
+                  Back
+                </LButton>
+                <LButton
+                  type="primary"
+                  size="lg"
+                  class="!flex-1"
+                  :loading="forgotting"
+                  :disabled="!forgotEmail.trim()"
+                  @click="onForgotKey"
+                >
+                  Issue a new key
                   <ArrowRight class="ml-1 h-4 w-4" />
                 </LButton>
               </div>
