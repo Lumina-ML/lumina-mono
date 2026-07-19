@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, watchEffect } from "vue";
+import { NConfigProvider } from "naive-ui";
+import { luminaThemeOverrides } from "../naive-theme";
 
 interface Props {
   /** 是否强制暗色模式 */
@@ -27,5 +29,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <slot />
+  <NConfigProvider :theme-overrides="luminaThemeOverrides">
+    <slot />
+  </NConfigProvider>
 </template>
