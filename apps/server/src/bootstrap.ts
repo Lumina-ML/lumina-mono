@@ -15,6 +15,7 @@ import { websocketPlugin } from "./plugins/websocket.js";
 import { healthPlugin } from "./plugins/health.js";
 import { otelPlugin } from "./plugins/otel.js";
 import { workspaceContextPlugin } from "./plugins/workspace-context.js";
+import { workspaceGuardPlugin } from "./plugins/workspace-guard.js";
 import { artifactRoutes } from "./modules/artifact/routes.js";
 import { evaluationRoutes } from "./modules/evaluation/routes.js";
 import { logLineRoutes } from "./modules/log-line/routes.js";
@@ -73,6 +74,12 @@ export async function buildApp() {
   // Workspace context runs after auth so it can read req.user.id and
   // resolve the user's default workspace from their memberships.
   await app.register(workspaceContextPlugin);
+  // Workspace guard enforces route-level `config.authz` rules. Runs as a
+  // preHandler hook so it sits after auth (req.user) and workspace
+  // context (req.workspaceId) have been resolved but before the handler
+  // touches any data. Without this hook, the per-handler `assertOwns*`
+  // ceremony still works; this plugin is the new policy surface.
+  await app.register(workspaceGuardPlugin);
   await app.register(websocketPlugin);
   // Health endpoints are unauthenticated and live outside /api/v1 so
   // orchestrators can probe them without an API key.

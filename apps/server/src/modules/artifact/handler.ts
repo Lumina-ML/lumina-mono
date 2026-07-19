@@ -10,11 +10,7 @@ import {
   ListArtifactsQuerySchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
-import {
-  assertOwnsArtifact,
-  assertOwnsArtifactVersion,
-  assertOwnsProject,
-} from "../../core/authz/assert-workspace.js";
+import { assertOwnsArtifactVersion } from "../../core/authz/assert-workspace.js";
 
 const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
 const ArtifactParamsSchema = z.object({ artifactId: z.string().uuid() });
@@ -32,7 +28,8 @@ export class ArtifactHandler {
 
   async createArtifact(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
-    if (!(await assertOwnsProject(req.server.prisma, req, reply, projectId))) return;
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = CreateArtifactSchema.parse(req.body);
     const artifact = await this.artifactService.createArtifact(projectId, data);
     reply.status(201).send(artifact);
@@ -40,7 +37,6 @@ export class ArtifactHandler {
 
   async listArtifacts(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
-    if (!(await assertOwnsProject(req.server.prisma, req, reply, projectId))) return;
     const artifacts = await this.artifactService.listArtifactsByProject(projectId);
     reply.send({ items: artifacts });
   }
@@ -62,7 +58,6 @@ export class ArtifactHandler {
 
   async getArtifact(req: FastifyRequest, reply: FastifyReply) {
     const { artifactId } = ArtifactParamsSchema.parse(req.params);
-    if (!(await assertOwnsArtifact(req.server.prisma, req, reply, artifactId))) return;
     const artifact = await this.artifactService.findArtifactById(artifactId);
     if (!artifact) {
       reply.status(404).send({ error: "Artifact not found" });
@@ -73,7 +68,6 @@ export class ArtifactHandler {
 
   async createVersion(req: FastifyRequest, reply: FastifyReply) {
     const { artifactId } = ArtifactParamsSchema.parse(req.params);
-    if (!(await assertOwnsArtifact(req.server.prisma, req, reply, artifactId))) return;
     const data = CreateArtifactVersionSchema.parse(req.body);
     const version = await this.artifactService.createVersion(artifactId, data);
     reply.status(201).send(version);
@@ -81,14 +75,12 @@ export class ArtifactHandler {
 
   async listVersions(req: FastifyRequest, reply: FastifyReply) {
     const { artifactId } = ArtifactParamsSchema.parse(req.params);
-    if (!(await assertOwnsArtifact(req.server.prisma, req, reply, artifactId))) return;
     const versions = await this.artifactService.listVersionsByArtifact(artifactId);
     reply.send({ items: versions });
   }
 
   async getVersion(req: FastifyRequest, reply: FastifyReply) {
     const { versionId } = VersionParamsSchema.parse(req.params);
-    if (!(await assertOwnsArtifactVersion(req.server.prisma, req, reply, versionId))) return;
     const version = await this.artifactService.findVersionById(versionId);
     if (!version) {
       reply.status(404).send({ error: "Version not found" });
@@ -99,7 +91,6 @@ export class ArtifactHandler {
 
   async patchVersion(req: FastifyRequest, reply: FastifyReply) {
     const { versionId } = VersionParamsSchema.parse(req.params);
-    if (!(await assertOwnsArtifactVersion(req.server.prisma, req, reply, versionId))) return;
     const data = PatchArtifactVersionSchema.parse(req.body);
     const version = await this.artifactService.updateVersion(versionId, data);
     reply.send(version);
@@ -107,7 +98,6 @@ export class ArtifactHandler {
 
   async addFile(req: FastifyRequest, reply: FastifyReply) {
     const { versionId } = VersionParamsSchema.parse(req.params);
-    if (!(await assertOwnsArtifactVersion(req.server.prisma, req, reply, versionId))) return;
     const data = CreateArtifactFileSchema.parse(req.body);
     try {
       const result = await this.artifactService.addFile(versionId, data);
@@ -128,7 +118,6 @@ export class ArtifactHandler {
 
   async finalizeVersion(req: FastifyRequest, reply: FastifyReply) {
     const { versionId } = VersionParamsSchema.parse(req.params);
-    if (!(await assertOwnsArtifactVersion(req.server.prisma, req, reply, versionId))) return;
     try {
       const version = await this.artifactService.finalizeVersion(versionId);
       reply.send(version);
@@ -144,9 +133,11 @@ export class ArtifactHandler {
 
   async attachLineage(req: FastifyRequest, reply: FastifyReply) {
     const { versionId } = VersionParamsSchema.parse(req.params);
-    if (!(await assertOwnsArtifactVersion(req.server.prisma, req, reply, versionId))) return;
+    // The URL-param versionId guard is enforced by the preHandler hook.
     const data = AttachLineageSchema.parse(req.body);
-    // Both endpoints of the lineage edge must live in the caller's workspace.
+    // Body-derived guard: parentVersionId lives in req.body, so the
+    // route config can't cover it. Both endpoints of the lineage edge
+    // must live in the caller's workspace.
     if (!(await assertOwnsArtifactVersion(req.server.prisma, req, reply, data.parentVersionId))) return;
     try {
       const row = await this.artifactService.attachLineage(versionId, data.parentVersionId, data.type);
@@ -167,15 +158,14 @@ export class ArtifactHandler {
 
   async detachLineage(req: FastifyRequest, reply: FastifyReply) {
     const { versionId, parentVersionId } = LineageParamsSchema.parse(req.params);
-    if (!(await assertOwnsArtifactVersion(req.server.prisma, req, reply, versionId))) return;
-    if (!(await assertOwnsArtifactVersion(req.server.prisma, req, reply, parentVersionId))) return;
+    // Both endpoint guards are enforced by the preHandler hook (route
+    // declares an array rule covering both params).
     await this.artifactService.detachLineage(versionId, parentVersionId);
     reply.status(204).send();
   }
 
   async listLineage(req: FastifyRequest, reply: FastifyReply) {
     const { versionId } = VersionParamsSchema.parse(req.params);
-    if (!(await assertOwnsArtifactVersion(req.server.prisma, req, reply, versionId))) return;
     const lineage = await this.artifactService.listLineage(versionId);
     reply.send(lineage);
   }

@@ -8,6 +8,10 @@ export async function logLineRoutes(app: FastifyInstance) {
   const runService = new RunService(app.prisma);
   const handler = new LogLineHandler(logLineService, runService);
 
-  app.post("/runs/:runId/logs", handler.log.bind(handler));
-  app.get("/runs/:runId/logs", handler.list.bind(handler));
+  app.post("/runs/:runId/logs", {
+    config: { authz: { kind: "run", param: "runId" } },
+  }, handler.log.bind(handler));
+  app.get("/runs/:runId/logs", {
+    config: { authz: { kind: "run", param: "runId" } },
+  }, handler.list.bind(handler));
 }

@@ -2,7 +2,6 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { MetricService } from "./service.js";
 import { ListMetricsQuerySchema, LogMetricsSchema, type ListMetricsQuery } from "./schema.js";
 import { RunService } from "../run/service.js";
-import { assertOwnsRun } from "../../core/authz/assert-workspace.js";
 
 export class MetricHandler {
   constructor(
@@ -14,7 +13,8 @@ export class MetricHandler {
     req: FastifyRequest<{ Params: { runId: string } }>,
     reply: FastifyReply,
   ) {
-    if (!(await assertOwnsRun(req.server.prisma, req, reply, req.params.runId))) return;
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = LogMetricsSchema.parse(req.body);
     const run = await this.runService.getByRunId(req.params.runId);
     if (!run) {
@@ -29,7 +29,6 @@ export class MetricHandler {
     req: FastifyRequest<{ Params: { runId: string }; Querystring: ListMetricsQuery }>,
     reply: FastifyReply,
   ) {
-    if (!(await assertOwnsRun(req.server.prisma, req, reply, req.params.runId))) return;
     const query = ListMetricsQuerySchema.parse(req.query);
     const run = await this.runService.getByRunId(req.params.runId);
     if (!run) {

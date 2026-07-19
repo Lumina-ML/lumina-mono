@@ -7,11 +7,6 @@ import {
   PatchRegistryModelVersionSchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
-import {
-  assertOwnsProject,
-  assertOwnsRegistryModel,
-  assertOwnsRegistryModelVersion,
-} from "../../core/authz/assert-workspace.js";
 
 const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
 const ModelParamsSchema = z.object({ modelId: z.string().uuid() });
@@ -25,7 +20,8 @@ export class RegistryModelHandler {
 
   async createRegistryModel(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
-    if (!(await assertOwnsProject(req.server.prisma, req, reply, projectId))) return;
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = CreateRegistryModelSchema.parse(req.body);
     const model = await this.registryModelService.createRegistryModel(projectId, data);
     reply.status(201).send(model);
@@ -33,14 +29,12 @@ export class RegistryModelHandler {
 
   async listRegistryModels(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
-    if (!(await assertOwnsProject(req.server.prisma, req, reply, projectId))) return;
     const models = await this.registryModelService.listByProject(projectId);
     reply.send({ items: models });
   }
 
   async getRegistryModel(req: FastifyRequest, reply: FastifyReply) {
     const { modelId } = ModelParamsSchema.parse(req.params);
-    if (!(await assertOwnsRegistryModel(req.server.prisma, req, reply, modelId))) return;
     const model = await this.registryModelService.findById(modelId);
     if (!model) {
       reply.status(404).send({ error: "Registry model not found" });
@@ -51,7 +45,6 @@ export class RegistryModelHandler {
 
   async createVersion(req: FastifyRequest, reply: FastifyReply) {
     const { modelId } = ModelParamsSchema.parse(req.params);
-    if (!(await assertOwnsRegistryModel(req.server.prisma, req, reply, modelId))) return;
     const data = CreateRegistryModelVersionSchema.parse(req.body);
     const version = await this.registryModelService.createVersion(modelId, data);
     reply.status(201).send(version);
@@ -59,14 +52,12 @@ export class RegistryModelHandler {
 
   async listVersions(req: FastifyRequest, reply: FastifyReply) {
     const { modelId } = ModelParamsSchema.parse(req.params);
-    if (!(await assertOwnsRegistryModel(req.server.prisma, req, reply, modelId))) return;
     const versions = await this.registryModelService.listVersionsByModel(modelId);
     reply.send({ items: versions });
   }
 
   async getVersion(req: FastifyRequest, reply: FastifyReply) {
     const { versionId } = VersionParamsSchema.parse(req.params);
-    if (!(await assertOwnsRegistryModelVersion(req.server.prisma, req, reply, versionId))) return;
     const version = await this.registryModelService.findVersionById(versionId);
     if (!version) {
       reply.status(404).send({ error: "Registry model version not found" });
@@ -77,7 +68,6 @@ export class RegistryModelHandler {
 
   async patchVersion(req: FastifyRequest, reply: FastifyReply) {
     const { versionId } = VersionParamsSchema.parse(req.params);
-    if (!(await assertOwnsRegistryModelVersion(req.server.prisma, req, reply, versionId))) return;
     const data = PatchRegistryModelVersionSchema.parse(req.body);
     const version = await this.registryModelService.updateVersion(versionId, data);
     reply.send(version);

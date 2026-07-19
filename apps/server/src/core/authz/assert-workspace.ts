@@ -4,16 +4,228 @@ import type { PrismaClient } from "../../generated/prisma/index.js";
 /**
  * Workspace-ownership guards for resource handlers.
  *
- * Each helper resolves a row's parent workspace and 404s if it doesn't
- * match `req.workspaceId`. We deliberately use 404 (not 403) so a user
- * in workspace A can't enumerate which IDs exist in workspace B by
- * distinguishing 403 from 404.
+ * Two layers, kept in one module so the lookup logic is the single
+ * source of truth:
  *
- * Call these as the FIRST line in a detail handler. They mutate `reply`
- * and return `boolean` for an `if (!assertOwns...(...)) return;` style,
- * mirroring the existing `requireAuth(req, reply)` pattern in
- * `apps/server/src/plugins/auth.ts`.
+ *   1. **`lookup*(prisma, id): Promise<string | null>`** — the raw
+ *      Prisma query that returns the row's `workspaceId` (or `null`
+ *      when the row doesn't exist). The `workspaceGuardPlugin`
+ *      preHandler hook reads these for URL-param-driven authorization
+ *      via `config.authz` on each route.
+ *
+ *   2. **`assertOwns*(prisma, req, reply, id)`** — thin wrappers that
+ *      call `lookup*` and 404 if the result doesn't match
+ *      `req.workspaceId`. Still used inline for the two cases the route
+ *      config can't express: body-derived IDs in
+ *      `artifact.attachLineage` and `tag.attachToRun`. New handlers
+ *      should set `config.authz` on the route and let the preHandler
+ *      hook do the work.
+ *
+ * Both layers deliberately use 404 (not 403) so a user in workspace A
+ * can't enumerate which IDs exist in workspace B by distinguishing 403
+ * from 404.
  */
+
+/** Look up a project's workspaceId. Returns null if the row is missing. */
+export async function lookupProject(
+  prisma: PrismaClient,
+  projectId: string,
+): Promise<string | null> {
+  const row = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { workspaceId: true },
+  });
+  return row?.workspaceId ?? null;
+}
+
+/** Look up a run's workspaceId via Run → Project → Workspace. */
+export async function lookupRun(
+  prisma: PrismaClient,
+  runId: string,
+): Promise<string | null> {
+  const row = await prisma.run.findUnique({
+    where: { runId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return row?.project.workspaceId ?? null;
+}
+
+/** Look up an artifact's workspaceId via Artifact → Project → Workspace. */
+export async function lookupArtifact(
+  prisma: PrismaClient,
+  artifactId: string,
+): Promise<string | null> {
+  const row = await prisma.artifact.findUnique({
+    where: { id: artifactId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return row?.project.workspaceId ?? null;
+}
+
+/** Look up an artifact version's workspaceId. */
+export async function lookupArtifactVersion(
+  prisma: PrismaClient,
+  versionId: string,
+): Promise<string | null> {
+  const row = await prisma.artifactVersion.findUnique({
+    where: { id: versionId },
+    select: { artifact: { select: { project: { select: { workspaceId: true } } } } },
+  });
+  return row?.artifact.project.workspaceId ?? null;
+}
+
+/** Look up a registry model's workspaceId. */
+export async function lookupRegistryModel(
+  prisma: PrismaClient,
+  modelId: string,
+): Promise<string | null> {
+  const row = await prisma.registryModel.findUnique({
+    where: { id: modelId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return row?.project.workspaceId ?? null;
+}
+
+/** Look up a registry model version's workspaceId. */
+export async function lookupRegistryModelVersion(
+  prisma: PrismaClient,
+  versionId: string,
+): Promise<string | null> {
+  const row = await prisma.registryModelVersion.findUnique({
+    where: { id: versionId },
+    select: { registryModel: { select: { project: { select: { workspaceId: true } } } } },
+  });
+  return row?.registryModel.project.workspaceId ?? null;
+}
+
+/** Look up an evaluation's workspaceId. */
+export async function lookupEvaluation(
+  prisma: PrismaClient,
+  evaluationId: string,
+): Promise<string | null> {
+  const row = await prisma.evaluation.findUnique({
+    where: { id: evaluationId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return row?.project.workspaceId ?? null;
+}
+
+/** Look up a trace's workspaceId. */
+export async function lookupTrace(
+  prisma: PrismaClient,
+  traceId: string,
+): Promise<string | null> {
+  const row = await prisma.trace.findUnique({
+    where: { traceId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return row?.project.workspaceId ?? null;
+}
+
+/** Look up a span's workspaceId via Span → Trace → Project → Workspace. */
+export async function lookupSpan(
+  prisma: PrismaClient,
+  spanId: string,
+): Promise<string | null> {
+  const row = await prisma.span.findUnique({
+    where: { spanId },
+    select: { trace: { select: { project: { select: { workspaceId: true } } } } },
+  });
+  return row?.trace.project.workspaceId ?? null;
+}
+
+/** Look up a report's workspaceId. */
+export async function lookupReport(
+  prisma: PrismaClient,
+  reportId: string,
+): Promise<string | null> {
+  const row = await prisma.report.findUnique({
+    where: { id: reportId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return row?.project.workspaceId ?? null;
+}
+
+/** Look up a run-media row's workspaceId. */
+export async function lookupRunMedia(
+  prisma: PrismaClient,
+  runMediaId: string,
+): Promise<string | null> {
+  const row = await prisma.runMedia.findUnique({
+    where: { id: runMediaId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return row?.project.workspaceId ?? null;
+}
+
+/** Look up a sweep's workspaceId. */
+export async function lookupSweep(
+  prisma: PrismaClient,
+  sweepId: string,
+): Promise<string | null> {
+  const row = await prisma.sweep.findUnique({
+    where: { id: sweepId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return row?.project.workspaceId ?? null;
+}
+
+/** Look up a launch queue's workspaceId via LaunchQueue → Project. */
+export async function lookupLaunchQueue(
+  prisma: PrismaClient,
+  queueId: string,
+): Promise<string | null> {
+  const row = await prisma.launchQueue.findUnique({
+    where: { id: queueId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return row?.project.workspaceId ?? null;
+}
+
+/** Look up a launch job's workspaceId via LaunchJob → Project. */
+export async function lookupLaunchJob(
+  prisma: PrismaClient,
+  jobId: string,
+): Promise<string | null> {
+  const row = await prisma.launchJob.findUnique({
+    where: { id: jobId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return row?.project.workspaceId ?? null;
+}
+
+/** Look up a launch run's workspaceId via LaunchRun → Queue → Project. */
+export async function lookupLaunchRun(
+  prisma: PrismaClient,
+  runId: string,
+): Promise<string | null> {
+  const row = await prisma.launchRun.findUnique({
+    where: { id: runId },
+    select: { queue: { select: { project: { select: { workspaceId: true } } } } },
+  });
+  return row?.queue.project.workspaceId ?? null;
+}
+
+/** Look up a tag's projectId (then project workspaceId). */
+export async function lookupTag(
+  prisma: PrismaClient,
+  tagId: string,
+): Promise<string | null> {
+  const row = await prisma.tag.findUnique({
+    where: { id: tagId },
+    select: { projectId: true },
+  });
+  if (!row) return null;
+  return lookupProject(prisma, row.projectId);
+}
+
+// ── Inline wrappers (body-derived cases only) ──────────────────────────
+//
+// Kept for the two cases that read IDs from `req.body`:
+// `attachLineage` (artifact/handler.ts) and `attachToRun` (tag/handler.ts).
+// New handlers should NOT call these for URL-param IDs — set
+// `config.authz` on the route and the preHandler hook does the work.
+
 async function checkWorkspace(
   prisma: PrismaClient,
   req: FastifyRequest,
@@ -25,361 +237,36 @@ async function checkWorkspace(
     reply.status(404).send({ error: notFoundMessage });
     return false;
   }
-  // Touch prisma so callers don't need to import it just to silence
-  // unused-var; also lets tests inject a fake via the app decorator.
   void prisma;
   return true;
 }
 
-/** Authorize a projectId route. Use when the URL is `/projects/:projectId/...`. */
-export async function assertOwnsProject(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  projectId: string,
-): Promise<boolean> {
-  const row = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { workspaceId: true },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.workspaceId,
-    "Project not found",
-  );
-}
-
-/**
- * Authorize a runId route. The Run → Project → Workspace chain is one
- * indexed hop via the existing `runId @unique` index plus the FK.
- */
-export async function assertOwnsRun(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  runId: string,
-): Promise<boolean> {
-  const row = await prisma.run.findUnique({
-    where: { runId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    "Run not found",
-  );
-}
-
-/** Authorize a runId route for child tables that denormalise projectId. */
-export async function assertOwnsRunChild(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  args: {
-    runId: string;
-    child: "metric" | "systemMetric" | "logLine";
-    notFoundMessage: string;
-  },
-): Promise<boolean> {
-  // The metric / systemMetric / logLine tables all store `projectId`
-  // directly, so we can check the run's workspace in one hop without
-  // joining through the run row.
-  const row = await prisma.run.findUnique({
-    where: { runId: args.runId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    args.notFoundMessage,
-  );
-}
-
-/** Authorize an artifact detail route by artifactId. */
-export async function assertOwnsArtifact(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  artifactId: string,
-): Promise<boolean> {
-  const row = await prisma.artifact.findUnique({
-    where: { id: artifactId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    "Artifact not found",
-  );
-}
-
-/** Authorize an artifactVersionId route (artifact/lineage endpoints). */
 export async function assertOwnsArtifactVersion(
   prisma: PrismaClient,
   req: FastifyRequest,
   reply: FastifyReply,
   versionId: string,
 ): Promise<boolean> {
-  const row = await prisma.artifactVersion.findUnique({
-    where: { id: versionId },
-    select: { artifact: { select: { project: { select: { workspaceId: true } } } } },
-  });
   return checkWorkspace(
     prisma,
     req,
     reply,
-    row?.artifact.project.workspaceId,
+    await lookupArtifactVersion(prisma, versionId),
     "Artifact version not found",
   );
 }
 
-/** Authorize a registryModelId route. */
-export async function assertOwnsRegistryModel(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  modelId: string,
-): Promise<boolean> {
-  const row = await prisma.registryModel.findUnique({
-    where: { id: modelId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    "Registry model not found",
-  );
-}
-
-/** Authorize a registryModelVersionId route. */
-export async function assertOwnsRegistryModelVersion(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  versionId: string,
-): Promise<boolean> {
-  const row = await prisma.registryModelVersion.findUnique({
-    where: { id: versionId },
-    select: { registryModel: { select: { project: { select: { workspaceId: true } } } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.registryModel.project.workspaceId,
-    "Registry model version not found",
-  );
-}
-
-/** Authorize an evaluationId route. */
-export async function assertOwnsEvaluation(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  evaluationId: string,
-): Promise<boolean> {
-  const row = await prisma.evaluation.findUnique({
-    where: { id: evaluationId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    "Evaluation not found",
-  );
-}
-
-/** Authorize a traceId route. */
-export async function assertOwnsTrace(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  traceId: string,
-): Promise<boolean> {
-  const row = await prisma.trace.findUnique({
-    where: { traceId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    "Trace not found",
-  );
-}
-
-/** Authorize a spanId route (joins through trace → project). */
-export async function assertOwnsSpan(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  spanId: string,
-): Promise<boolean> {
-  const row = await prisma.span.findUnique({
-    where: { spanId },
-    select: { trace: { select: { project: { select: { workspaceId: true } } } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.trace.project.workspaceId,
-    "Span not found",
-  );
-}
-
-/** Authorize a reportId route. */
-export async function assertOwnsReport(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  reportId: string,
-): Promise<boolean> {
-  const row = await prisma.report.findUnique({
-    where: { id: reportId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    "Report not found",
-  );
-}
-
-/** Authorize a runMediaId route. */
-export async function assertOwnsRunMedia(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  runMediaId: string,
-): Promise<boolean> {
-  const row = await prisma.runMedia.findUnique({
-    where: { id: runMediaId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    "Run media not found",
-  );
-}
-
-/** Authorize a sweepId route. */
-export async function assertOwnsSweep(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  sweepId: string,
-): Promise<boolean> {
-  const row = await prisma.sweep.findUnique({
-    where: { id: sweepId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    "Sweep not found",
-  );
-}
-
-/**
- * Authorize a launchQueueId / launchJobId / launchRunId route. All three
- * routes hang off a single project, so they share this helper.
- */
-export async function assertOwnsLaunchQueue(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  queueId: string,
-): Promise<boolean> {
-  const row = await prisma.launchQueue.findUnique({
-    where: { id: queueId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    "Launch queue not found",
-  );
-}
-
-export async function assertOwnsLaunchJob(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  jobId: string,
-): Promise<boolean> {
-  const row = await prisma.launchJob.findUnique({
-    where: { id: jobId },
-    select: { project: { select: { workspaceId: true } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.project.workspaceId,
-    "Launch job not found",
-  );
-}
-
-export async function assertOwnsLaunchRun(
-  prisma: PrismaClient,
-  req: FastifyRequest,
-  reply: FastifyReply,
-  runId: string,
-): Promise<boolean> {
-  const row = await prisma.launchRun.findUnique({
-    where: { id: runId },
-    select: { queue: { select: { project: { select: { workspaceId: true } } } } },
-  });
-  return checkWorkspace(
-    prisma,
-    req,
-    reply,
-    row?.queue.project.workspaceId,
-    "Launch run not found",
-  );
-}
-
-/**
- * Authorize a tag detail route by tagId. Tags live on projects (for
- * project-wide tags) or get attached to runs (for run-scoped tags);
- * both share `projectId` on the tag row itself.
- */
 export async function assertOwnsTag(
   prisma: PrismaClient,
   req: FastifyRequest,
   reply: FastifyReply,
   tagId: string,
 ): Promise<boolean> {
-  const row = await prisma.tag.findUnique({
-    where: { id: tagId },
-    select: { projectId: true },
-  });
-  if (!row) {
-    reply.status(404).send({ error: "Tag not found" });
-    return false;
-  }
-  return assertOwnsProject(prisma, req, reply, row.projectId);
+  return checkWorkspace(
+    prisma,
+    req,
+    reply,
+    await lookupTag(prisma, tagId),
+    "Tag not found",
+  );
 }

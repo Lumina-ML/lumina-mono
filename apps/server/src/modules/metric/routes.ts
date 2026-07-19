@@ -8,6 +8,10 @@ export async function metricRoutes(app: FastifyInstance) {
   const runService = new RunService(app.prisma);
   const handler = new MetricHandler(metricService, runService);
 
-  app.post("/runs/:runId/metrics", handler.log.bind(handler));
-  app.get("/runs/:runId/metrics", handler.list.bind(handler));
+  app.post("/runs/:runId/metrics", {
+    config: { authz: { kind: "run", param: "runId" } },
+  }, handler.log.bind(handler));
+  app.get("/runs/:runId/metrics", {
+    config: { authz: { kind: "run", param: "runId" } },
+  }, handler.list.bind(handler));
 }

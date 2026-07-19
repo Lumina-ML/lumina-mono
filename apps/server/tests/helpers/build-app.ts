@@ -10,6 +10,7 @@ import { NoopTelemetry } from "../../src/infra/noop/noop-telemetry.js";
 import { LocalObjectStorage } from "../../src/infra/storage/local.js";
 import type { ServerConfig } from "../../src/config/index.js";
 import type { PrismaClient } from "../../src/generated/prisma/index.js";
+import { workspaceGuardPlugin } from "../../src/plugins/workspace-guard.js";
 
 export interface BuildTestAppOptions {
   /** Override the in-memory event bus (e.g. with a real Redis bus). */
@@ -127,6 +128,12 @@ export async function buildTestApp(
       }
     }
   });
+
+  // Register the workspace guard so route-level `config.authz` rules
+  // are enforced the same way they are in production. Tests that want
+  // to exercise cross-workspace isolation pin `req.workspaceId` via
+  // their own `onRequest` hook (see tests/modules/workspace-isolation).
+  await app.register(workspaceGuardPlugin);
 
   return app;
 }

@@ -10,7 +10,13 @@ export async function runRoutes(app: FastifyInstance) {
 
   app.post("/runs", handler.create.bind(handler));
   app.get("/runs", handler.list.bind(handler));
-  app.get("/runs/:id", handler.getById.bind(handler));
-  app.patch("/runs/:id", handler.update.bind(handler));
-  app.delete("/runs/:id", handler.delete.bind(handler));
+  app.get("/runs/:id", {
+    config: { authz: { kind: "run", param: "id" } },
+  }, handler.getById.bind(handler));
+  app.patch("/runs/:id", {
+    config: { authz: { kind: "run", param: "id" } },
+  }, handler.update.bind(handler));
+  app.delete("/runs/:id", {
+    config: { authz: { kind: "run", param: "id" } },
+  }, handler.delete.bind(handler));
 }

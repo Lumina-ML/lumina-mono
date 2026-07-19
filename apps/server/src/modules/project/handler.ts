@@ -1,7 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { ProjectService } from "./service.js";
 import { CreateProjectSchema, ListProjectsQuerySchema, ProjectParamsSchema, UpdateProjectSchema } from "./schema.js";
-import { assertOwnsProject } from "../../core/authz/assert-workspace.js";
 
 export class ProjectHandler {
   constructor(private readonly service: ProjectService) { }
@@ -20,7 +19,8 @@ export class ProjectHandler {
 
   async getById(req: FastifyRequest, reply: FastifyReply) {
     const { id } = ProjectParamsSchema.parse(req.params);
-    if (!(await assertOwnsProject(req.server.prisma, req, reply, id))) return;
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const project = await this.service.findById(id);
     if (!project) {
       reply.status(404).send({ error: "Project not found" });
@@ -31,7 +31,6 @@ export class ProjectHandler {
 
   async update(req: FastifyRequest, reply: FastifyReply) {
     const { id } = ProjectParamsSchema.parse(req.params);
-    if (!(await assertOwnsProject(req.server.prisma, req, reply, id))) return;
     const data = UpdateProjectSchema.parse(req.body);
     const project = await this.service.update(id, data);
     reply.send(project);
@@ -39,7 +38,6 @@ export class ProjectHandler {
 
   async delete(req: FastifyRequest, reply: FastifyReply) {
     const { id } = ProjectParamsSchema.parse(req.params);
-    if (!(await assertOwnsProject(req.server.prisma, req, reply, id))) return;
     await this.service.delete(id);
     reply.status(204).send();
   }

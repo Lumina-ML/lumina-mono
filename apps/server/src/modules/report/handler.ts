@@ -7,10 +7,6 @@ import {
   ListReportsQuerySchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
-import {
-  assertOwnsProject,
-  assertOwnsReport,
-} from "../../core/authz/assert-workspace.js";
 
 const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
 const ReportParamsSchema = z.object({ reportId: z.string().uuid() });
@@ -23,7 +19,8 @@ export class ReportHandler {
 
   async createReport(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
-    if (!(await assertOwnsProject(req.server.prisma, req, reply, projectId))) return;
+    // Workspace ownership is enforced by the `workspaceGuardPlugin`
+    // preHandler hook via `config.authz` on this route.
     const data = CreateReportSchema.parse(req.body);
     const report = await this.reportService.createReport(projectId, data);
     reply.status(201).send(report);
@@ -31,7 +28,6 @@ export class ReportHandler {
 
   async listReports(req: FastifyRequest, reply: FastifyReply) {
     const { projectId } = ProjectParamsSchema.parse(req.params);
-    if (!(await assertOwnsProject(req.server.prisma, req, reply, projectId))) return;
     const reports = await this.reportService.listByProject(projectId);
     reply.send({ items: reports });
   }
@@ -53,7 +49,6 @@ export class ReportHandler {
 
   async getReport(req: FastifyRequest, reply: FastifyReply) {
     const { reportId } = ReportParamsSchema.parse(req.params);
-    if (!(await assertOwnsReport(req.server.prisma, req, reply, reportId))) return;
     const report = await this.reportService.findById(reportId);
     if (!report) {
       reply.status(404).send({ error: "Report not found" });
@@ -64,7 +59,6 @@ export class ReportHandler {
 
   async patchReport(req: FastifyRequest, reply: FastifyReply) {
     const { reportId } = ReportParamsSchema.parse(req.params);
-    if (!(await assertOwnsReport(req.server.prisma, req, reply, reportId))) return;
     const data = PatchReportSchema.parse(req.body);
     const report = await this.reportService.updateReport(reportId, data);
     reply.send(report);
@@ -72,7 +66,6 @@ export class ReportHandler {
 
   async deleteReport(req: FastifyRequest, reply: FastifyReply) {
     const { reportId } = ReportParamsSchema.parse(req.params);
-    if (!(await assertOwnsReport(req.server.prisma, req, reply, reportId))) return;
     await this.reportService.deleteReport(reportId);
     reply.status(204).send();
   }

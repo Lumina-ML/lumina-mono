@@ -8,7 +8,13 @@ export async function runMediaRoutes(app: FastifyInstance) {
   const projectService = new ProjectService(app.prisma);
   const handler = new RunMediaHandler(runMediaService, projectService);
 
-  app.post("/projects/:projectId/run-media", handler.createRunMedia.bind(handler));
-  app.get("/projects/:projectId/run-media", handler.listRunMedia.bind(handler));
-  app.get("/run-media/:runMediaId", handler.getRunMedia.bind(handler));
+  app.post("/projects/:projectId/run-media", {
+    config: { authz: { kind: "project", param: "projectId" } },
+  }, handler.createRunMedia.bind(handler));
+  app.get("/projects/:projectId/run-media", {
+    config: { authz: { kind: "project", param: "projectId" } },
+  }, handler.listRunMedia.bind(handler));
+  app.get("/run-media/:runMediaId", {
+    config: { authz: { kind: "runMedia", param: "runMediaId" } },
+  }, handler.getRunMedia.bind(handler));
 }
