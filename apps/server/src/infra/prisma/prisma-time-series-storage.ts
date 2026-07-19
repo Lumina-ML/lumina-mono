@@ -5,7 +5,7 @@ import type {
   TimeSeriesStorage,
   TimeSeriesTable,
 } from "../../core/storage/time-series-storage.js";
-import { toDate, toDateOrNull } from "../../utils/date.js";
+import { toDate } from "../../utils/date.js";
 
 
 export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
@@ -39,38 +39,6 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
           })),
         });
         break;
-      case "trace":
-        await this.prisma.trace.createMany({
-          data: rows.map((r) => ({
-            projectId: String(r.projectId),
-            runId: r.runId == null ? null : String(r.runId),
-            traceId: String(r.traceId),
-            name: String(r.name),
-            status: String(r.status ?? "ok") as any,
-            latencyMs: r.latencyMs == null ? null : Number(r.latencyMs),
-            metadata: (r.metadata as any) ?? {},
-            startedAt: toDate(r.startedAt),
-            finishedAt: toDateOrNull(r.finishedAt),
-          })),
-        });
-        break;
-      case "span":
-        await this.prisma.span.createMany({
-          data: rows.map((r) => ({
-            traceId: String(r.traceId),
-            parentSpanId: r.parentSpanId == null ? null : String(r.parentSpanId),
-            spanId: String(r.spanId),
-            name: String(r.name),
-            kind: String(r.kind ?? "internal") as any,
-            input: (r.input as any) ?? {},
-            output: (r.output as any) ?? {},
-            latencyMs: r.latencyMs == null ? null : Number(r.latencyMs),
-            status: String(r.status ?? "ok") as any,
-            startedAt: toDate(r.startedAt),
-            finishedAt: toDateOrNull(r.finishedAt),
-          })),
-        });
-        break;
       default:
         throw new Error(`Unsupported time series table: ${table}`);
     }
@@ -82,7 +50,7 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
     if (options.runId) where.runId = options.runId;
     if (options.projectId) where.projectId = options.projectId;
 
-    const timestampColumn = table === "span" ? "startedAt" : "timestamp";
+    const timestampColumn = this.timestampColumnFor(table);
     const timeFilter: Record<string, Date> = {};
     if (options.start) timeFilter.gte = options.start;
     if (options.end) timeFilter.lte = options.end;
@@ -105,12 +73,18 @@ export class PrismaTimeSeriesStorage implements TimeSeriesStorage {
         return this.prisma.logLine;
       case "system_metric":
         return this.prisma.systemMetric;
-      case "trace":
-        return this.prisma.trace;
-      case "span":
-        return this.prisma.span;
       default:
         throw new Error(`Unsupported time series table: ${table}`);
+    }
+  }
+
+  private timestampColumnFor(table: TimeSeriesTable): string {
+    switch (table) {
+      case "system_metric":
+        return "loggedAt";
+      case "log_line":
+      default:
+        return "timestamp";
     }
   }
 }

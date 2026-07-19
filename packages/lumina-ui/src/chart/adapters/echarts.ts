@@ -1,21 +1,22 @@
 import type { EChartsOption, SeriesOption, DataZoomComponentOption } from "echarts";
 import type {
   ChartAxis,
+  ChartBrush,
   ChartConfig,
   ChartDataZoom,
   ChartLegend,
   ChartPerformance,
   ChartSeries,
+  ChartToolbox,
   ChartTooltip,
 } from "../types";
-import { getChartThemeColors } from "../theme";
+import type { ChartThemeColors } from "../theme";
+import { getChartThemeColors, resolveHsl } from "../theme";
 
 const DEFAULT_SAMPLING_THRESHOLD = 2_000;
 const DEFAULT_LARGE_THRESHOLD = 20_000;
 
-function buildAxisBase(axis: ChartAxis) {
-  const theme = getChartThemeColors();
-
+function buildAxisBase(axis: ChartAxis, theme: ChartThemeColors) {
   return {
     type: axis.type as any,
     name: axis.name,
@@ -48,12 +49,12 @@ function buildAxisBase(axis: ChartAxis) {
   };
 }
 
-function buildXAxis(axis: ChartAxis): EChartsOption["xAxis"] {
-  return buildAxisBase(axis) as EChartsOption["xAxis"];
+function buildXAxis(axis: ChartAxis, theme: ChartThemeColors): EChartsOption["xAxis"] {
+  return buildAxisBase(axis, theme) as EChartsOption["xAxis"];
 }
 
-function buildYAxis(axis: ChartAxis): EChartsOption["yAxis"] {
-  return buildAxisBase(axis) as EChartsOption["yAxis"];
+function buildYAxis(axis: ChartAxis, theme: ChartThemeColors): EChartsOption["yAxis"] {
+  return buildAxisBase(axis, theme) as EChartsOption["yAxis"];
 }
 
 function applyPerformance(
@@ -125,7 +126,7 @@ function buildSeries(series: ChartSeries, performance?: ChartPerformance): Serie
   }
 }
 
-function buildLegend(legend: ChartLegend | undefined): EChartsOption["legend"] {
+function buildLegend(legend: ChartLegend | undefined, theme: ChartThemeColors): EChartsOption["legend"] {
   if (legend?.show === false) return { show: false };
 
   const positionMap: Record<string, string> = {
@@ -139,13 +140,11 @@ function buildLegend(legend: ChartLegend | undefined): EChartsOption["legend"] {
     show: legend?.show ?? true,
     [positionMap[legend?.position ?? "bottom"]]: 0,
     type: legend?.type ?? "scroll",
-    textStyle: { color: getChartThemeColors().mutedTextColor },
+    textStyle: { color: theme.mutedTextColor },
   };
 }
 
-function buildTooltip(tooltip: ChartTooltip | undefined): EChartsOption["tooltip"] {
-  const theme = getChartThemeColors();
-
+function buildTooltip(tooltip: ChartTooltip | undefined, theme: ChartThemeColors): EChartsOption["tooltip"] {
   return {
     trigger: tooltip?.trigger ?? "axis",
     axisPointer:
@@ -165,7 +164,7 @@ function buildTooltip(tooltip: ChartTooltip | undefined): EChartsOption["tooltip
   };
 }
 
-function buildDataZoom(dz: ChartDataZoom): DataZoomComponentOption {
+function buildDataZoom(dz: ChartDataZoom, theme: ChartThemeColors): DataZoomComponentOption {
   const base = {
     type: dz.type,
     xAxisIndex: dz.xAxisIndex,
@@ -180,20 +179,83 @@ function buildDataZoom(dz: ChartDataZoom): DataZoomComponentOption {
       bottom: 0,
       height: 20,
       borderColor: "transparent",
-      fillerColor: "hsl(var(--ldl-primary) / 0.2)",
-      handleStyle: { color: "hsl(var(--ldl-primary))" },
-      textStyle: { color: getChartThemeColors().mutedTextColor },
+      fillerColor: resolveHsl("--primary", 0.2),
+      handleStyle: { color: resolveHsl("--primary") },
+      textStyle: { color: theme.mutedTextColor },
     } as DataZoomComponentOption;
   }
 
   return base as DataZoomComponentOption;
 }
 
+function buildToolbox(
+  toolbox: ChartToolbox | undefined,
+  theme: ChartThemeColors,
+): EChartsOption["toolbox"] {
+  const show = toolbox?.show ?? true;
+  if (!show) return { show: false };
+
+  return {
+    show: true,
+    right: 12,
+    top: 0,
+    itemSize: 14,
+    itemGap: 12,
+    iconStyle: {
+      borderColor: theme.mutedTextColor,
+    },
+    emphasis: {
+      iconStyle: {
+        borderColor: theme.textColor,
+      },
+    },
+    feature: {
+      saveAsImage:
+        toolbox?.saveAsImage === false
+          ? undefined
+          : {
+              show: true,
+              title: "Save",
+              pixelRatio: 2,
+            },
+      dataZoom:
+        toolbox?.dataZoom === false
+          ? undefined
+          : {
+              show: true,
+              title: { zoom: "Zoom", back: "Reset" },
+            },
+      restore:
+        toolbox?.restore === false
+          ? undefined
+          : {
+              show: true,
+              title: "Reset",
+            },
+    },
+  };
+}
+
+function buildBrush(brush: ChartBrush | undefined): EChartsOption["brush"] {
+  if (!brush) return undefined;
+
+  return {
+    toolbox: ["rect", "polygon", "lineX", "lineY", "keep", "clear"],
+    xAxisIndex: brush.xAxisIndex ?? 0,
+    yAxisIndex: brush.yAxisIndex,
+    throttleType: "debounce",
+    throttleDelay: 300,
+  };
+}
+
 /**
  * 把 Lumina ChartConfig 转成 ECharts option。
  */
-export function toEChartsOption(config: ChartConfig): EChartsOption {
-  const theme = getChartThemeColors();
+export function toEChartsOption(
+  config: ChartConfig,
+  themeColors?: ChartThemeColors,
+): EChartsOption {
+  const theme = themeColors ?? getChartThemeColors();
 
   return {
     backgroundColor: config.backgroundColor ?? theme.backgroundColor,
@@ -205,8 +267,10 @@ export function toEChartsOption(config: ChartConfig): EChartsOption {
           textStyle: { fontSize: 14, fontWeight: "normal", color: theme.textColor },
         }
       : undefined,
-    tooltip: buildTooltip(config.tooltip),
-    legend: buildLegend(config.legend),
+    tooltip: buildTooltip(config.tooltip, theme),
+    legend: buildLegend(config.legend, theme),
+    toolbox: buildToolbox(config.toolbox, theme),
+    brush: buildBrush(config.brush),
     grid: {
       left: config.grid?.left ?? "3%",
       right: config.grid?.right ?? "4%",
@@ -214,9 +278,11 @@ export function toEChartsOption(config: ChartConfig): EChartsOption {
       bottom: config.grid?.bottom ?? "15%",
       containLabel: config.grid?.containLabel ?? true,
     },
-    xAxis: buildXAxis(config.xAxis),
-    yAxis: buildYAxis(config.yAxis),
-    dataZoom: config.dataZoom?.map(buildDataZoom) as DataZoomComponentOption[] | undefined,
+    xAxis: buildXAxis(config.xAxis, theme),
+    yAxis: buildYAxis(config.yAxis, theme),
+    dataZoom: config.dataZoom?.map((dz) => buildDataZoom(dz, theme)) as
+      | DataZoomComponentOption[]
+      | undefined,
     series: config.series.map((s) => buildSeries(s, config.performance)) as SeriesOption[],
     animation: config.animation?.enabled ?? true,
     animationDuration: config.animation?.duration ?? 300,

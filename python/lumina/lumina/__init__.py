@@ -24,7 +24,13 @@ lumina.wandb_lib = wandb_sdk.lib
 # backend path for init/log/finish. Otherwise fall back to WandB behavior.
 from lumina.backend import LuminaClient, LuminaRun, get_run_context, reset_run_context
 from lumina.backend.client import set_api_key
-from lumina.backend.artifact import LuminaArtifact, use_lumina_artifact
+from lumina.backend.artifact import (
+    LuminaArtifact,
+    artifact_lineage,
+    link_artifacts,
+    unlink_artifacts,
+    use_lumina_artifact,
+)
 from lumina.backend.model_registry import log_model as _lumina_log_model
 from lumina.backend.model_registry import use_model as _lumina_use_model
 from lumina.backend.model_registry import link_model as _lumina_link_model
@@ -367,4 +373,4 @@ if 'dev' in __version__:
     import lumina.env
     import os
     os.environ[lumina.env.ERROR_REPORTING] = os.environ.get(lumina.env.ERROR_REPORTING, 'false')
-__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'LuminaRun', 'log_media', 'login', 'launch', 'launch_agent', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run')
+__all__ = ('__version__', 'init', 'finish', 'setup', 'save', 'sweep', 'controller', 'agent', 'config', 'log', 'summary', 'join', 'Api', 'Graph', 'Image', 'Plotly', 'Video', 'Audio', 'Table', 'EvalTable', 'Html', 'box3d', 'Object3D', 'Molecule', 'Histogram', 'ArtifactTTL', 'log_artifact', 'use_artifact', 'log_model', 'use_model', 'link_model', 'init_eval', 'log_eval_result', 'finish_eval', 'trace', 'span', 'start_trace', 'finish_trace', 'start_span', 'finish_span', 'LuminaReport', 'LuminaTable', 'LuminaRun', 'log_media', 'login', 'launch', 'launch_agent', 'define_metric', 'watch', 'unwatch', 'plot_table', 'Run', 'link_artifacts', 'unlink_artifacts', 'artifact_lineage')

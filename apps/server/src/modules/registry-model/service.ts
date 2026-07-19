@@ -66,13 +66,20 @@ export class RegistryModelService {
     return `v${count + 1}`;
   }
 
-  private async enrichFilesWithUrls(files: Array<{ storageKey: string; size: bigint } & Record<string, unknown>>) {
+  private async enrichFilesWithUrls(
+    files: Array<{ storageKey: string | null; size: bigint } & Record<string, unknown>>,
+  ) {
     return Promise.all(
-      files.map(async (file) => ({
-        ...file,
-        size: file.size.toString(),
-        downloadUrl: await this.storage.getDownloadUrl(file.storageKey),
-      })),
+      files.map(async (file) => {
+        const enriched: Record<string, unknown> = {
+          ...file,
+          size: file.size.toString(),
+        };
+        if (file.storageKey) {
+          enriched.downloadUrl = await this.storage.getDownloadUrl(file.storageKey);
+        }
+        return enriched;
+      }),
     );
   }
 }

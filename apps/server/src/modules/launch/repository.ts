@@ -122,6 +122,39 @@ export class LaunchRepository {
     });
   }
 
+  async findOldestPendingId(queueId: string): Promise<string | null> {
+    const row = await this.prisma.launchRun.findFirst({
+      where: { queueId, status: "pending" },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    return row?.id ?? null;
+  }
+
+  /**
+   * Atomically claim a single pending run for `queueId`. Uses a
+   * compare-and-set update so two concurrent agents can't both win the same
+   * run. Returns the claimed row (with job + run joined) or `null` if
+   * nothing was pending, or if another worker claimed it first.
+   */
+  async claimNextPendingRun(queueId: string): Promise<unknown> {
+    const id = await this.findOldestPendingId(queueId);
+    if (!id) return null;
+    const { count } = await this.prisma.launchRun.updateMany({
+      where: { id, status: "pending" },
+      data: { status: "running" },
+    });
+    if (count === 0) {
+      // Lost the race; another worker grabbed it. Retry once.
+      return this.claimNextPendingRun(queueId);
+    }
+    return this.prisma.launchRun.findUnique({
+      where: { id },
+      include: { queue: true, job: true, run: true },
+    });
+  }
+
+  /** Backwards-compatible non-atomic read used by tests/legacy callers. */
   async getNextPendingRun(queueId: string) {
     return this.prisma.launchRun.findFirst({
       where: { queueId, status: "pending" },

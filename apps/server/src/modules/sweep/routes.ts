@@ -15,4 +15,9 @@ export async function sweepRoutes(app: FastifyInstance) {
   app.get("/sweeps/:sweepId", handler.getById.bind(handler));
   app.patch("/sweeps/:sweepId", handler.update.bind(handler));
   app.delete("/sweeps/:sweepId", handler.delete.bind(handler));
+
+  app.get("/sweeps/:sweepId/observations", handler.listObservations.bind(handler));
+  app.post("/sweeps/:sweepId/suggest", handler.suggest.bind(handler));
+  app.post("/sweeps/:sweepId/should-terminate", handler.shouldTerminate.bind(handler));
+  app.post("/sweeps/:sweepId/record-best", handler.recordBestRun.bind(handler));
 }

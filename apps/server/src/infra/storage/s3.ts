@@ -62,6 +62,24 @@ export class S3ObjectStorage implements ObjectStorage {
     await this.client.send(command);
   }
 
+  async put(key: string, data: Buffer): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({ Bucket: this.config.bucket, Key: key, Body: data }),
+    );
+  }
+
+  async getBuffer(key: string): Promise<Buffer> {
+    const res = await this.client.send(
+      new GetObjectCommand({ Bucket: this.config.bucket, Key: key }),
+    );
+    const stream = res.Body as { transformToByteArray?: () => Promise<Uint8Array> } | undefined;
+    if (!stream?.transformToByteArray) {
+      throw new Error(`S3ObjectStorage: cannot read body for key ${key}`);
+    }
+    const bytes = await stream.transformToByteArray();
+    return Buffer.from(bytes);
+  }
+
   async ensureBucket() {
     try {
       await this.client.send(new HeadBucketCommand({ Bucket: this.config.bucket }));

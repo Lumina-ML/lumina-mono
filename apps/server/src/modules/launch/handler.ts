@@ -118,7 +118,9 @@ export class LaunchHandler {
   async dequeueRun(req: FastifyRequest, reply: FastifyReply) {
     if (!requireAuth(req, reply)) return;
     const { queueId } = QueueParamsSchema.parse(req.params);
-    const run = await this.launchService.getNextPendingRun(queueId);
+    // Atomic claim: the row's status flips pending -> running inside this
+    // call so concurrent agents can't both win the same run.
+    const run = await this.launchService.claimNextPendingRun(queueId);
     if (!run) {
       reply.status(204).send();
       return;

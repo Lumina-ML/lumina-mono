@@ -72,8 +72,8 @@ class LuminaClient:
             payload["config"] = config
         return self._request("POST", "/api/v1/runs", payload)
 
-    def finish_run(self, run_id: str) -> dict[str, Any]:
-        return self._request("PATCH", f"/api/v1/runs/{run_id}", {"status": "finished"})
+    def finish_run(self, run_id: str, status: str = "finished") -> dict[str, Any]:
+        return self._request("PATCH", f"/api/v1/runs/{run_id}", {"status": status})
 
     def update_run(
         self,
@@ -144,6 +144,45 @@ class LuminaClient:
             payload["color"] = color
         self._request("POST", f"/api/v1/runs/{run_id}/tags", payload)
 
+    def mark_preempting(self, run_id: str) -> dict[str, Any]:
+        return self._request("PATCH", f"/api/v1/runs/{run_id}", {"status": "preempting"})
+
+    def pin_config_keys(self, run_id: str, keys: list[str]) -> dict[str, Any]:
+        return self._request(
+            "PATCH",
+            f"/api/v1/runs/{run_id}",
+            {"metadata": {"pinnedConfigKeys": list(keys)}},
+        )
+
+    def save_run_file(
+        self,
+        run_id: str,
+        path: str,
+        content: bytes,
+        policy: str = "live",
+    ) -> dict[str, Any]:
+        """Upload a file to a run's object storage. Backed by the
+        `POST /api/v1/runs/{runId}/files` endpoint."""
+        import base64
+
+        payload = {
+            "path": path,
+            "contentBase64": base64.b64encode(content).decode("ascii"),
+            "policy": policy,
+        }
+        return self._request("POST", f"/api/v1/runs/{run_id}/files", payload)
+
+    def list_run_files(self, run_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/runs/{run_id}/files")
+
+    def restore_run_file(self, run_id: str, path: str) -> bytes:
+        """Download a previously saved file from a run. Backed by the
+        `GET /api/v1/runs/{runId}/file?path=...` endpoint."""
+        import base64
+
+        result = self._request("GET", f"/api/v1/runs/{run_id}/file?path={path}")
+        return base64.b64decode(result["contentBase64"])
+
     def list_projects(self) -> dict[str, Any]:
         return self._request("GET", "/api/v1/projects")
 
@@ -183,15 +222,55 @@ class LuminaClient:
             payload["metadata"] = metadata
         return self._request("POST", f"/api/v1/artifacts/{artifact_id}/versions", payload)
 
-    def add_artifact_file(self, version_id: str, path: str, size: int) -> dict[str, Any]:
+    def add_artifact_file(
+        self,
+        version_id: str,
+        path: str,
+        size: int,
+        sha256: Optional[str] = None,
+        content_type: Optional[str] = None,
+        reference_uri: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"path": path, "size": size}
+        if sha256:
+            payload["sha256"] = sha256
+        if content_type:
+            payload["contentType"] = content_type
+        if reference_uri:
+            payload["referenceUri"] = reference_uri
         return self._request(
             "POST",
             f"/api/v1/versions/{version_id}/files",
-            {"path": path, "size": size},
+            payload,
         )
 
     def get_artifact_version(self, version_id: str) -> dict[str, Any]:
         return self._request("GET", f"/api/v1/versions/{version_id}")
+
+    def finalize_artifact_version(self, version_id: str) -> dict[str, Any]:
+        """Trigger server-side manifest build + event emission."""
+        return self._request("POST", f"/api/v1/versions/{version_id}/finalize", {})
+
+    def attach_artifact_lineage(
+        self,
+        child_version_id: str,
+        parent_version_id: str,
+        lineage_type: str = "derived_from",
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/api/v1/versions/{child_version_id}/lineage",
+            {"parentVersionId": parent_version_id, "type": lineage_type},
+        )
+
+    def detach_artifact_lineage(self, child_version_id: str, parent_version_id: str) -> None:
+        self._request(
+            "DELETE",
+            f"/api/v1/versions/{child_version_id}/lineage/{parent_version_id}",
+        )
+
+    def list_artifact_lineage(self, version_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/api/v1/versions/{version_id}/lineage")
 
     def patch_artifact_version(
         self,

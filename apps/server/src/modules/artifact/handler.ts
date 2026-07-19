@@ -6,12 +6,17 @@ import {
   CreateArtifactVersionSchema,
   PatchArtifactVersionSchema,
   CreateArtifactFileSchema,
+  AttachLineageSchema,
 } from "./schema.js";
 import { ProjectService } from "../project/service.js";
 
 const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
 const ArtifactParamsSchema = z.object({ artifactId: z.string().uuid() });
 const VersionParamsSchema = z.object({ versionId: z.string().uuid() });
+const LineageParamsSchema = z.object({
+  versionId: z.string().uuid(),
+  parentVersionId: z.string().uuid(),
+});
 
 export class ArtifactHandler {
   constructor(
@@ -80,7 +85,67 @@ export class ArtifactHandler {
   async addFile(req: FastifyRequest, reply: FastifyReply) {
     const { versionId } = VersionParamsSchema.parse(req.params);
     const data = CreateArtifactFileSchema.parse(req.body);
-    const result = await this.artifactService.addFile(versionId, data);
-    reply.status(201).send(result);
+    try {
+      const result = await this.artifactService.addFile(versionId, data);
+      reply.status(201).send(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.startsWith("Version not found")) {
+        reply.status(404).send({ error: msg });
+        return;
+      }
+      if (msg.startsWith("File path already registered")) {
+        reply.status(409).send({ error: msg });
+        return;
+      }
+      throw err;
+    }
+  }
+
+  async finalizeVersion(req: FastifyRequest, reply: FastifyReply) {
+    const { versionId } = VersionParamsSchema.parse(req.params);
+    try {
+      const version = await this.artifactService.finalizeVersion(versionId);
+      reply.send(version);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.startsWith("Version not found")) {
+        reply.status(404).send({ error: msg });
+        return;
+      }
+      throw err;
+    }
+  }
+
+  async attachLineage(req: FastifyRequest, reply: FastifyReply) {
+    const { versionId } = VersionParamsSchema.parse(req.params);
+    const data = AttachLineageSchema.parse(req.body);
+    try {
+      const row = await this.artifactService.attachLineage(versionId, data.parentVersionId, data.type);
+      reply.status(201).send(row);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("not found")) {
+        reply.status(404).send({ error: msg });
+        return;
+      }
+      if (msg.includes("cannot be its own parent")) {
+        reply.status(400).send({ error: msg });
+        return;
+      }
+      throw err;
+    }
+  }
+
+  async detachLineage(req: FastifyRequest, reply: FastifyReply) {
+    const { versionId, parentVersionId } = LineageParamsSchema.parse(req.params);
+    await this.artifactService.detachLineage(versionId, parentVersionId);
+    reply.status(204).send();
+  }
+
+  async listLineage(req: FastifyRequest, reply: FastifyReply) {
+    const { versionId } = VersionParamsSchema.parse(req.params);
+    const lineage = await this.artifactService.listLineage(versionId);
+    reply.send(lineage);
   }
 }

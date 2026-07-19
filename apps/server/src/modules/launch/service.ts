@@ -69,4 +69,11 @@ export class LaunchService {
   async getNextPendingRun(queueId: string) {
     return this.repository.getNextPendingRun(queueId);
   }
+
+  /** Atomically claim one pending run for `queueId`. The row's status
+   * transitions ``pending -> running`` inside the same call so concurrent
+   * agents can't double-claim. */
+  async claimNextPendingRun(queueId: string) {
+    return this.repository.claimNextPendingRun(queueId);
+  }
 }

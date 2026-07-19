@@ -6,3 +6,6 @@ export * from './tokens/motion';
 export * from './tokens/typography';
 export * from './tokens/icon';
 export * from './tokens/breakpoints';
+
+export * from './naive-theme';
+export { default as LThemeProvider } from './provider/LThemeProvider.vue';

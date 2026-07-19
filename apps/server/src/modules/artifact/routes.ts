@@ -4,7 +4,12 @@ import { ArtifactHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
 
 export async function artifactRoutes(app: FastifyInstance) {
-  const artifactService = new ArtifactService(app.prisma, app.storage);
+  const artifactService = new ArtifactService({
+    prisma: app.prisma,
+    storage: app.storage,
+    eventBus: app.eventBus,
+    queue: app.queue,
+  });
   const projectService = new ProjectService(app.prisma);
   const handler = new ArtifactHandler(artifactService, projectService);
 
@@ -16,4 +21,12 @@ export async function artifactRoutes(app: FastifyInstance) {
   app.get("/versions/:versionId", handler.getVersion.bind(handler));
   app.patch("/versions/:versionId", handler.patchVersion.bind(handler));
   app.post("/versions/:versionId/files", handler.addFile.bind(handler));
+  app.post("/versions/:versionId/finalize", handler.finalizeVersion.bind(handler));
+
+  app.post("/versions/:versionId/lineage", handler.attachLineage.bind(handler));
+  app.delete(
+    "/versions/:versionId/lineage/:parentVersionId",
+    handler.detachLineage.bind(handler),
+  );
+  app.get("/versions/:versionId/lineage", handler.listLineage.bind(handler));
 }

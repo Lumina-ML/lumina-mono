@@ -1,92 +1,149 @@
 /**
  * Lumina Design Language — Theme Variables
  *
- * 所有语义化颜色以 HSL 格式定义，便于暗色模式切换。
+ * 参考：Linear（Precision）+ Cursor（Developer Dark）+ Vercel（Minimal）。
+ * 所有语义化颜色以 HSL 格式定义，便于运行时 light/dark 切换。
  * 如需新增 token，请同步更新 tokens/colors.ts。
  */
 
 :root {
-  /* Foreground */
-  --ldl-foreground: 222.2 84% 4.9%;
-  --ldl-foreground-muted: 215.4 16.3% 46.9%;
-  --ldl-foreground-disabled: 215.4 16.3% 60%;
+  /* Radius */
+  --radius: 0.5rem;
 
-  /* Layer System — Light */
-  --ldl-canvas: 0 0% 100%;
-  --ldl-surface: 0 0% 100%;
-  --ldl-panel: 0 0% 100%;
-  --ldl-panel-hover: 210 40% 96.1%;
-  --ldl-card: 0 0% 100%;
-  --ldl-card-hover: 210 40% 96.1%;
-  --ldl-overlay: 0 0% 100% / 0.8;
-  --ldl-floating: 0 0% 100%;
+  /* Foreground / Text — Linear 式层级 */
+  --foreground: 220 20% 6%;
+  --foreground-muted: 220 10% 45%;
+  --foreground-disabled: 220 10% 62%;
 
-  /* Borders */
-  --ldl-border: 214.3 31.8% 91.4%;
-  --ldl-divider: 214.3 31.8% 91.4%;
-  --ldl-selection: 210 40% 96.1%;
+  /* Background / Layers — 极干净，层级靠亮度差 */
+  --background: 220 14% 98.5%;
+  --canvas: 220 14% 98.5%;
+  --surface: 0 0% 100%;
+  --panel: 220 14% 98.5%;
+  --panel-hover: 220 14% 94%;
+  --card: 0 0% 100%;
+  --card-hover: 220 14% 97%;
+  --card-foreground: 220 20% 6%;
+  --overlay: 220 20% 6% / 0.24;
+  --floating: 0 0% 100%;
 
-  /* Brand */
-  --ldl-primary: 222.2 47.4% 11.2%;
-  --ldl-primary-foreground: 210 40% 98%;
-  --ldl-secondary: 210 40% 96.1%;
-  --ldl-secondary-foreground: 222.2 47.4% 11.2%;
-  --ldl-accent: 210 40% 96.1%;
-  --ldl-accent-foreground: 222.2 47.4% 11.2%;
+  /* Borders & Dividers — 极淡 */
+  --border: 220 12% 90%;
+  --input: 220 12% 90%;
+  --divider: 220 12% 90%;
+  --selection: 220 14% 93%;
+
+  /* Brand / Accent — 低饱和 Indigo，专业不刺眼 */
+  --primary: 245 58% 51%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 14% 94%;
+  --secondary-foreground: 220 20% 6%;
+  --accent: 245 58% 51%;
+  --accent-foreground: 0 0% 100%;
 
   /* States */
-  --ldl-muted: 210 40% 96.1%;
-  --ldl-muted-foreground: 215.4 16.3% 46.9%;
-  --ldl-destructive: 0 84.2% 60.2%;
-  --ldl-destructive-foreground: 210 40% 98%;
-  --ldl-info: 217 91% 60%;
-  --ldl-success: 142 76% 36%;
-  --ldl-warning: 38 92% 50%;
-  --ldl-error: 0 84% 60%;
+  --muted: 220 14% 94%;
+  --muted-foreground: 220 10% 45%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --info: 215 80% 52%;
+  --success: 160 60% 38%;
+  --warning: 38 92% 50%;
+  --error: 0 72% 51%;
 
-  /* Focus */
-  --ldl-ring: 222.2 84% 4.9%;
+  /* Focus / Ring */
+  --ring: 245 58% 51%;
+
+  /* Legacy LDL aliases — 与 Dashboard 变量对齐，保持向下兼容 */
+  --ldl-foreground: var(--foreground);
+  --ldl-foreground-muted: var(--foreground-muted);
+  --ldl-foreground-disabled: var(--foreground-disabled);
+
+  --ldl-canvas: var(--canvas);
+  --ldl-surface: var(--surface);
+  --ldl-panel: var(--panel);
+  --ldl-panel-hover: var(--panel-hover);
+  --ldl-card: var(--card);
+  --ldl-card-hover: var(--card-hover);
+  --ldl-overlay: var(--overlay);
+  --ldl-floating: var(--floating);
+
+  --ldl-border: var(--border);
+  --ldl-divider: var(--divider);
+  --ldl-selection: var(--selection);
+
+  --ldl-primary: var(--primary);
+  --ldl-primary-foreground: var(--primary-foreground);
+  --ldl-secondary: var(--secondary);
+  --ldl-secondary-foreground: var(--secondary-foreground);
+  --ldl-accent: var(--accent);
+  --ldl-accent-foreground: var(--accent-foreground);
+
+  --ldl-muted: var(--muted);
+  --ldl-muted-foreground: var(--muted-foreground);
+  --ldl-destructive: var(--destructive);
+  --ldl-destructive-foreground: var(--destructive-foreground);
+  --ldl-info: var(--info);
+  --ldl-success: var(--success);
+  --ldl-warning: var(--warning);
+  --ldl-error: var(--error);
+
+  --ldl-ring: var(--ring);
 }
 
 .dark {
-  /* Foreground */
-  --ldl-foreground: 210 40% 98%;
-  --ldl-foreground-muted: 215 20.2% 65.1%;
-  --ldl-foreground-disabled: 215 20.2% 45%;
+  /* Foreground / Text — Cursor 式高对比 */
+  --foreground: 220 10% 96%;
+  --foreground-muted: 220 10% 58%;
+  --foreground-disabled: 220 10% 42%;
 
-  /* Layer System — Dark */
-  --ldl-canvas: 222.2 84% 4.9%;
-  --ldl-surface: 222.2 84% 4.9%;
-  --ldl-panel: 222.2 84% 4.9%;
-  --ldl-panel-hover: 217.2 32.6% 17.5%;
-  --ldl-card: 222.2 84% 4.9%;
-  --ldl-card-hover: 217.2 32.6% 17.5%;
-  --ldl-overlay: 222.2 84% 4.9% / 0.8;
-  --ldl-floating: 222.2 84% 4.9%;
+  /* Background / Layers — 接近纯黑，靠亮度差建立层级 */
+  --background: 220 15% 5%;
+  --canvas: 220 15% 5%;
+  --surface: 220 12% 8%;
+  --panel: 220 15% 5%;
+  --panel-hover: 220 12% 12%;
+  --card: 220 12% 8%;
+  --card-hover: 220 12% 11%;
+  --card-foreground: 220 10% 96%;
+  --overlay: 220 15% 5% / 0.6;
+  --floating: 220 12% 10%;
 
-  /* Borders */
-  --ldl-border: 217.2 32.6% 17.5%;
-  --ldl-divider: 217.2 32.6% 17.5%;
-  --ldl-selection: 217.2 32.6% 17.5%;
+  /* Borders & Dividers — 极淡 */
+  --border: 220 12% 16%;
+  --input: 220 12% 16%;
+  --divider: 220 12% 16%;
+  --selection: 220 12% 14%;
 
-  /* Brand */
-  --ldl-primary: 210 40% 98%;
-  --ldl-primary-foreground: 222.2 47.4% 11.2%;
-  --ldl-secondary: 217.2 32.6% 17.5%;
-  --ldl-secondary-foreground: 210 40% 98%;
-  --ldl-accent: 217.2 32.6% 17.5%;
-  --ldl-accent-foreground: 210 40% 98%;
+  /* Brand / Accent — 暗色模式下更亮的 Indigo */
+  --primary: 245 75% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 12% 14%;
+  --secondary-foreground: 220 10% 96%;
+  --accent: 245 75% 62%;
+  --accent-foreground: 0 0% 100%;
 
   /* States */
-  --ldl-muted: 217.2 32.6% 17.5%;
-  --ldl-muted-foreground: 215 20.2% 65.1%;
-  --ldl-destructive: 0 62.8% 30.6%;
-  --ldl-destructive-foreground: 210 40% 98%;
-  --ldl-info: 217 91% 60%;
-  --ldl-success: 142 71% 45%;
-  --ldl-warning: 38 92% 50%;
-  --ldl-error: 0 62.8% 30.6%;
+  --muted: 220 12% 14%;
+  --muted-foreground: 220 10% 58%;
+  --destructive: 0 65% 54%;
+  --destructive-foreground: 0 0% 100%;
+  --info: 215 85% 60%;
+  --success: 160 55% 45%;
+  --warning: 38 92% 50%;
+  --error: 0 65% 54%;
 
-  /* Focus */
-  --ldl-ring: 212.7 26.8% 83.9%;
+  /* Focus / Ring */
+  --ring: 245 75% 62%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

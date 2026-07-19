@@ -12,10 +12,23 @@ export default defineConfig({
       formats: ['es'],
     },
     rollupOptions: {
-      external: ['vue'],
+      external: [
+        'vue',
+        'vue-router',
+        'echarts',
+        'vue-echarts',
+        '@tanstack/vue-table',
+        '@tanstack/vue-virtual',
+        'marked',
+        'isomorphic-dompurify',
+        'vue-json-pretty',
+      ],
       output: {
         globals: {
           vue: 'Vue',
+          'vue-router': 'VueRouter',
+          echarts: 'echarts',
+          'vue-echarts': 'VueECharts',
         },
       },
     },

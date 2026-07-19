@@ -14,12 +14,19 @@ defineProps<Props>();
     :is="to ? RouterLink : 'button'"
     :to="to"
     :class="[
-      'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+      'group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors duration-fast',
       active
         ? 'bg-muted font-medium text-foreground'
-        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+        : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
     ]"
   >
+    <span
+      :class="[
+        'absolute left-0 h-5 w-[2px] rounded-r-full bg-primary transition-opacity duration-fast',
+        active ? 'opacity-100' : 'opacity-0 group-hover:opacity-0',
+      ]"
+      aria-hidden="true"
+    />
     <span class="flex h-5 w-5 shrink-0 items-center justify-center">
       <slot name="icon" />
     </span>

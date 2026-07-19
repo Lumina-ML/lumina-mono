@@ -22,6 +22,12 @@ defineProps<Props>();
 
 <style scoped>
 .l-card {
+  --n-color: hsl(var(--card));
+  --n-text-color: hsl(var(--card-foreground));
+  --n-border-color: hsl(var(--border));
+  --n-border-radius: var(--radius);
+  --n-box-shadow: none;
+
   /* Mobile-first：小屏更紧凑 */
   --n-padding-left: 16px;
   --n-padding-right: 16px;
@@ -31,10 +37,10 @@ defineProps<Props>();
 
 @media (min-width: 768px) {
   .l-card {
-    --n-padding-left: 24px;
-    --n-padding-right: 24px;
-    --n-padding-top: 24px;
-    --n-padding-bottom: 24px;
+    --n-padding-left: 20px;
+    --n-padding-right: 20px;
+    --n-padding-top: 20px;
+    --n-padding-bottom: 20px;
   }
 }
 </style>
