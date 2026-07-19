@@ -42,29 +42,12 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
     }, "request completed");
   });
 
-  // Health check with dependency probes
-  app.get("/healthz", async () => {
-    const checks: Record<string, "ok" | "error"> = {
-      database: "ok",
-      storage: "ok",
-    };
-
-    try {
-      await app.prisma.$queryRaw`SELECT 1`;
-    } catch {
-      checks.database = "error";
-    }
-
-    try {
-      // Probe storage by generating a presigned URL for a test key.
-      await app.storage.getDownloadUrl("__health_check__");
-    } catch {
-      checks.storage = "error";
-    }
-
-    const status = Object.values(checks).every((c) => c === "ok") ? "ok" : "error";
-    return { status, checks };
-  });
+  // Health endpoints (`/healthz`, `/readyz`) live in the dedicated
+  // `healthPlugin` — it does the same dependency probes plus more
+  // (ClickHouse, Redis), and registers them at the root prefix. The
+  // previous duplicate registration here would crash Fastify on the
+  // second `app.get("/healthz", …)` call when both plugins were
+  // loaded; this stub is intentionally absent.
 
   // Prometheus metrics endpoint
   if (config.metricsEnabled) {
