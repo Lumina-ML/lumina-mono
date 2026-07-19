@@ -244,3 +244,82 @@ export const luminaThemeOverrides: GlobalThemeOverrides = {
   common: luminaCommonOverrides,
   ...luminaComponentOverrides,
 };
+
+/**
+ * TODO: Oncall to native-ui
+ * naive-ui 的 seemly 颜色引擎会在运行时用 JS 解析颜色字段(派生 hover/pressed/rgba 等),
+ * 它无法解析 `hsl(var(--x))` 这种 CSS 变量引用,会抛
+ * `[seemly/rgba]: Invalid color value`,导致挂载 naive 组件的整个子树崩溃。
+ *
+ * 因此这里把 override 里的 `hsl(var(--token))` / `hsl(var(--token) / a)` 在运行时
+ * 解析为具体的 rgb()/rgba() 色值再交给 naive。CSS 变量仍是唯一真源:
+ * light/dark 切换后重新调用即可拿到对应主题的解析结果。
+ */
+function hslTripleToRgba(raw: string, extraAlpha?: number): string {
+  let alpha = extraAlpha ?? 1;
+  let body = raw;
+  const slash = raw.indexOf('/');
+  if (slash >= 0) {
+    const a = parseFloat(raw.slice(slash + 1));
+    if (!Number.isNaN(a)) alpha = extraAlpha != null ? extraAlpha * a : a;
+    body = raw.slice(0, slash);
+  }
+  const parts = body.trim().split(/\s+/);
+  if (parts.length < 3) return '';
+  const h = ((parseFloat(parts[0]) % 360) + 360) % 360;
+  const s = parseFloat(parts[1]) / 100;
+  const l = parseFloat(parts[2]) / 100;
+  if (Number.isNaN(h) || Number.isNaN(s) || Number.isNaN(l)) return '';
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else[r, g, b] = [c, 0, x];
+  const R = Math.round((r + m) * 255);
+  const G = Math.round((g + m) * 255);
+  const B = Math.round((b + m) * 255);
+  return alpha >= 1 ? `rgb(${R}, ${G}, ${B})` : `rgba(${R}, ${G}, ${B}, ${alpha})`;
+}
+
+const HSL_VAR_RE = /hsl\(\s*var\((--[\w-]+)\)\s*(?:\/\s*([\d.]+))?\s*\)/g;
+
+function resolveVarsInString(value: string, styles: CSSStyleDeclaration): string {
+  return value.replace(HSL_VAR_RE, (whole, token: string, alpha?: string) => {
+    const raw = styles.getPropertyValue(token).trim();
+    if (!raw) return whole;
+    const out = hslTripleToRgba(raw, alpha != null ? parseFloat(alpha) : undefined);
+    return out || whole;
+  });
+}
+
+function deepResolve<T>(obj: T, styles: CSSStyleDeclaration): T {
+  if (typeof obj === 'string') return resolveVarsInString(obj, styles) as unknown as T;
+  if (Array.isArray(obj)) return obj.map((v) => deepResolve(v, styles)) as unknown as T;
+  if (obj && typeof obj === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const k in obj) out[k] = deepResolve((obj as Record<string, unknown>)[k], styles);
+    return out as unknown as T;
+  }
+  return obj;
+}
+
+/**
+ * 读取 `el`(默认 documentElement)上生效的 CSS 变量,把 override 中的
+ * `hsl(var(--x))` 解析成具体色值。SSR 环境下返回原对象(无 window)。
+ */
+export function resolveThemeOverrides(
+  overrides: GlobalThemeOverrides = luminaThemeOverrides,
+  el?: HTMLElement | null,
+): GlobalThemeOverrides {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return overrides;
+  const target = el ?? document.documentElement;
+  const styles = window.getComputedStyle(target);
+  return deepResolve(overrides, styles);
+}
