@@ -11,19 +11,38 @@ declare module "fastify" {
   }
 }
 
-function channelForEvent(event: KnownDomainEvent): string | undefined {
+// Mirror DEFAULT_WORKSPACE_ID in bootstrap.ts. Keep them in sync —
+// when multi-workspace lands we'll resolve this through the bootstrap
+// seed and pass it down explicitly.
+const DEFAULT_WORKSPACE_ID = "default";
+
+function channelsForEvent(event: KnownDomainEvent): string[] {
+  const out: string[] = [];
   switch (event.type) {
     case "MetricLogged":
-      return `run:${event.payload.runId}`;
+      // Per-run only. MetricLogged fires very frequently and fanning
+      // out to project would scale poorly with active runs.
+      out.push(`run:${event.payload.runId}`);
+      break;
     case "RunCreated":
-      return `project:${event.payload.projectId}`;
+      out.push(`project:${event.payload.projectId}`);
+      break;
     case "RunFinished":
-      return `run:${event.payload.runId}`;
+      // Both per-run and per-project: the run page needs to flip status,
+      // and the project list needs to update its counters.
+      out.push(`run:${event.payload.runId}`);
+      out.push(`project:${event.payload.projectId}`);
+      break;
     case "ArtifactUploaded":
-      return `project:${event.payload.projectId}`;
-    default:
-      return undefined;
+      out.push(`project:${event.payload.projectId}`);
+      break;
   }
+  // Workspace-wide channel so cross-page UI (notifications, sidebar
+  // counters) gets a single subscription per browser session instead
+  // of having to subscribe to every project. The dashboard hardcodes
+  // this id; keep it in sync with `useWorkspaceStore.currentId`.
+  out.push(`workspace:${DEFAULT_WORKSPACE_ID}`);
+  return out;
 }
 
 export const websocketPlugin = fp(async (app: FastifyInstance) => {
@@ -38,31 +57,14 @@ export const websocketPlugin = fp(async (app: FastifyInstance) => {
 
   // Subscribe to domain events and broadcast to WebSocket clients.
   // When using RedisEventBus, this also receives events from other instances.
-  app.eventBus.subscribe("MetricLogged", (event) => {
-    const channel = channelForEvent(event);
-    if (channel) {
+  function fanout(event: KnownDomainEvent) {
+    for (const channel of channelsForEvent(event)) {
       realtime.broadcast(channel, event.type, event.payload);
     }
-  });
+  }
 
-  app.eventBus.subscribe("RunCreated", (event) => {
-    const channel = channelForEvent(event);
-    if (channel) {
-      realtime.broadcast(channel, event.type, event.payload);
-    }
-  });
-
-  app.eventBus.subscribe("RunFinished", (event) => {
-    const channel = channelForEvent(event);
-    if (channel) {
-      realtime.broadcast(channel, event.type, event.payload);
-    }
-  });
-
-  app.eventBus.subscribe("ArtifactUploaded", (event) => {
-    const channel = channelForEvent(event);
-    if (channel) {
-      realtime.broadcast(channel, event.type, event.payload);
-    }
-  });
+  app.eventBus.subscribe("MetricLogged", fanout);
+  app.eventBus.subscribe("RunCreated", fanout);
+  app.eventBus.subscribe("RunFinished", fanout);
+  app.eventBus.subscribe("ArtifactUploaded", fanout);
 });

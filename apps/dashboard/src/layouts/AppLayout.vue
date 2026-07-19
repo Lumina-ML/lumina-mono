@@ -108,6 +108,18 @@ const breadcrumbs = computed(() => {
     crumbs.push({
       label: `${route.params.name}@${route.params.version}`,
     });
+  } else if (name === "GlobalDatasets") {
+    crumbs.push({ label: "Datasets" });
+  } else if (name === "GlobalSweeps") {
+    crumbs.push({ label: "Sweeps" });
+  } else if (name === "GlobalReports") {
+    crumbs.push({ label: "Reports" });
+  } else if (name === "GlobalTraces") {
+    crumbs.push({ label: "Traces" });
+  } else if (name === "GlobalArtifacts") {
+    crumbs.push({ label: "Artifacts" });
+  } else if (name === "GlobalEvaluations") {
+    crumbs.push({ label: "Evaluations" });
   } else if (projectId) {
     // Any project-scoped page
     crumbs.push({ label: "Projects", to: "/projects" });

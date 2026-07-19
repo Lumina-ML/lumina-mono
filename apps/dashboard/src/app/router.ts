@@ -172,15 +172,24 @@ const router = createRouter({
           ],
         },
 
-        // ─── Backward-compatible aliases ────────────────────────────────
-        // Old global list paths collapse to projects (ProjectList shows all).
+        // ─── Workspace-wide (cross-project) views ─────────────────────
+        // Top-level sweeps/artifacts/traces/etc. routes show a "coming
+        // soon" stub pointing users to the project-scoped versions,
+        // which are fully implemented under `/projects/:projectId/...`.
+        {
+          path: "datasets",
+          name: "GlobalDatasets",
+          component: () => import("@/pages/GlobalDatasets.vue"),
+        },
         {
           path: "sweeps",
-          redirect: "/projects",
+          name: "GlobalSweeps",
+          component: () => import("@/pages/GlobalSweeps.vue"),
         },
         {
           path: "artifacts",
-          redirect: "/projects",
+          name: "GlobalArtifacts",
+          component: () => import("@/pages/GlobalArtifacts.vue"),
         },
         {
           path: "registry",
@@ -188,15 +197,18 @@ const router = createRouter({
         },
         {
           path: "evaluations",
-          redirect: "/projects",
+          name: "GlobalEvaluations",
+          component: () => import("@/pages/GlobalEvaluations.vue"),
         },
         {
           path: "traces",
-          redirect: "/projects",
+          name: "GlobalTraces",
+          component: () => import("@/pages/GlobalTraces.vue"),
         },
         {
           path: "reports",
-          redirect: "/projects",
+          name: "GlobalReports",
+          component: () => import("@/pages/GlobalReports.vue"),
         },
         // Legacy run detail: fetch the run to learn its projectId, then
         // redirect to the canonical /projects/:id/runs/:runId URL.

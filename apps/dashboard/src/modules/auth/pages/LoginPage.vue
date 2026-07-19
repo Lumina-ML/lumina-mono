@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useRouter, useRoute, RouterLink } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import {
   LCard,
   LInput,
@@ -22,6 +22,7 @@ import {
   WorkspaceService,
   type WorkspaceRole,
 } from "@/services/workspace.service";
+import { ApiError } from "@/services/api";
 import { useToast } from "@/composables/useToast";
 import BrandMark from "@/components/BrandMark.vue";
 
@@ -139,7 +140,20 @@ async function onBootstrap() {
     );
     redirectAfterAuth();
   } catch (err) {
-    bootstrapError.value = err instanceof Error ? err.message : "Bootstrap failed.";
+    handleCreateUserError(err, {
+      setError: (msg) => (bootstrapError.value = msg),
+      // For bootstrap, a 409 means someone (another tab, a previous
+      // session) already created the first user. The submitted email
+      // exists but we can't recover their API key, so flip into
+      // sign-in mode and ask them to use the key they were issued.
+      onConflict: () => {
+        apiKey.value = "";
+        mode.value = "sign-in";
+        toast.warning(
+          "A user with this email already exists on this server. Sign in with your existing API key instead.",
+        );
+      },
+    });
   } finally {
     bootstrapping.value = false;
   }
@@ -172,10 +186,39 @@ async function onCreateUser() {
     );
     redirectAfterAuth();
   } catch (err) {
-    newUserError.value = err instanceof Error ? err.message : "Failed to create account.";
+    handleCreateUserError(err, {
+      setError: (msg) => (newUserError.value = msg),
+      // For new-user, a 409 just means "pick a different email" — stay
+      // on the form so they can correct the input.
+      onConflict: () => {},
+    });
   } finally {
     creatingUser.value = false;
   }
+}
+
+/**
+ * Shared error shape for both create-user flows. Branches on 409 (the
+ * only "expected" client-side failure — every other error is a real
+ * server/network problem and should surface verbatim).
+ */
+function handleCreateUserError(
+  err: unknown,
+  opts: {
+    setError: (msg: string) => void;
+    onConflict: () => void;
+  },
+) {
+  if (err instanceof ApiError && err.status === 409) {
+    // Server already shaped the body as { error, message, field }.
+    const data = err.data as { message?: string; field?: string } | undefined;
+    const message =
+      data?.message ?? "An account with this email already exists.";
+    opts.setError(message);
+    opts.onConflict();
+    return;
+  }
+  opts.setError(err instanceof Error ? err.message : "Action failed.");
 }
 
 onMounted(async () => {
@@ -199,9 +242,9 @@ const apiBase = import.meta.env.VITE_LUMINA_API_URL || "(default — same origin
 <template>
   <div class="flex min-h-screen flex-col bg-background">
     <header class="flex items-center justify-between border-b border-border px-6 py-3">
-      <RouterLink to="/login" class="flex items-center gap-2">
+      <div class="flex items-center gap-2">
         <BrandMark :size="24" :show-wordmark="true" />
-      </RouterLink>
+      </div>
       <a
         href="https://github.com/Lumina-ML/lumina"
         target="_blank"
