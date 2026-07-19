@@ -29,6 +29,9 @@ _VERSION_DIGESTS: dict[str, str] = {}
 _UPLOADS: dict[str, int] = {}  # upload_url -> bytes received
 _SWEEPS: dict[str, dict[str, Any]] = {}  # by id
 _SWEEP_RUNS: list[dict[str, Any]] = []  # per-sweep run rows for observations
+_LAUNCH_QUEUES: dict[str, dict[str, Any]] = {}
+_LAUNCH_JOBS: dict[str, dict[str, Any]] = {}
+_LAUNCH_RUNS_FB: dict[str, dict[str, Any]] = {}
 
 
 def _reset_state() -> None:
@@ -44,6 +47,9 @@ def _reset_state() -> None:
     _UPLOADS.clear()
     _SWEEPS.clear()
     _SWEEP_RUNS.clear()
+    _LAUNCH_QUEUES.clear()
+    _LAUNCH_JOBS.clear()
+    _LAUNCH_RUNS_FB.clear()
 
 
 def _project_id_for(name: str) -> str:
@@ -61,6 +67,12 @@ def _artifact_id(project_id: str, name: str) -> str | None:
 
 def _handle(method: str, path: str, body: dict[str, Any], *, upload_base: str = "") -> tuple[Any, int]:
     base_path = path.split("?", 1)[0]
+
+    # Launch routes have their own handler so the rest of _handle can stay
+    # focused on runs / artifacts / sweeps.
+    launch_resp = _launch_handle(method, base_path, body)
+    if launch_resp is not None:
+        return launch_resp
 
     # Projects
     if method == "GET" and base_path == "/api/v1/projects":
@@ -346,6 +358,101 @@ def _handle(method: str, path: str, body: dict[str, Any], *, upload_base: str = 
     return {"error": "not implemented", "path": path, "method": method}, 501
 
 
+# A second _handle for launch routes. The first _handle returns 501 for
+# anything launch-related since we extend here. We pass through to the
+# existing _handle via inline dispatch above; this block handles launch
+# routes directly.
+def _launch_handle(method: str, base_path: str, body: dict[str, Any]):
+    # Projects/{id}/launch-queues
+    if method == "POST" and base_path.startswith("/api/v1/projects/") and base_path.endswith("/launch-queues"):
+        project_id = base_path.split("/")[4]
+        qid = f"q-{len(_LAUNCH_QUEUES) + 1}"
+        row = {"id": qid, "projectId": project_id, "name": body["name"], "config": body.get("config", {})}
+        _LAUNCH_QUEUES[qid] = row
+        return row, 201
+    if method == "GET" and base_path.startswith("/api/v1/projects/") and base_path.endswith("/launch-queues"):
+        project_id = base_path.split("/")[4]
+        items = [q for q in _LAUNCH_QUEUES.values() if q["projectId"] == project_id]
+        return {"items": items}, 200
+    if method == "GET" and base_path.startswith("/api/v1/launch-queues/") and base_path.count("/") == 4:
+        qid = base_path.split("/")[4]
+        return _LAUNCH_QUEUES.get(qid, {"error": "not found"}), 200 if qid in _LAUNCH_QUEUES else 404
+
+    # Projects/{id}/launch-jobs
+    if method == "POST" and base_path.startswith("/api/v1/projects/") and base_path.endswith("/launch-jobs"):
+        project_id = base_path.split("/")[4]
+        jid = f"j-{len(_LAUNCH_JOBS) + 1}"
+        row = {
+            "id": jid,
+            "projectId": project_id,
+            "name": body["name"],
+            "image": body.get("image"),
+            "command": body.get("command") or [],
+            "args": body.get("args") or [],
+            "env": body.get("env") or {},
+            "config": body.get("config") or {},
+        }
+        _LAUNCH_JOBS[jid] = row
+        return row, 201
+    if method == "GET" and base_path.startswith("/api/v1/projects/") and base_path.endswith("/launch-jobs"):
+        project_id = base_path.split("/")[4]
+        items = [j for j in _LAUNCH_JOBS.values() if j["projectId"] == project_id]
+        return {"items": items}, 200
+    if method == "GET" and base_path.startswith("/api/v1/launch-jobs/") and base_path.count("/") == 4:
+        jid = base_path.split("/")[4]
+        return _LAUNCH_JOBS.get(jid, {"error": "not found"}), 200 if jid in _LAUNCH_JOBS else 404
+
+    # Projects/{id}/launch-runs
+    if method == "POST" and base_path.startswith("/api/v1/projects/") and base_path.endswith("/launch-runs"):
+        project_id = base_path.split("/")[4]
+        rid = f"lr-{len(_LAUNCH_RUNS_FB) + 1}"
+        row = {
+            "id": rid,
+            "projectId": project_id,
+            "queueId": body["queueId"],
+            "jobId": body["jobId"],
+            "runId": body.get("runId"),
+            "status": "pending",
+            "metadata": body.get("metadata") or {},
+        }
+        _LAUNCH_RUNS_FB[rid] = row
+        return row, 201
+    if method == "PATCH" and base_path.startswith("/api/v1/launch-runs/") and base_path.count("/") == 4:
+        rid = base_path.split("/")[4]
+        row = _LAUNCH_RUNS_FB.get(rid)
+        if not row:
+            return {"error": "not found"}, 404
+        if "status" in body:
+            row["status"] = body["status"]
+        if "metadata" in body:
+            row["metadata"] = {**(row.get("metadata") or {}), **body["metadata"]}
+        return row, 200
+    if method == "GET" and base_path.startswith("/api/v1/launch-runs/") and base_path.count("/") == 4:
+        rid = base_path.split("/")[4]
+        row = _LAUNCH_RUNS_FB.get(rid)
+        if not row:
+            return {"error": "not found"}, 404
+        job = _LAUNCH_JOBS.get(row["jobId"], {})
+        return {**row, "job": job}, 200
+    if method == "GET" and base_path.startswith("/api/v1/launch-queues/") and base_path.endswith("/runs"):
+        qid = base_path.split("/")[4]
+        items = [r for r in _LAUNCH_RUNS_FB.values() if r["queueId"] == qid]
+        return {"items": items}, 200
+    if method == "POST" and base_path.startswith("/api/v1/launch-queues/") and base_path.endswith("/dequeue"):
+        qid = base_path.split("/")[4]
+        # Atomic claim: find oldest pending, flip to running in one shot.
+        candidates = sorted(
+            [r for r in _LAUNCH_RUNS_FB.values() if r["queueId"] == qid and r["status"] == "pending"],
+            key=lambda r: r["id"],
+        )
+        if not candidates:
+            return None, 204
+        row = candidates[0]
+        row["status"] = "running"
+        return {**row, "job": _LAUNCH_JOBS.get(row["jobId"], {})}, 200
+    return None
+
+
 class _Handler(BaseHTTPRequestHandler):
     server_version = "FakeLuminaBackend/1.0"
 
@@ -462,6 +569,58 @@ class FakeLuminaBackend:
 
     def get_sweep(self, sweep_id: str) -> dict[str, Any]:
         return dict(_SWEEPS.get(sweep_id, {}))
+
+    # Launch test introspection
+    def create_launch_queue(self, project_name: str, name: str) -> dict[str, Any]:
+        pid = _project_id_for(project_name)
+        return _LAUNCH_QUEUES.setdefault(
+            f"q-{len(_LAUNCH_QUEUES) + 1}",
+            {"id": f"q-{len(_LAUNCH_QUEUES) + 1}", "projectId": pid, "name": name, "config": {}},
+        )
+
+    def create_launch_job(
+        self,
+        project_name: str,
+        name: str,
+        *,
+        command: list[str] | None = None,
+        args: list[str] | None = None,
+        image: str | None = None,
+    ) -> dict[str, Any]:
+        pid = _project_id_for(project_name)
+        jid = f"j-{len(_LAUNCH_JOBS) + 1}"
+        return _LAUNCH_JOBS.setdefault(
+            jid,
+            {
+                "id": jid,
+                "projectId": pid,
+                "name": name,
+                "image": image,
+                "command": command or [],
+                "args": args or [],
+                "env": {},
+                "config": {},
+            },
+        )
+
+    def create_launch_run(self, project_name: str, queue_id: str, job_id: str) -> dict[str, Any]:
+        pid = _project_id_for(project_name)
+        rid = f"lr-{len(_LAUNCH_RUNS_FB) + 1}"
+        return _LAUNCH_RUNS_FB.setdefault(
+            rid,
+            {
+                "id": rid,
+                "projectId": pid,
+                "queueId": queue_id,
+                "jobId": job_id,
+                "runId": None,
+                "status": "pending",
+                "metadata": {},
+            },
+        )
+
+    def get_launch_run(self, run_id: str) -> dict[str, Any]:
+        return dict(_LAUNCH_RUNS_FB.get(run_id, {}))
 
 
 @pytest.fixture
