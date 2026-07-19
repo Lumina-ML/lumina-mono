@@ -1,19 +1,38 @@
 <script setup lang="ts">
-import { ref, h } from "vue";
+import { ref, h, computed } from "vue";
 import { RouterLink } from "vue-router";
+import { useQueryClient } from "@tanstack/vue-query";
 import { LCard, LTag, LDataTable, LButton, LStatusBadge } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { useEvaluations } from "@/modules/evaluation/composables/useEvaluations";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
 import type { Evaluation } from "@/types/evaluation";
 
 const { formatDate } = useDateFormat();
+const queryClient = useQueryClient();
 
 const page = ref(1);
 const pageSize = ref(20);
 
 const { data: evaluations, isLoading } = useEvaluations(
   ref({ limit: pageSize.value, offset: (page.value - 1) * pageSize.value }),
+);
+
+// Workspace-wide realtime: refetch the list when any run lifecycle event
+// arrives (a new run can attach to an evaluation; a run finishing can
+// flip an evaluation's status). MetricLogged is intentionally ignored
+// here — it's noisy and doesn't change the list shape.
+useRealtimeSubscription(
+  computed(() => "workspace:default"),
+  (event) => {
+    if (
+      event.type === "RunCreated" ||
+      event.type === "RunFinished"
+    ) {
+      queryClient.invalidateQueries({ queryKey: ["evaluations"] });
+    }
+  },
 );
 
 const columns: ColumnDef<Evaluation>[] = [

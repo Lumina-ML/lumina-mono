@@ -30,6 +30,7 @@ import {
 import { LaunchService } from "@/services/launch.service";
 import { useToast } from "@/composables/useToast";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
 import QueueRow from "@/modules/launch/pages/QueueRow.vue";
 
 const toast = useToast();
@@ -38,6 +39,21 @@ const { formatDate } = useDateFormat();
 
 const { data: projects } = useProjects();
 const selectedProjectId = ref<string | null>(null);
+
+// Workspace-wide realtime: refetch queue + job tables when an agent
+// claims or completes a run. MetricLogged is ignored — too chatty for
+// a list that only shows counts and last-activity.
+useRealtimeSubscription(
+  computed(() => "workspace:default"),
+  () => {
+    // Any run-lifecycle event can flip queue depth or job activity, so
+    // invalidate both tables together rather than try to model the
+    // exact mapping.
+    queryClient.invalidateQueries({ queryKey: ["launch-queues"] });
+    queryClient.invalidateQueries({ queryKey: ["launch-jobs"] });
+    queryClient.invalidateQueries({ queryKey: ["launch-runs"] });
+  },
+);
 
 const effectiveProjectId = computed(() => {
   if (selectedProjectId.value) return selectedProjectId.value;

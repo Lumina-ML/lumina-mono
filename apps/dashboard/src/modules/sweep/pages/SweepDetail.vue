@@ -31,6 +31,7 @@ import { RunService } from "@/services/run.service";
 import { SweepService } from "@/services/sweep.service";
 import { useToast } from "@/composables/useToast";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
 import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
 import type { Run } from "@/types/run";
 import type { SweepState } from "@/types/sweep";
@@ -43,6 +44,27 @@ const toast = useToast();
 const queryClient = useQueryClient();
 
 const { data: sweep, isLoading } = useSweep(sweepId);
+
+// Workspace-wide realtime: refetch sweep runs + observations when any
+// run in the workspace lifecycle changes. The sweep list filters
+// client-side, so a single invalidation covers both the sweep's
+// `bestRunId` and the table of child runs.
+useRealtimeSubscription(
+  computed(() => "workspace:default"),
+  (event) => {
+    if (
+      event.type === "RunCreated" ||
+      event.type === "RunFinished" ||
+      event.type === "MetricLogged"
+    ) {
+      queryClient.invalidateQueries({ queryKey: ["sweep", sweepId.value] });
+      queryClient.invalidateQueries({
+        queryKey: ["sweep-runs", projectId.value, sweepId.value],
+      });
+      queryClient.invalidateQueries({ queryKey: ["sweep-observations"] });
+    }
+  },
+);
 
 // Runs belonging to this sweep. Backend doesn't expose ?sweepId= filter
 // yet, so we fetch the project's runs and filter client-side. Mark as
