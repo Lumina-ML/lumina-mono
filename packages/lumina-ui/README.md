@@ -27,6 +27,14 @@ import "@lumina/ui/dist/style.css";
 
 ### 基础组件
 
+目前已覆盖：
+
+- **通用**：LButton, LIconButton, LCard, LTag, LAvatar, LEmpty, LSkeleton, LSpinner, LStatistic, LDivider, LResult
+- **导航**：LBreadcrumb, LBreadcrumbItem, LSidebar, LSidebarItem, LMenu, LPagination, LSteps, LTimeline, LTree
+- **表单**：LInput, LTextarea, LSelect, LSwitch, LCheckbox, LRadio, LRadioGroup, LSlider, LForm, LFormItem
+- **反馈**：LDialog, LDrawer, LAlert, LTooltip, LPopover, LDropdown, LTable
+- **图标**：LIcon（接收 lucide-vue-next 等图标组件）
+
 ```vue
 <script setup lang="ts">
 import { LButton, LCard, LInput, LDialog } from "@lumina/ui";
@@ -94,12 +102,27 @@ registerWidget({
 ### Composables
 
 ```ts
-import { useTheme, usePagination, useWidgetData, useBreakpoint } from "@lumina/ui";
+import {
+  useTheme,
+  usePagination,
+  useWidgetData,
+  useBreakpoint,
+  useLocalStorage,
+  useToggle,
+  useClipboard,
+  useCountdown,
+  useDebounce,
+} from "@lumina/ui";
 
 const { isDark, toggleDark } = useTheme();
 const { page, pageSize, setPage } = usePagination({ total: 100 });
 const { data, loading, refresh } = useWidgetData({ fetcher: fetchMetrics });
 const { isMobile } = useBreakpoint();
+const token = useLocalStorage("token", { defaultValue: "" });
+const { value: open, toggle } = useToggle();
+const { copy, copied } = useClipboard();
+const { formatted } = useCountdown({ duration: 60, immediate: true });
+const search = useDebounce(rawQuery, 300);
 ```
 
 ## 目录结构
@@ -113,7 +136,8 @@ src/
 ├── primitives/         # 基础 UI 组件
 ├── chart/              # ChartRenderer + Lumina Chart Language
 ├── widgets/            # Widget Registry + Grid Layout
-├── composables/        # useTheme, usePagination, useWidgetData, useBreakpoint, useDebounce
+├── composables/        # useTheme, usePagination, useWidgetData, useBreakpoint, useDebounce,
+│                       # useLocalStorage, useSessionStorage, useToggle, useClipboard, useCountdown
 └── hoc/                # LAsync, LErrorBoundary, LList
 ```
 
