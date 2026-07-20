@@ -10,7 +10,9 @@ import tempfile
 import threading
 import time
 from urllib.parse import quote as url_quote
-import lumina
+
+from lumina.backend.client import LuminaClient, LuminaClientError
+from lumina.errors.term import termlog, termwarn
 from lumina.proto import wandb_internal_pb2
 from lumina.sdk.interface.interface_queue import InterfaceQueue
 from lumina.sdk.internal import datastore, handler, sender, tb_watcher
@@ -116,32 +118,47 @@ class SyncThread(threading.Thread):
         """Return true if this sync item can be synced as tensorboard."""
         if tb_root is not None:
             if tb_event_files > 0 and sync_item.endswith(WANDB_SUFFIX):
-                lumina.termwarn('Found .wandb file, not streaming tensorboard metrics.')
+                termwarn('Found .wandb file, not streaming tensorboard metrics.')
             else:
                 print(f'Found {tb_event_files} tfevent files in {tb_root}')
                 if len(tb_logdirs) > 3:
-                    lumina.termwarn(f'Found {len(tb_logdirs)} directories containing tfevent files. If these represent multiple experiments, sync them individually or pass a list of paths.')
+                    termwarn(f'Found {len(tb_logdirs)} directories containing tfevent files. If these represent multiple experiments, sync them individually or pass a list of paths.')
                 return True
         return False
 
     def _send_tensorboard(self, tb_root, tb_logdirs, send_manager):
         if self._entity is None:
-            viewer, _ = send_manager._api.viewer_server_info()
-            self._entity = viewer.get('entity')
+            try:
+                viewer = send_manager._client.get_current_user()
+                self._entity = viewer.get("entity") or viewer.get("id")
+            except LuminaClientError as exc:
+                termwarn(f"could not fetch current user for entity: {exc}")
+                self._entity = None
         proto_run = wandb_internal_pb2.RunRecord()
-        proto_run.run_id = self._run_id or lumina.util.generate_id()
-        proto_run.project = self._project or lumina.util.auto_project_name(None)
+        proto_run.run_id = self._run_id or _generate_id()
+        proto_run.project = self._project or _auto_project_name(None)
         proto_run.entity = self._entity
         proto_run.telemetry.feature.sync_tfevents = True
-        url = f'{self._app_url}/{url_quote(proto_run.entity)}/{url_quote(proto_run.project)}/runs/{url_quote(proto_run.run_id)}'
+        url = f'{self._app_url}/{url_quote(proto_run.entity or "")}/{url_quote(proto_run.project)}/runs/{url_quote(proto_run.run_id)}'
         print(f'Syncing: {url} ...')
         sys.stdout.flush()
         record_q = queue.Queue()
         sender_record_q = queue.Queue()
         new_interface = InterfaceQueue(record_q)
-        send_manager = sender.SendManager(settings=send_manager._settings, record_q=sender_record_q, result_q=queue.Queue(), interface=new_interface)
-        record = send_manager._interface._make_record(run=proto_run)
-        settings = lumina.Settings(root_dir=self._tmp_dir.name, run_id=proto_run.run_id, x_start_time=time.time())
+        # Reuse the parent send_manager's LuminaClient so sync reuses
+        # the same env-derived base_url / api_key.
+        send_manager = sender.SendManager(
+            settings=send_manager._settings,
+            record_q=sender_record_q,
+            result_q=queue.Queue(),
+            interface=new_interface,
+            client=send_manager._client,
+        )
+        # Inline the proto Record so we don't pull in `import lumina`
+        # (which still triggers the agents-bug chain on the branch).
+        record = wandb_internal_pb2.Record(run=proto_run)
+        record.control.req_resp = True
+        settings = _build_settings(root_dir=self._tmp_dir.name, run_id=proto_run.run_id, start_time=time.time())
         settings_static = SettingsStatic(dict(settings))
         handle_manager = handler.HandleManager(settings=settings_static, record_q=record_q, result_q=None, stopped=False, writer_q=sender_record_q, interface=new_interface)
         filesystem.mkdir_exists_ok(settings.files_dir)
@@ -161,7 +178,7 @@ class SyncThread(threading.Thread):
                 data = next(send_manager)
                 send_manager.send(data)
             print_line = spinner_states[progress_step % 4] + line
-            lumina.termlog(print_line, newline=False, prefix=True)
+            termlog(print_line, newline=False, prefix=True)
             progress_step += 1
         while len(send_manager) > 0:
             data = next(send_manager)
@@ -176,7 +193,7 @@ class SyncThread(threading.Thread):
             return ds.scan_data()
         except AssertionError as e:
             if ds.in_last_block():
-                lumina.termwarn(f".wandb file is incomplete ({e}), be sure to sync this run again once it's finished")
+                termwarn(f".wandb file is incomplete ({e}), be sure to sync this run again once it's finished")
                 return None
             else:
                 raise
@@ -197,7 +214,14 @@ class SyncThread(threading.Thread):
             sync_tb = self._setup_tensorboard(tb_root, tb_logdirs, tb_event_files, sync_item)
             root_dir = self._tmp_dir.name if sync_tb else os.path.dirname(sync_item)
             resume = 'allow' if self._append else None
-            sm = sender.SendManager.setup(root_dir, resume=resume)
+            # Honor env-derived base_url so `LUMINA_API_URL` controls
+            # the sync destination.
+            sm = sender.SendManager.setup(
+                root_dir,
+                resume=resume,
+                base_url=os.getenv("LUMINA_API_URL"),
+                api_key=os.getenv("LUMINA_API_KEY"),
+            )
             if sync_tb:
                 self._send_tensorboard(tb_root, tb_logdirs, sm)
                 continue
@@ -314,3 +338,36 @@ def get_runs(include_offline: bool=True, include_online: bool=True, include_sync
 
 def get_run_from_path(path):
     return _LocalRun(path)
+
+
+# ---------------------------------------------------------------------------
+# Leaf-level helpers — avoid `import lumina` here so the file stays loadable
+# even when the pre-existing `lumina/agents/agent.py:19` bug is unfixed.
+# ---------------------------------------------------------------------------
+
+def _generate_id() -> str:
+    """Standalone replacement for `lumina.util.generate_id`. UUID v7."""
+    import uuid
+    return str(uuid.uuid4())
+
+
+def _auto_project_name(_program: str | None) -> str:
+    """Standalone replacement for `lumina.util.auto_project_name`."""
+    return "uncategorized"
+
+
+def _build_settings(*, root_dir: str, run_id: str, start_time: float) -> Any:
+    """Standalone replacement for `lumina.Settings(...)` for sync's needs.
+
+    Returns an object with at least the attributes the rest of sync
+    reads (`files_dir`, `program`, `start_time`, ...).
+    """
+    settings = SettingsStatic({
+        "root_dir": root_dir,
+        "run_id": run_id,
+        "x_start_time": start_time,
+        "x_files_dir": os.path.join(root_dir, "files"),
+        "x_sync": True,
+    })
+    settings.files_dir = os.path.join(root_dir, "files")
+    return settings

@@ -269,7 +269,7 @@ class WandbLogger(Logger):
     """
     LOGGER_JOIN_CHAR = '-'
 
-    def __init__(self, name: str | None=None, save_dir: _PATH='.', version: str | None=None, offline: bool=False, dir: _PATH | None=None, id: str | None=None, anonymous: bool | None=None, project: str | None=None, log_model: Literal['all'] | bool=False, experiment: wandb.Run | None=None, prefix: str='', checkpoint_name: str | None=None, log_checkpoint_on: Literal['success'] | Literal['all']='success', **kwargs: Any) -> None:
+    def __init__(self, name: str | None=None, save_dir: _PATH='.', version: str | None=None, offline: bool=False, dir: _PATH | None=None, id: str | None=None, anonymous: bool | None=None, project: str | None=None, log_model: Literal['all'] | bool=False, experiment: lumina.Run | None=None, prefix: str='', checkpoint_name: str | None=None, log_checkpoint_on: Literal['success'] | Literal['all']='success', **kwargs: Any) -> None:
         if offline and log_model:
             raise MisconfigurationException(f'Providing log_model={log_model} and offline={offline} is an invalid configuration since model checkpoints cannot be uploaded in offline mode.\nHint: Set `offline=False` to log your model.')
         super().__init__()

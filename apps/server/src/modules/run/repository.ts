@@ -19,6 +19,11 @@ export class RunRepository {
         status: "running",
         config: data.config as any,
         metadata: data.metadata as any,
+        // Step 3.2 fields — all nullable; safe to omit on old callers.
+        displayName: data.displayName ?? null,
+        group: data.group ?? null,
+        jobType: data.jobType ?? null,
+        notes: data.notes ?? null,
       },
     });
   }
@@ -91,6 +96,8 @@ export class RunRepository {
     if (data.summary !== undefined) updateData.summary = data.summary as any;
     if (data.notes !== undefined) updateData.notes = data.notes;
     if (data.metadata !== undefined) updateData.metadata = data.metadata as any;
+    if (data.telemetry !== undefined) updateData.telemetry = data.telemetry as any;
+    if (data.metricDefs !== undefined) updateData.metricDefs = data.metricDefs as any;
 
     return this.prisma.run.update({
       where: { runId },

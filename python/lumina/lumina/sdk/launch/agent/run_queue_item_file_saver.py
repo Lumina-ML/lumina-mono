@@ -7,7 +7,7 @@ FileSubtypes = Literal['warning', 'error']
 
 class RunQueueItemFileSaver:
 
-    def __init__(self, agent_run: wandb.Run | None, run_queue_item_id: str):
+    def __init__(self, agent_run: lumina.Run | None, run_queue_item_id: str):
         self.run_queue_item_id = run_queue_item_id
         self.run = agent_run
 

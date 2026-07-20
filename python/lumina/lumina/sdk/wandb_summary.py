@@ -1,125 +1,83 @@
-import abc
-import typing as t
-from .interface.summary_record import SummaryItem, SummaryRecord
+"""Stub for the wandb-cloud `Summary` dict-like class.
 
-class SummaryDict(metaclass=abc.ABCMeta):
-    """dict-like wrapper for the nested dictionaries in a SummarySubDict.
+Step 3.7 — the original `Summary` dispatched `SummaryRecord`
+updates through the wandb-core service binary's mailbox via the
+``_update_callback``. The Lumina backend stores summary server-side
+and reads it back from the ``Run.summary`` mapping (which is the
+live ``LuminaRun.summary``).
 
-    Triggers self._root._callback on property changes.
-    """
+This stub keeps the import surface working:
+``from lumina.sdk.wandb_summary import Summary`` resolves, but the
+returned class is a thin dict-like wrapper that stores values in
+process-local state and prints a one-shot deprecation warning
+when ``.update()`` is called (suggesting ``Run.summary[key] = v``
+on ``LuminaRun`` instead).
+"""
+from __future__ import annotations
+import warnings
+from typing import Any
 
-    @abc.abstractmethod
-    def _as_dict(self):
-        raise NotImplementedError
 
-    @abc.abstractmethod
-    def _update(self, record: SummaryRecord):
-        raise NotImplementedError
+class SummaryDict:
+    """No-op dict-like stub. Stores writes in a local dict."""
 
-    def keys(self):
-        return [k for k in self._as_dict() if k != '_wandb']
+    def __init__(self, _get_current_summary_callback: Any = None) -> None:
+        object.__setattr__(self, "_data", {})
 
-    def get(self, key, default=None):
-        return self._as_dict().get(key, default)
+    def keys(self) -> list[str]:
+        return list(self._data.keys())
 
-    def __getitem__(self, key):
-        item = self._as_dict()[key]
-        if isinstance(item, dict):
-            wrapped_item = SummarySubDict()
-            object.__setattr__(wrapped_item, '_items', item)
-            object.__setattr__(wrapped_item, '_parent', self)
-            object.__setattr__(wrapped_item, '_parent_key', key)
-            return wrapped_item
-        return item
-    __getattr__ = __getitem__
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._data.get(key, default)
 
-    def __setitem__(self, key, val):
-        self.update({key: val})
-    __setattr__ = __setitem__
+    def __getitem__(self, key: str) -> Any:
+        return self._data[key]
 
-    def __delattr__(self, key):
-        record = SummaryRecord()
-        item = SummaryItem()
-        item.key = (key,)
-        record.remove = (item,)
-        self._update(record)
-    __delitem__ = __delattr__
+    def __setitem__(self, key: str, val: Any) -> None:
+        warnings.warn(
+            "lumina.sdk.wandb_summary.Summary is a stub under the "
+            "Lumina backend. Use LuminaRun.summary[key] = value "
+            "to update summary server-side.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self._data[key] = val
 
-    def update(self, d: dict):
-        record = SummaryRecord()
+    def __delitem__(self, key: str) -> None:
+        del self._data[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._data
+
+    def update(self, d: dict) -> None:
         for key, value in d.items():
-            item = SummaryItem()
-            item.key = (key,)
-            item.value = value
-            record.update.append(item)
-        self._update(record)
+            self[key] = value
+
+    def _as_dict(self) -> dict[str, Any]:
+        return dict(self._data)
+
+    def _update(self, record: Any) -> None:
+        # Used to push a SummaryRecord into the wandb-core mailbox.
+        # No equivalent on the Lumina backend — silently drop.
+        warnings.warn(
+            "lumina.sdk.wandb_summary._update() is a no-op under the "
+            "Lumina backend.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
 
 class Summary(SummaryDict):
-    """Track single values for each metric for each run.
+    """Stub for ``wandb.summary``.
 
-    By default, a metric's summary is the last value of its History.
-
-    For example, `wandb.log({'accuracy': 0.9})` will add a new step to History and
-    update Summary to the latest value. In some cases, it's more useful to have
-    the maximum or minimum of a metric instead of the final value. You can set
-    history manually `(wandb.summary['accuracy'] = best_acc)`.
-
-    In the UI, summary metrics appear in the table to compare across runs.
-    Summary metrics are also used in visualizations like the scatter plot and
-    parallel coordinates chart.
-
-    After training has completed, you may want to save evaluation metrics to a
-    run. Summary can handle numpy arrays and PyTorch/TensorFlow tensors. When
-    you save one of these types to Summary, we persist the entire tensor in a
-    binary file and store high level metrics in the summary object, such as min,
-    mean, variance, and 95th percentile.
-
-    Examples:
-        ```python
-        wandb.init(config=args)
-
-        best_accuracy = 0
-        for epoch in range(1, args.epochs + 1):
-            test_loss, test_accuracy = test()
-            if test_accuracy > best_accuracy:
-                wandb.run.summary["best_accuracy"] = test_accuracy
-                best_accuracy = test_accuracy
-        ```
+    Use ``LuminaRun.summary[key] = value`` on the live LuminaRun
+    instance instead — that path goes through
+    ``LuminaClient.update_run(summary=...)`` and persists to the
+    Lumina server.
     """
-    _update_callback: t.Callable
-    _get_current_summary_callback: t.Callable
 
-    def __init__(self, get_current_summary_callback: t.Callable):
-        super().__init__()
-        object.__setattr__(self, '_update_callback', None)
-        object.__setattr__(self, '_get_current_summary_callback', get_current_summary_callback)
-
-    def _set_update_callback(self, update_callback: t.Callable):
-        object.__setattr__(self, '_update_callback', update_callback)
-
-    def _as_dict(self):
-        return self._get_current_summary_callback()
-
-    def _update(self, record: SummaryRecord):
-        if self._update_callback:
-            self._update_callback(record)
 
 class SummarySubDict(SummaryDict):
-    """Non-root node of the summary data structure.
-
-    Contains a path to itself from the root.
+    """Stub for the non-root summary dict.
+    Stores writes in process-local state.
     """
-    _items: dict
-    _parent: SummaryDict
-    _parent_key: str
-
-    def __init__(self):
-        object.__setattr__(self, '_items', dict())
-        object.__setattr__(self, '_parent', None)
-        object.__setattr__(self, '_parent_key', None)
-
-    def _as_dict(self):
-        return self._items
-
-    def _update(self, record: SummaryRecord):
-        return self._parent._update(record._add_next_parent(self._parent_key))

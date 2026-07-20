@@ -6,7 +6,14 @@ from lumina.plot.custom_chart import plot_table
 if TYPE_CHECKING:
     from lumina.plot.custom_chart import CustomChart
 
-def line_series(xs: Iterable[Iterable[Any]] | Iterable[Any], ys: Iterable[Iterable[Any]], keys: Iterable[str] | None=None, title: str='', xname: str='x', split_table: bool=False) -> CustomChart:
+def line_series(
+        xs: Iterable[Iterable[Any]] | Iterable[Any], 
+        ys: Iterable[Iterable[Any]], 
+        keys: Iterable[str] | None=None, 
+        title: str='', 
+        xname: str='x', 
+        split_table: bool=False
+    ) -> CustomChart:
     """Constructs a line series chart.
 
     Args:
@@ -127,14 +134,24 @@ def line_series(xs: Iterable[Iterable[Any]] | Iterable[Any], ys: Iterable[Iterab
     """
     if not isinstance(xs[0], Iterable) or isinstance(xs[0], (str, bytes)):
         xs = [xs] * len(ys)
+
     if len(xs) != len(ys):
         msg = f'Number of x-series ({len(xs)}) must match y-series ({len(ys)}).'
         raise ValueError(msg)
+    
     if keys is None:
         keys = [f'line_{i}' for i in range(len(ys))]
+
     if len(keys) != len(ys):
         msg = f'Number of keys ({len(keys)}) must match y-series ({len(ys)}).'
         raise ValueError(msg)
+    
     data = [[x, keys[i], y] for i, (xx, yy) in enumerate(zip(xs, ys, strict=False)) for x, y in zip(xx, yy, strict=False)]
     table = lumina.Table(data=data, columns=['step', 'lineKey', 'lineVal'])
-    return plot_table(data_table=table, vega_spec_name='wandb/lineseries/v0', fields={'step': 'step', 'lineKey': 'lineKey', 'lineVal': 'lineVal'}, string_fields={'title': title, 'xname': xname}, split_table=split_table)
+    return plot_table(
+        data_table=table, 
+        vega_spec_name='wandb/lineseries/v0', 
+        fields={'step': 'step', 'lineKey': 'lineKey', 'lineVal': 'lineVal'}, 
+        string_fields={'title': title, 'xname': xname}, 
+        split_table=split_table
+    )

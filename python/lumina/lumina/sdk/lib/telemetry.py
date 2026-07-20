@@ -31,26 +31,6 @@ def context(run: wandb_run.Run | None=None, obj: TelemetryRecord | None=None) ->
     return _TelemetryObject(run=run, obj=obj)
 MATCH_RE = re.compile('(?P<code>[a-zA-Z0-9_-]+)[,}](?P<rest>.*)')
 
-def _parse_label_lines(lines: list[str]) -> dict[str, str]:
-    seen = False
-    ret = {}
-    for line in lines:
-        idx = line.find(_LABEL_TOKEN)
-        if idx < 0:
-            if seen:
-                break
-            continue
-        seen = True
-        label_str = line[idx + len(_LABEL_TOKEN):]
-        r = MATCH_RE.match(label_str)
-        if r:
-            ret['code'] = r.group('code').replace('-', '_')
-            label_str = r.group('rest')
-        tokens = re.findall('([a-zA-Z0-9_]+)\\s*=\\s*("[a-zA-Z0-9_-]*"|[a-zA-Z0-9_-]*)[,}]', label_str)
-        for k, v in tokens:
-            ret[k] = v.strip('"').replace('-', '_')
-    return ret
-
 def list_telemetry_imports(only_imported: bool=False) -> set[str]:
     import_telemetry_set = {desc.name for desc in TelemetryImports.DESCRIPTOR.fields if desc.type == desc.TYPE_BOOL}
     if only_imported:

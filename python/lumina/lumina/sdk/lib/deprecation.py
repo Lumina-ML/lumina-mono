@@ -9,7 +9,7 @@ UNSET: DoNotSet = object()
 DoNotSet: TypeAlias = object
 'The type of UNSET.'
 
-def warn_and_record_deprecation(*, feature: Deprecated, message: str, run: wandb.Run | None=None) -> None:
+def warn_and_record_deprecation(*, feature: Deprecated, message: str, run: lumina.Run | None=None) -> None:
     """Warn the user that a feature has been deprecated and update telemetry.
 
     Args:

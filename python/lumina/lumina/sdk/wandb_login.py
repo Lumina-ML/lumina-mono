@@ -133,7 +133,7 @@ def _login(*, key: str | None=None, relogin: bool | None=None, host: str | None=
     else:
         return (True, None)
 
-def _use_explicit_key(key: str, settings: wandb.Settings, *, host: wbauth.HostUrl, update_api_key: bool, silent: bool) -> wbauth.Auth:
+def _use_explicit_key(key: str, settings: lumina.Settings, *, host: wbauth.HostUrl, update_api_key: bool, silent: bool) -> wbauth.Auth:
     """Log in with an explicit key.
 
     Same arguments as `_login()`.
@@ -149,7 +149,7 @@ def _use_explicit_key(key: str, settings: wandb.Settings, *, host: wbauth.HostUr
             lumina.termwarn(str(e))
     return auth
 
-def _find_or_prompt_for_key(settings: wandb.Settings, *, host: wbauth.HostUrl, force: bool, relogin: bool, referrer: str, input_timeout: float | None) -> wbauth.Auth | None:
+def _find_or_prompt_for_key(settings: lumina.Settings, *, host: wbauth.HostUrl, force: bool, relogin: bool, referrer: str, input_timeout: float | None) -> wbauth.Auth | None:
     """Log in without an explicit key.
 
     Same arguments as `_login()`.

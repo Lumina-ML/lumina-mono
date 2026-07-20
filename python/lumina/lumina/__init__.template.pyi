@@ -106,7 +106,7 @@ def link_model(path: StrPath, registered_model_name: str, name: str | None=None,
     """<sdk/wandb_run.py::Run::link_model>"""
     ...
 
-def plot_table(vega_spec_name: str, data_table: wandb.Table, fields: dict[str, Any], string_fields: dict[str, Any] | None=None, split_table: bool=False) -> CustomChart:
+def plot_table(vega_spec_name: str, data_table: lumina.Table, fields: dict[str, Any], string_fields: dict[str, Any] | None=None, split_table: bool=False) -> CustomChart:
     """<plot/custom_chart.py::plot_table>"""
     ...
 

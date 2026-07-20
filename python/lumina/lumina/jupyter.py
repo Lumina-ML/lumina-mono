@@ -20,7 +20,7 @@ from lumina.sdk import wandb_setup
 from lumina.sdk.lib import filesystem
 logger = logging.getLogger(__name__)
 
-def display_if_magic_is_used(run: wandb.Run) -> bool:
+def display_if_magic_is_used(run: lumina.Run) -> bool:
     """Display a run's page if the cell has the %%wandb cell magic.
 
     Args:
@@ -46,7 +46,7 @@ class _WandbCellMagicState:
         self._height = height
         self._already_displayed = False
 
-    def display_if_allowed(self, run: wandb.Run) -> None:
+    def display_if_allowed(self, run: lumina.Run) -> None:
         """Display a run's iframe if one is not already displayed.
 
         Args:
@@ -73,7 +73,7 @@ def _display_by_wandb_path(path: str, *, height: int) -> None:
         traceback.print_exc()
         IPython.display.display_html(f'Path {path!r} does not refer to a W&B object you can access.', raw=True)
 
-def _display_wandb_run(run: wandb.Run, *, height: int) -> None:
+def _display_wandb_run(run: lumina.Run, *, height: int) -> None:
     """Display a run (usually in an iframe).
 
     Args:
@@ -217,7 +217,7 @@ def attempt_kaggle_load_ipynb():
 
 class Notebook:
 
-    def __init__(self, settings: wandb.Settings) -> None:
+    def __init__(self, settings: lumina.Settings) -> None:
         self.outputs: dict[int, Any] = {}
         self.settings = settings
         self.shell = IPython.get_ipython()
@@ -286,7 +286,7 @@ class Notebook:
             return True
         return False
 
-    def save_history(self, run: wandb.Run):
+    def save_history(self, run: lumina.Run):
         """This saves all cell executions in the current session as a new notebook."""
         try:
             from nbformat import v4, validator, write

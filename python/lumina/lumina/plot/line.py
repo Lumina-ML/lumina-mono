@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     import lumina
     from lumina.plot.custom_chart import CustomChart
 
-def line(table: wandb.Table, x: str, y: str, stroke: str | None=None, title: str='', split_table: bool=False) -> CustomChart:
+def line(table: lumina.Table, x: str, y: str, stroke: str | None=None, title: str='', split_table: bool=False) -> CustomChart:
     """Constructs a customizable line chart.
 
     Args:
@@ -55,4 +55,10 @@ def line(table: wandb.Table, x: str, y: str, stroke: str | None=None, title: str
         run.log({"line-chart": line_chart})
     ```
     """
-    return plot_table(data_table=table, vega_spec_name='wandb/line/v0', fields={'x': x, 'y': y, 'stroke': stroke}, string_fields={'title': title}, split_table=split_table)
+    return plot_table(
+        data_table=table, 
+        vega_spec_name='wandb/line/v0', 
+        fields={'x': x, 'y': y, 'stroke': stroke}, 
+        string_fields={'title': title}, 
+        split_table=split_table
+    )

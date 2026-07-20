@@ -41,7 +41,17 @@ class Retry(Generic[_R]):
     """
     MAX_SLEEP_SECONDS = 5 * 60
 
-    def __init__(self, call_fn: Callable[..., _R], retry_timedelta: datetime.timedelta | None=None, retry_cancel_event: threading.Event | None=None, num_retries: int | None=None, check_retry_fn: CheckRetryFnType=lambda e: True, retryable_exceptions: tuple[type[Exception], ...] | None=None, error_prefix: str='Network error', retry_callback: Callable[[int, str], Any] | None=None) -> None:
+    def __init__(
+            self, 
+            call_fn: Callable[..., _R], 
+            retry_timedelta: datetime.timedelta | None=None, 
+            retry_cancel_event: threading.Event | None=None, 
+            num_retries: int | None=None, 
+            check_retry_fn: CheckRetryFnType=lambda e: True,
+            retryable_exceptions: tuple[type[Exception], ...] | None=None, 
+            error_prefix: str='Network error', 
+            retry_callback: Callable[[int, str], Any] | None=None
+        ) -> None:
         self._call_fn = call_fn
         self._check_retry_fn = check_retry_fn
         self._error_prefix = error_prefix
@@ -68,7 +78,16 @@ class Retry(Generic[_R]):
         """The number of iterations the previous __call__ retried."""
         return self._num_iter
 
-    def __call__(self, *args: Any, num_retries: int | None=None, retry_timedelta: datetime.timedelta | None=None, retry_sleep_base: float | None=None, retry_cancel_event: threading.Event | None=None, check_retry_fn: CheckRetryFnType | None=None, **kwargs: Any) -> _R:
+    def __call__(
+        self, 
+        *args: Any, 
+        num_retries: int | None=None, 
+        retry_timedelta: datetime.timedelta | None=None, 
+        retry_sleep_base: float | None=None, 
+        retry_cancel_event: threading.Event | None=None, 
+        check_retry_fn: CheckRetryFnType | None=None, 
+        **kwargs: Any
+    ) -> _R:
         """Call the wrapped function, with retries.
 
         Args:

@@ -4,7 +4,7 @@ This class defines the interface that the W&B launch runner uses to manage the l
 of runs launched in different environments (e.g. runs launched locally or in a cluster).
 """
 from __future__ import annotations
-import logging
+
 import os
 import shutil
 import subprocess
@@ -15,7 +15,7 @@ import lumina
 from lumina.apis.internal import Api
 from lumina.sdk.lib import runid
 from .._project_spec import LaunchProject
-_logger = logging.getLogger(__name__)
+
 State = Literal['unknown', 'starting', 'running', 'failed', 'finished', 'stopping', 'stopped', 'preempted']
 
 class Status:

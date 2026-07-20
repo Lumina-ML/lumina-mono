@@ -8,7 +8,14 @@ if TYPE_CHECKING:
     from lumina.plot.custom_chart import CustomChart
 T = TypeVar('T')
 
-def confusion_matrix(probs: Sequence[Sequence[float]] | None=None, y_true: Sequence[T] | None=None, preds: Sequence[T] | None=None, class_names: Sequence[str] | None=None, title: str='Confusion Matrix Curve', split_table: bool=False) -> CustomChart:
+def confusion_matrix(
+        probs: Sequence[Sequence[float]] | None=None, 
+        y_true: Sequence[T] | None=None, 
+        preds: Sequence[T] | None=None, 
+        class_names: Sequence[str] | None=None, 
+        title: str='Confusion Matrix Curve', 
+        split_table: bool=False
+    ) -> CustomChart:
     """Constructs a confusion matrix from a sequence of probabilities or predictions.
 
     Args:
@@ -112,26 +119,40 @@ def confusion_matrix(probs: Sequence[Sequence[float]] | None=None, y_true: Seque
     confusion matrix.
     """
     np = util.get_module('numpy', required=('numpy is required to use wandb.plot.confusion_matrix, install with `pip install numpy`',))
+
     if probs is not None and preds is not None:
         raise ValueError('Only one of `probs` or `preds` should be provided, not both.')
     if probs is not None:
         preds = np.argmax(probs, axis=1).tolist()
+
     if len(preds) != len(y_true):
         raise ValueError('The number of predictions and true labels must be equal.')
+    
     if class_names is not None:
         n_classes = len(class_names)
         class_idx = list(range(n_classes))
+
         if len(set(preds)) > len(class_names):
             raise ValueError('The number of unique predicted classes exceeds the number of class names.')
+        
         if len(set(y_true)) > len(class_names):
             raise ValueError('The number of unique true labels exceeds the number of class names.')
     else:
         class_idx = set(preds).union(set(y_true))
         n_classes = len(class_idx)
         class_names = [f'Class_{i + 1}' for i in range(n_classes)]
+
     class_mapping = {val: i for i, val in enumerate(sorted(list(class_idx)))}
     counts = np.zeros((n_classes, n_classes))
+
     for i in range(len(preds)):
         counts[class_mapping[y_true[i]], class_mapping[preds[i]]] += 1
     data = [[class_names[i], class_names[j], counts[i, j]] for i in range(n_classes) for j in range(n_classes)]
-    return plot_table(data_table=lumina.Table(columns=['Actual', 'Predicted', 'nPredictions'], data=data), vega_spec_name='wandb/confusion_matrix/v1', fields={'Actual': 'Actual', 'Predicted': 'Predicted', 'nPredictions': 'nPredictions'}, string_fields={'title': title}, split_table=split_table)
+
+    return plot_table(
+        data_table=lumina.Table(columns=['Actual', 'Predicted', 'nPredictions'], data=data), 
+        vega_spec_name='wandb/confusion_matrix/v1', 
+        fields={'Actual': 'Actual', 'Predicted': 'Predicted', 'nPredictions': 'nPredictions'}, 
+        string_fields={'title': title}, 
+        split_table=split_table
+    )

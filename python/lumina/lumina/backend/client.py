@@ -90,7 +90,25 @@ class LuminaClient:
         name: Optional[str] = None,
         config: Optional[dict[str, Any]] = None,
         sweep_id: Optional[str] = None,
+        *,
+        display_name: Optional[str] = None,
+        entity: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        group: Optional[str] = None,
+        job_type: Optional[str] = None,
+        notes: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
+        """POST ``/api/v1/runs`` to create a new run.
+
+        Step 3.2 adds the optional kwargs ``display_name``, ``entity``,
+        ``tags``, ``group``, ``job_type``, ``notes``, ``metadata`` —
+        all forwarded verbatim to the server's ``CreateRunSchema`` (see
+        ``apps/server/src/modules/run/schema.ts``). Older callers that
+        only pass positional ``project/name/config/sweepId`` keep working
+        unchanged because every new kwarg defaults to None and the
+        corresponding server field is also optional.
+        """
         payload: dict[str, Any] = {"project": project}
         if name:
             payload["name"] = name
@@ -98,6 +116,20 @@ class LuminaClient:
             payload["sweepId"] = sweep_id
         if config:
             payload["config"] = config
+        if display_name:
+            payload["displayName"] = display_name
+        if entity:
+            payload["entity"] = entity
+        if tags:
+            payload["tags"] = list(tags)
+        if group:
+            payload["group"] = group
+        if job_type:
+            payload["jobType"] = job_type
+        if notes:
+            payload["notes"] = notes
+        if metadata:
+            payload["metadata"] = metadata
         return self._request("POST", "/api/v1/runs", payload)
 
     def finish_run(self, run_id: str, status: str = "finished") -> dict[str, Any]:
@@ -111,7 +143,16 @@ class LuminaClient:
         summary: dict[str, Any] | None = None,
         notes: str | None = None,
         metadata: dict[str, Any] | None = None,
+        telemetry: dict[str, Any] | None = None,
+        metric_defs: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """PATCH ``/api/v1/runs/:id`` with any subset of run-mutable fields.
+
+        Step 3.2 adds ``telemetry`` (wandb TelemetryRecord envelope) and
+        ``metricDefs`` (wandb MetricRecord definitions) to the existing
+        PATCH surface so the SDK sender can push them through the same
+        route instead of separate endpoints.
+        """
         payload: dict[str, Any] = {}
         if config is not None:
             payload["config"] = config
@@ -121,6 +162,10 @@ class LuminaClient:
             payload["notes"] = notes
         if metadata is not None:
             payload["metadata"] = metadata
+        if telemetry is not None:
+            payload["telemetry"] = telemetry
+        if metric_defs is not None:
+            payload["metricDefs"] = metric_defs
         return self._request("PATCH", f"/api/v1/runs/{run_id}", payload)
 
     def log_metrics(self, run_id: str, metrics: dict[str, Any], step: Optional[int] = None) -> None:
@@ -174,6 +219,108 @@ class LuminaClient:
 
     def mark_preempting(self, run_id: str) -> dict[str, Any]:
         return self._request("PATCH", f"/api/v1/runs/{run_id}", {"status": "preempting"})
+
+    def should_stop(self, run_id: str) -> bool:
+        """Polled by the SDK sender to check whether the user (via the
+        dashboard's "Stop" button) has asked for this run to terminate.
+
+        Backed by ``GET /api/v1/runs/{runId}/should-stop``. Step 3.2
+        replaces wandb's ``Api.check_stop_requested`` GraphQL call.
+        """
+        result = self._request("GET", f"/api/v1/runs/{run_id}/should-stop")
+        return bool(result.get("shouldStop"))
+
+    def get_run(self, run_id: str) -> dict[str, Any]:
+        """Fetch a single run row. Backed by ``GET /api/v1/runs/:id``."""
+        return self._request("GET", f"/api/v1/runs/{run_id}")
+
+    def get_run_resume_state(self, run_id: str) -> dict[str, Any]:
+        """Resume-time tail data for a run (historyTail, eventsTail,
+        summary, config, tags). Backed by
+        ``GET /api/v1/runs/{runId}/resume-state``. Step 3.2 replaces
+        wandb's ``Api.run_resume_status`` GraphQL call.
+        """
+        return self._request("GET", f"/api/v1/runs/{run_id}/resume-state")
+
+    def rewind_run(
+        self,
+        run_id: str,
+        *,
+        metric_name: str,
+        metric_value: float,
+        program_path: str | None = None,
+    ) -> dict[str, Any]:
+        """Fork a run's history from a chosen metric value. Backed by
+        ``POST /api/v1/runs/{runId}/rewind``. Step 3.2 replaces wandb's
+        ``RewindRun`` GraphQL mutation.
+        """
+        payload: dict[str, Any] = {
+            "metricName": metric_name,
+            "metricValue": metric_value,
+        }
+        if program_path is not None:
+            payload["programPath"] = program_path
+        return self._request("POST", f"/api/v1/runs/{run_id}/rewind", payload)
+
+    def create_run_alert(
+        self,
+        run_id: str,
+        *,
+        title: str,
+        text: str,
+        level: str | None = None,
+        wait_duration: float | None = None,
+    ) -> dict[str, Any]:
+        """Record a scriptable alert for a run. Backed by
+        ``POST /api/v1/runs/{runId}/alerts``. Step 3.2 replaces wandb's
+        ``notify_scriptable_run_alert`` mutation.
+        """
+        payload: dict[str, Any] = {"title": title, "text": text}
+        if level is not None:
+            payload["level"] = level
+        if wait_duration is not None:
+            payload["waitDuration"] = wait_duration
+        return self._request("POST", f"/api/v1/runs/{run_id}/alerts", payload)
+
+    def record_run_use_artifact(
+        self,
+        run_id: str,
+        *,
+        artifact_version_id: str,
+        use_type: str | None = None,
+    ) -> dict[str, Any]:
+        """Record that a run referenced an artifact version. Backed by
+        ``POST /api/v1/runs/{runId}/use-artifact``. Step 3.2 replaces
+        wandb's ``UseArtifact`` mutation.
+        """
+        payload: dict[str, Any] = {"artifactVersionId": artifact_version_id}
+        if use_type is not None:
+            payload["type"] = use_type
+        return self._request("POST", f"/api/v1/runs/{run_id}/use-artifact", payload)
+
+    def link_artifact_to_portfolio(
+        self,
+        version_id: str,
+        *,
+        portfolio_name: str,
+        portfolio_project: str,
+        portfolio_entity: str | None = None,
+        aliases: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Link an artifact version to a registry portfolio with optional
+        aliases (``latest``, ``v1``, ...). Backed by
+        ``POST /api/v1/versions/{id}/link``. Step 3.2 replaces wandb's
+        ``LinkArtifact`` mutation.
+        """
+        payload: dict[str, Any] = {
+            "portfolioName": portfolio_name,
+            "portfolioProject": portfolio_project,
+        }
+        if portfolio_entity is not None:
+            payload["portfolioEntity"] = portfolio_entity
+        if aliases is not None:
+            payload["aliases"] = list(aliases)
+        return self._request("POST", f"/api/v1/versions/{version_id}/link", payload)
 
     def pin_config_keys(self, run_id: str, keys: list[str]) -> dict[str, Any]:
         return self._request(

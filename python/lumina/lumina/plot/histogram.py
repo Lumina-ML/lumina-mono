@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     import lumina
     from lumina.plot.custom_chart import CustomChart
 
-def histogram(table: wandb.Table, value: str, title: str='', split_table: bool=False) -> CustomChart:
+def histogram(table: lumina.Table, value: str, title: str='', split_table: bool=False) -> CustomChart:
     """Constructs a histogram chart from a W&B Table.
 
     Args:
@@ -48,4 +48,10 @@ def histogram(table: wandb.Table, value: str, title: str='', split_table: bool=F
         run.log({"histogram-plot1": histogram})
     ```
     """
-    return plot_table(data_table=table, vega_spec_name='wandb/histogram/v0', fields={'value': value}, string_fields={'title': title}, split_table=split_table)
+    return plot_table(
+        data_table=table, 
+        vega_spec_name='wandb/histogram/v0', 
+        fields={'value': value}, 
+        string_fields={'title': title}, 
+        split_table=split_table
+    )

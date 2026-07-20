@@ -17,6 +17,7 @@ _wb_logging.configure_wandb_logger()
 from lumina import sdk as wandb_sdk
 import lumina
 import os as _os
+import warnings
 from typing import Any, Optional
 lumina.wandb_lib = wandb_sdk.lib
 
@@ -50,9 +51,6 @@ from lumina.backend.media import _is_media_value
 from lumina.backend.launch import launch as _lumina_launch
 from lumina.backend.launch import launch_agent as _lumina_launch_agent
 
-_WANDB_INIT = wandb_sdk.init
-_WANDB_FINISH = wandb_sdk.finish
-
 
 def init(
     project: str | None = None,
@@ -60,50 +58,53 @@ def init(
     config: dict | None = None,
     sweep: str | None = None,
     **kwargs,
-) -> LuminaRun | Any:
-    """Start a Lumina run."""
-    if _os.getenv("LUMINA_API_URL") or project:
-        ctx = get_run_context()
-        reset_run_context()
-        ctx.project = project or _os.getenv("LUMINA_PROJECT", "uncategorized")
-        ctx.name = name
-        ctx.config = config or {}
-        ctx.sweep_id = sweep
-        client = LuminaClient()
-        run_data = client.create_run(ctx.project, ctx.name, ctx.config, sweep_id=sweep)
-        run_id = run_data["runId"]
-        ctx.run_id = run_id
-        run = LuminaRun(
-            run_id=run_id,
-            project=ctx.project,
-            name=ctx.name,
-            config=ctx.config,
-            sweep_id=ctx.sweep_id,
-            client=client,
-        )
-        get_run_context().__dict__.update(ctx.__dict__)
-        # Rebind top-level helpers to the active run, matching wandb semantics.
-        from lumina.sdk.lib import module as _module
+) -> LuminaRun:
+    """Start a Lumina run.
 
-        _module.set_global(
-            run=run,
-            config=run.config,
-            log=run.log,
-            summary=run.summary,
-            save=run.save,
-            use_artifact=run.use_artifact,
-            log_artifact=run.log_artifact,
-            define_metric=run.define_metric,
-            alert=run.alert,
-            watch=run.watch,
-            unwatch=run.unwatch,
-            mark_preempting=run.mark_preempting,
-            log_model=run.log_model,
-            use_model=run.use_model,
-            link_model=run.link_model,
-        )
-        return run
-    return _WANDB_INIT(project=project, name=name, config=config, **kwargs)
+    Always dispatched to the Lumina backend (``LuminaClient`` → REST).
+    For legacy WandB-compat callers (e.g. ``import lumina as wandb`` against
+    api.wandb.ai), use ``from lumina.sdk.wandb_init import init`` directly.
+    """
+    ctx = get_run_context()
+    reset_run_context()
+    ctx.project = project or _os.getenv("LUMINA_PROJECT", "uncategorized")
+    ctx.name = name
+    ctx.config = config or {}
+    ctx.sweep_id = sweep
+    client = LuminaClient()
+    run_data = client.create_run(ctx.project, ctx.name, ctx.config, sweep_id=sweep)
+    run_id = run_data["runId"]
+    ctx.run_id = run_id
+    run = LuminaRun(
+        run_id=run_id,
+        project=ctx.project,
+        name=ctx.name,
+        config=ctx.config,
+        sweep_id=ctx.sweep_id,
+        client=client,
+    )
+    get_run_context().__dict__.update(ctx.__dict__)
+    # Rebind top-level helpers to the active run, matching wandb semantics.
+    from lumina.sdk.lib import module as _module
+
+    _module.set_global(
+        run=run,
+        config=run.config,
+        log=run.log,
+        summary=run.summary,
+        save=run.save,
+        use_artifact=run.use_artifact,
+        log_artifact=run.log_artifact,
+        define_metric=run.define_metric,
+        alert=run.alert,
+        watch=run.watch,
+        unwatch=run.unwatch,
+        mark_preempting=run.mark_preempting,
+        log_model=run.log_model,
+        use_model=run.use_model,
+        link_model=run.link_model,
+    )
+    return run
 
 
 def login(api_key: Optional[str] = None, **kwargs):
@@ -173,7 +174,11 @@ def add_tag(name: str, color: str | None = None, **kwargs):
 
 
 def finish(**kwargs):
-    """Finish the current Lumina run."""
+    """Finish the current Lumina run.
+
+    Always routed through the Lumina backend. Calling ``finish()`` without an
+    active run is a no-op (no fallback to wandb cloud).
+    """
     if isinstance(lumina.run, LuminaRun):
         lumina.run.finish(**kwargs)
         reset_run_context()
@@ -184,12 +189,59 @@ def finish(**kwargs):
         client.finish_run(ctx.run_id)
         reset_run_context()
         return
-    return _WANDB_FINISH(**kwargs)
+    # No active run; nothing to finish.
 
 
 setup = wandb_sdk.setup
 attach = _attach = wandb_sdk._attach
 teardown = _teardown = wandb_sdk.teardown
+
+
+def _deprecated_setup_shim(settings: Any = None) -> Any:
+    """No-op shim for the wandb-cloud `setup()` call.
+
+    Step 3.1c — under the Lumina backend, the wandb-core service
+    process that `setup()` used to bootstrap is no longer used
+    (`lumina.init()` is self-contained). Kept as a public-API stub
+    so existing callers don't AttributeError; emits a one-shot
+    deprecation warning pointing at `lumina.init()`.
+    """
+    warnings.warn(
+        "lumina.setup() is a no-op under the Lumina backend; "
+        "use lumina.init() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return None
+
+
+def _deprecated_attach_shim(*args: Any, **kwargs: Any) -> Any:
+    warnings.warn(
+        "lumina.attach() / lumina._attach() is unsupported under the "
+        "Lumina backend; load a saved run via the PublicApi instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return None
+
+
+def _deprecated_teardown_shim(exit_code: int | None = None) -> None:
+    warnings.warn(
+        "lumina.teardown() / lumina._teardown() is a no-op under the "
+        "Lumina backend; runs self-finalize when their context exits.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+
+# Override the wandb_sdk.* bindings with no-op + deprecation-warning
+# shims. The `wandb_sdk.setup/_attach/teardown` functions are kept
+# importable (line 194-196) for legacy code that imports them via
+# `from lumina import wandb_sdk`; the public-API names below get the
+# shim.
+lumina_setup = _deprecated_setup_shim  # type: ignore[assignment]
+lumina_attach = _deprecated_attach_shim  # type: ignore[assignment]
+lumina_teardown = _deprecated_teardown_shim  # type: ignore[assignment]
 join = finish
 helper = wandb_sdk.helper
 controller = wandb_sdk.controller
@@ -228,7 +280,6 @@ from lumina.data_types import Molecule
 from lumina.data_types import Histogram
 from lumina.data_types import Classes
 from lumina.data_types import JoinedTable
-from lumina.wandb_agent import agent as _wandb_agent
 from lumina.backend.sweep import sweep, agent, get_sweep
 from lumina.plot import visualize, plot_table
 from lumina.integration.sagemaker import sagemaker_auth
