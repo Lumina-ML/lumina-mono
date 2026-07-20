@@ -19,6 +19,11 @@ export class RunRepository {
         status: "running",
         config: data.config as any,
         metadata: data.metadata as any,
+        // Step 3.2 fields — all nullable; safe to omit on old callers.
+        displayName: data.displayName ?? null,
+        group: data.group ?? null,
+        jobType: data.jobType ?? null,
+        notes: data.notes ?? null,
       },
     });
   }

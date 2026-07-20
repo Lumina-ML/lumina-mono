@@ -120,6 +120,14 @@ model Run {
   /// Metric definitions (name -> {step, hidden, summaryType, ...}). Folded
   /// into the existing PATCH /runs/:id route via UpdateRunSchema.
   metricDefs  Json     @default("{}")
+  /// Optional human-readable alias shown in the dashboard; independent of
+  /// the immutable `runId` (UUID v7). Step 3.2 sends this from the SDK
+  /// sender to keep wandb's displayName parity.
+  displayName String?
+  /// Optional grouping hint (used by sweeps / launch to fan out jobs).
+  group       String?
+  /// Optional job type ("train" / "eval" / "sweep-agent" / ...).
+  jobType     String?
   startedAt   DateTime @default(now())
   finishedAt  DateTime?
   createdAt   DateTime @default(now())

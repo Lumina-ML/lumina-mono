@@ -90,7 +90,25 @@ class LuminaClient:
         name: Optional[str] = None,
         config: Optional[dict[str, Any]] = None,
         sweep_id: Optional[str] = None,
+        *,
+        display_name: Optional[str] = None,
+        entity: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        group: Optional[str] = None,
+        job_type: Optional[str] = None,
+        notes: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
+        """POST ``/api/v1/runs`` to create a new run.
+
+        Step 3.2 adds the optional kwargs ``display_name``, ``entity``,
+        ``tags``, ``group``, ``job_type``, ``notes``, ``metadata`` —
+        all forwarded verbatim to the server's ``CreateRunSchema`` (see
+        ``apps/server/src/modules/run/schema.ts``). Older callers that
+        only pass positional ``project/name/config/sweepId`` keep working
+        unchanged because every new kwarg defaults to None and the
+        corresponding server field is also optional.
+        """
         payload: dict[str, Any] = {"project": project}
         if name:
             payload["name"] = name
@@ -98,6 +116,20 @@ class LuminaClient:
             payload["sweepId"] = sweep_id
         if config:
             payload["config"] = config
+        if display_name:
+            payload["displayName"] = display_name
+        if entity:
+            payload["entity"] = entity
+        if tags:
+            payload["tags"] = list(tags)
+        if group:
+            payload["group"] = group
+        if job_type:
+            payload["jobType"] = job_type
+        if notes:
+            payload["notes"] = notes
+        if metadata:
+            payload["metadata"] = metadata
         return self._request("POST", "/api/v1/runs", payload)
 
     def finish_run(self, run_id: str, status: str = "finished") -> dict[str, Any]:
