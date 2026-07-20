@@ -30,8 +30,33 @@ from lumina.apis.normalize import normalize_exceptions
 from lumina.apis.public.const import RETRY_TIMEDELTA
 from lumina.apis.public.registries import Registries, Registry
 from lumina.apis.public.registries._utils import fetch_org_entity_from_organization
-from lumina.apis.public.service_api import ServiceApi
 from lumina.apis.public.utils import PathType, fetch_org_from_settings_or_entity, parse_org_from_registry_path
+
+
+class ServiceApi:
+    """Stub for the wandb-cloud `ServiceApi` GraphQL transport.
+
+    Step 3.5 — the wandb-cloud service binary / GraphQL transport
+    was removed. The `PublicApi` class still constructs a `ServiceApi`
+    instance for backwards compatibility, but every method that
+    used to round-trip a GraphQL mutation/now raises
+    `NotImplementedError`. Use `LuminaClient` for actual reads /
+    writes against a self-hosted Lumina backend.
+    """
+
+    def __init__(self, settings: Any = None, timeout: Any = None) -> None:
+        self._settings = settings
+        self._timeout = timeout
+
+    @property
+    def app_url(self) -> str | None:
+        return None
+
+    def execute_graphql(self, *_args: Any, **_kwargs: Any) -> Any:
+        raise NotImplementedError(
+            "PublicApi.execute_graphql() is unavailable under the "
+            "Lumina backend. Use LuminaClient (lumina.backend.client).",
+        )
 from lumina.errors import UsageError
 from lumina.proto import wandb_internal_pb2 as pb
 from lumina.proto.wandb_telemetry_pb2 import Deprecated

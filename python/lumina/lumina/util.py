@@ -1411,18 +1411,25 @@ def working_set() -> Iterable[InstalledDistribution]:
             yield InstalledDistribution(key=d.metadata['Name'], version=d.version)
 
 def get_core_path() -> str:
-    """Returns the path to the wandb-core binary.
+    """Stub for the wandb-core binary path lookup.
 
-    Returns:
-        str: The path to the wandb-core package.
+    Step 3.5 — `wandb-core` is the out-of-process service binary that
+    the rewired `SendManager` no longer depends on (see step 3.2
+    phase C). The Lumina SDK uses `LuminaClient` REST instead, so
+    there is no core binary to find.
 
-    Raises:
-        WandbCoreNotAvailableError: If wandb-core was not built for the current system.
+    Kept as a callable so existing imports don't fail. CLI commands
+    (`lumina beta`, `lumina leet`, etc.) that depended on the
+    binary now receive a clear `WandbCoreNotAvailableError` at
+    invocation time instead of failing with a confusing "File not
+    found" traceback.
     """
-    bin_path = pathlib.Path(__file__).parent / 'bin' / 'wandb-core'
-    if not bin_path.exists():
-        raise WandbCoreNotAvailableError(f'File not found: {bin_path}. Please contact support at support@wandb.com. Your platform is: {platform.platform()}.')
-    return str(bin_path)
+    raise WandbCoreNotAvailableError(
+        "wandb-core is not used by the Lumina SDK. The reporting "
+        "path goes through LuminaClient (REST) instead. The "
+        "`lumina beta` / `lumina leet` commands require the wandb-core "
+        "binary which is not part of this build.",
+    )
 
 def time_string_to_seconds(time_str: str) -> int:
     """Parse a time period string and return seconds.
