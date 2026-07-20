@@ -50,7 +50,6 @@ from lumina.backend.media import _is_media_value
 from lumina.backend.launch import launch as _lumina_launch
 from lumina.backend.launch import launch_agent as _lumina_launch_agent
 
-_WANDB_INIT = wandb_sdk.init
 _WANDB_FINISH = wandb_sdk.finish
 
 
@@ -60,50 +59,53 @@ def init(
     config: dict | None = None,
     sweep: str | None = None,
     **kwargs,
-) -> LuminaRun | Any:
-    """Start a Lumina run."""
-    if _os.getenv("LUMINA_API_URL") or project:
-        ctx = get_run_context()
-        reset_run_context()
-        ctx.project = project or _os.getenv("LUMINA_PROJECT", "uncategorized")
-        ctx.name = name
-        ctx.config = config or {}
-        ctx.sweep_id = sweep
-        client = LuminaClient()
-        run_data = client.create_run(ctx.project, ctx.name, ctx.config, sweep_id=sweep)
-        run_id = run_data["runId"]
-        ctx.run_id = run_id
-        run = LuminaRun(
-            run_id=run_id,
-            project=ctx.project,
-            name=ctx.name,
-            config=ctx.config,
-            sweep_id=ctx.sweep_id,
-            client=client,
-        )
-        get_run_context().__dict__.update(ctx.__dict__)
-        # Rebind top-level helpers to the active run, matching wandb semantics.
-        from lumina.sdk.lib import module as _module
+) -> LuminaRun:
+    """Start a Lumina run.
 
-        _module.set_global(
-            run=run,
-            config=run.config,
-            log=run.log,
-            summary=run.summary,
-            save=run.save,
-            use_artifact=run.use_artifact,
-            log_artifact=run.log_artifact,
-            define_metric=run.define_metric,
-            alert=run.alert,
-            watch=run.watch,
-            unwatch=run.unwatch,
-            mark_preempting=run.mark_preempting,
-            log_model=run.log_model,
-            use_model=run.use_model,
-            link_model=run.link_model,
-        )
-        return run
-    return _WANDB_INIT(project=project, name=name, config=config, **kwargs)
+    Always dispatched to the Lumina backend (``LuminaClient`` → REST).
+    For legacy WandB-compat callers (e.g. ``import lumina as wandb`` against
+    api.wandb.ai), use ``from lumina.sdk.wandb_init import init`` directly.
+    """
+    ctx = get_run_context()
+    reset_run_context()
+    ctx.project = project or _os.getenv("LUMINA_PROJECT", "uncategorized")
+    ctx.name = name
+    ctx.config = config or {}
+    ctx.sweep_id = sweep
+    client = LuminaClient()
+    run_data = client.create_run(ctx.project, ctx.name, ctx.config, sweep_id=sweep)
+    run_id = run_data["runId"]
+    ctx.run_id = run_id
+    run = LuminaRun(
+        run_id=run_id,
+        project=ctx.project,
+        name=ctx.name,
+        config=ctx.config,
+        sweep_id=ctx.sweep_id,
+        client=client,
+    )
+    get_run_context().__dict__.update(ctx.__dict__)
+    # Rebind top-level helpers to the active run, matching wandb semantics.
+    from lumina.sdk.lib import module as _module
+
+    _module.set_global(
+        run=run,
+        config=run.config,
+        log=run.log,
+        summary=run.summary,
+        save=run.save,
+        use_artifact=run.use_artifact,
+        log_artifact=run.log_artifact,
+        define_metric=run.define_metric,
+        alert=run.alert,
+        watch=run.watch,
+        unwatch=run.unwatch,
+        mark_preempting=run.mark_preempting,
+        log_model=run.log_model,
+        use_model=run.use_model,
+        link_model=run.link_model,
+    )
+    return run
 
 
 def login(api_key: Optional[str] = None, **kwargs):
