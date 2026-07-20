@@ -66,9 +66,9 @@ and already routed through `lumina.backend.*`:
   active run-context. Behavior is currently "fall through to
   `sdk.wandb_run.Run.finish()`". Should be cut over in step 3.1b (next
   step) for consistency — replace fallback with explicit no-op + reset.
+  ✅ **Done in 3.1b** — fallback replaced with no-op, `_WANDB_FINISH` removed.
 - **Dead aliases**: `_WANDB_INIT = wandb_sdk.init` (line 53) was removed in
-  this commit. `_WANDB_FINISH` still in use at line 190, will be removed in
-  3.1b.
+  3.1. `_WANDB_FINISH` removed in 3.1b. ✅
 - **`lumina.setup` / `lumina.attach` / `lumina.teardown`** still bind to
   `wandb_sdk.*`. Not used by `init()`/`finish()` directly, but exposed as
   public API. Out of scope for step 3.1; track for step 3.1c or later.

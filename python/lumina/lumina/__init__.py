@@ -50,8 +50,6 @@ from lumina.backend.media import _is_media_value
 from lumina.backend.launch import launch as _lumina_launch
 from lumina.backend.launch import launch_agent as _lumina_launch_agent
 
-_WANDB_FINISH = wandb_sdk.finish
-
 
 def init(
     project: str | None = None,
@@ -175,7 +173,11 @@ def add_tag(name: str, color: str | None = None, **kwargs):
 
 
 def finish(**kwargs):
-    """Finish the current Lumina run."""
+    """Finish the current Lumina run.
+
+    Always routed through the Lumina backend. Calling ``finish()`` without an
+    active run is a no-op (no fallback to wandb cloud).
+    """
     if isinstance(lumina.run, LuminaRun):
         lumina.run.finish(**kwargs)
         reset_run_context()
@@ -186,7 +188,7 @@ def finish(**kwargs):
         client.finish_run(ctx.run_id)
         reset_run_context()
         return
-    return _WANDB_FINISH(**kwargs)
+    # No active run; nothing to finish.
 
 
 setup = wandb_sdk.setup
