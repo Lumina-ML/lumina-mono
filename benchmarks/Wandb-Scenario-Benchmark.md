@@ -3,6 +3,10 @@
 > 目标：为 Lumina 建立一套覆盖 Wandb 核心能力、可分级数据量、最终用于产品验收的基准测试。
 > 
 > 状态：设计稿 2026-07-21。
+>
+> 更新 2026-07-21：第一批核心场景（ET-1 / ET-2 / AR-1 / SW-1 / PA-1）已实现并接入 `scenario_runner.py`。本地 docker compose 执行 AR-1 时，对象存储 presigned URL 使用内部 hostname（`minio:9000`），从宿主机无法直接访问，当前会标记为 skip；需在容器网络内执行或配置公共 S3 endpoint。
+>
+> 更新 2026-07-21：第二批核心场景（AR-2 / AR-3 / SW-2 / TR-1 / AW-1）已实现并接入 runner。AR-2 与 AR-1 受同一 S3 内网 hostname 限制会 skip；TR-1 当前验证 trace 创建与 project-scoped 列表，span tree 细节验证需等 workspace-guard 对 ClickHouse trace 的 authz 查询统一后补齐。
 
 ## 1. 设计原则
 
@@ -25,8 +29,8 @@
 | **Concurrency** | 多 run 并行、多 agent 并发 sweep | 无并发 benchmark |
 | **Read/Query** | metric 列表、summary 聚合、Public API 查询 | 无读侧 benchmark |
 | **Correctness** | summary 聚合、artifact digest、lineage、sweep early-stop | 未系统验证 |
-| **Multi-workspace** | 切换 workspace、跨 workspace 隔离 | 无相关 benchmark |
-| **Storage Backend** | Postgres vs ClickHouse metrics；本地 vs S3 artifacts | 无后端对比 benchmark |
+| **Multi-workspace** | 切换 workspace、跨 workspace 隔离 | AW-1 已实现 |
+| **Storage Backend** | Postgres vs ClickHouse metrics；本地 vs S3 artifacts | 无后端对比 benchmark；TR-1 span 验证受 ClickHouse authz 缺口影响 |
 
 ## 3. 数据量级定义
 
@@ -122,19 +126,19 @@
 ```
 benchmarks/
   Wandb-Scenario-Benchmark.md      # 本文档
-  scenario_runner.py               # 统一入口（已创建骨架）
+  scenario_runner.py               # 统一入口（已接入 10 个场景）
   scenarios/
     __init__.py                    # 已创建
     base.py                        # Scenario 抽象基类 + LEVEL_PARAMS（已创建）
     experiment_tracking.py         # ET-1, ET-2 已实现；ET-3 ~ ET-5 待补充
-    artifacts.py                   # AR-1 ~ AR-3, MR-1 待实现
+    artifacts.py                   # AR-1 ~ AR-3 已实现（AR-1/AR-2 本地 docker 可能 skip）
     media_tables.py                # MD-1 ~ MD-2 待实现
-    sweeps.py                      # SW-1 ~ SW-2 待实现
+    sweeps.py                      # SW-1, SW-2 已实现
     launch.py                      # LN-1 ~ LN-2 待实现
     evaluations.py                 # EV-1 ~ EV-2 待实现
-    traces.py                      # TR-1 ~ TR-2 待实现
-    reports_public_api.py          # RP-1, PA-1 待实现
-    auth_workspace.py              # AW-1 ~ AW-2 待实现
+    traces.py                      # TR-1 已实现（span 树细节验证待补齐）；TR-2 待实现
+    reports_public_api.py          # PA-1 已实现；RP-1 待实现
+    auth_workspace.py              # AW-1 已实现；AW-2 待实现
 ```
 
 ### 5.2 `Scenario` 基类约定
@@ -191,11 +195,11 @@ python benchmarks/scenario_runner.py --mode real --level M --scenario ET-2 AR-1
 
 ## 7. 推荐实施顺序
 
-1. **先实现 `scenarios/base.py` + `scenario_runner.py` 骨架**（0.5d）
-2. **ET-1 / ET-2 / AR-1 / SW-1 / PA-1** 作为第一批核心场景（2-3d）
-3. **AR-2 / AR-3 / SW-2 / TR-1 / AW-1** 作为第二批（2-3d）
+1. ✅ **先实现 `scenarios/base.py` + `scenario_runner.py` 骨架**
+2. ✅ **ET-1 / ET-2 / AR-1 / SW-1 / PA-1** 作为第一批核心场景
+3. ✅ **AR-2 / AR-3 / SW-2 / TR-1 / AW-1** 作为第二批核心场景
 4. **MR-1 / MD-1 / MD-2 / LN-1 / EV-1** 补齐（2d）
-5. **XL 级别 + 真实后端压测**（1-2d）
+5. **XL 级别 + 真实后端压测 + TR-1 span 树完整验证**（1-2d）
 
 ## 8. 验收标准
 

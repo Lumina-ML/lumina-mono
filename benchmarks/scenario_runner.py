@@ -20,20 +20,31 @@ from typing import Literal
 BENCH_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BENCH_DIR))
 
-from scenarios.artifacts import ArtifactUploadDownloadScenario
+from scenarios.artifacts import (
+    ArtifactLineageScenario,
+    ArtifactUploadDownloadScenario,
+    ManySmallFilesArtifactScenario,
+)
+from scenarios.auth_workspace import WorkspaceIsolationScenario
 from scenarios.base import Scenario, ScenarioResult
 from scenarios.experiment_tracking import (
     ExperimentLifecycleScenario,
     MetricThroughputScenario,
 )
 from scenarios.public_api import PublicApiQueryScenario
-from scenarios.sweeps import BayesianSweepScenario
+from scenarios.sweeps import BayesianSweepScenario, ConcurrentSweepAgentsScenario
+from scenarios.traces import TraceSpanTreeScenario
 
 SCENARIOS: dict[str, type[Scenario]] = {
     ExperimentLifecycleScenario.scenario_id: ExperimentLifecycleScenario,
     MetricThroughputScenario.scenario_id: MetricThroughputScenario,
     ArtifactUploadDownloadScenario.scenario_id: ArtifactUploadDownloadScenario,
+    ManySmallFilesArtifactScenario.scenario_id: ManySmallFilesArtifactScenario,
+    ArtifactLineageScenario.scenario_id: ArtifactLineageScenario,
     BayesianSweepScenario.scenario_id: BayesianSweepScenario,
+    ConcurrentSweepAgentsScenario.scenario_id: ConcurrentSweepAgentsScenario,
+    TraceSpanTreeScenario.scenario_id: TraceSpanTreeScenario,
+    WorkspaceIsolationScenario.scenario_id: WorkspaceIsolationScenario,
     PublicApiQueryScenario.scenario_id: PublicApiQueryScenario,
 }
 
