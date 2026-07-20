@@ -29,7 +29,19 @@ lumina demo --reset       # wipe everything under __demo__
 
 ## Status
 
-MVP V1 in progress. Current end-to-end flow works. Note: workspace context and guard plugin are now shipped; multi-workspace UI switching works, but API key storage still uses `localStorage` (HttpOnly cookie mode is planned, see `docs/Design-Multiworkspace-Cookie-Auth.md`).
+MVP V1 in progress. Current end-to-end flow works.
+
+Shipped:
+- Workspace context/guard plugin + UI workspace switching (`X-Lumina-Workspace` header)
+- Run Comparison page with metric overlay chart + parallel coordinates + heatmap
+- Chart data transform layer, `ChartPanel`, and chart widget system
+- Query error boundary (`QueryBoundary`) and `useConfirm` dialog service
+- Redis `/readyz` probe and OTel SDK auto-initialization
+- WandB scenario benchmark suite with 23 scenarios
+
+Still open:
+- API key storage still uses `localStorage`; HttpOnly cookie mode is planned (see `docs/Design-Multiworkspace-Cookie-Auth.md`).
+- ClickHouse trace detail authz (`/traces/:traceId/spans`) needs guard unified with `traceStorage`.
 
 ```bash
 # Terminal 1: start backend + database
@@ -58,11 +70,27 @@ open http://localhost:3000
 
 ## Architecture
 
-- `apps/server` - Fastify backend API (Run + Metric modules)
-- `apps/dashboard` - Vue 3 + Vite web dashboard (Projects, Runs, Metrics, Logs, System, Tags)
-- `packages/shared` - Shared TypeScript types and schemas
+- `apps/server` - Fastify backend API (Run, Metric, Artifact, Sweep, Launch, Eval, Trace, Report, etc.)
+- `apps/dashboard` - Vue 3 + Vite web dashboard
+- `packages/shared` - Shared TypeScript types and schemas (placeholder)
 - `packages/lumina-ui` - Internal UI component library
 - `python/lumina` - Python SDK, rebased from WandB
+- `benchmarks/` - WandB scenario benchmark suite (`scenario_runner.py`)
+
+## Benchmarks
+
+Lumina ships a WandB scenario benchmark suite used for product acceptance. It covers 23 scenarios across experiment tracking, artifacts, model registry, sweeps, launch, evaluations, traces, reports, public API, auth, and multi-workspace.
+
+```bash
+# Start the full stack
+docker compose up
+
+# Run the S-level acceptance suite
+cd python/lumina
+uv run python ../../benchmarks/scenario_runner.py --mode real --level S
+```
+
+See [`benchmarks/Wandb-Scenario-Benchmark.md`](./benchmarks/Wandb-Scenario-Benchmark.md) for the full matrix.
 
 ## Quick Start
 
@@ -488,6 +516,11 @@ lumina.launch_agent("default-queue", project="demo", max_runs=1)
 ```
 
 See [`examples/launch_experiment.py`](./examples/launch_experiment.py) for a full example.
+
+## Developer guides
+
+- [`AGENTS.md`](./AGENTS.md) — conventions and commands for AI agents working in this repo
+- [`CLAUDE.md`](./CLAUDE.md) — detailed codebase guide for Claude Code
 
 ## Storage configuration
 
