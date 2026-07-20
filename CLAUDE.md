@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository
 
-Lumina — open-source MLOps platform rebased from WandB, designed for self-hosting. Monorepo managed by pnpm workspaces and Turbo. Default branch: `main`. Feature branch in use: `feat/lumina-ui`.
+Lumina — open-source MLOps platform rebased from WandB, designed for self-hosting. Monorepo managed by pnpm workspaces and Turbo. Default branch: `main`. Feature branch in use: `feat/wandb_benchmark`.
 
 ```
 lumina-mono/
@@ -13,8 +13,9 @@ lumina-mono/
 │   └── dashboard/    Vue 3 + Vite web dashboard
 ├── packages/
 │   ├── lumina-ui/    Internal UI component library (Vue 3, GridStack, ECharts)
-│   └── shared/       Shared types/schemas (currently zod-based, near-empty)
+│   └── shared/       Shared types/schemas (placeholder workspace)
 ├── python/lumina/    Python SDK (rebased from WandB; pip-installable)
+├── benchmarks/       Wandb scenario benchmark suite
 ├── examples/         SDK usage examples, one per feature
 ├── lumina-design/    Design language research (tokens, mobile-first, widgets)
 └── docs/             Architecture notes, iteration goals, gap analyses
@@ -80,9 +81,9 @@ Fastify on Node 20, ESM, TypeScript, Prisma. Entry points:
 
 1. **Config** (`plugins/config.ts`) — Zod-validated env (`loadConfig` in `config/index.ts`)
 2. **Core infra** — `prismaPlugin`, `clickhousePlugin`, `storagePlugin`, `telemetryPlugin`, `busPlugin`, `cachePlugin`, `queuePlugin`
-3. **Cross-cutting** — `authPlugin`, `observabilityPlugin`, `websocketPlugin`
+3. **Cross-cutting** — `authPlugin`, `observabilityPlugin`, `otelPlugin`, `workspaceContextPlugin`, `workspaceGuardPlugin`, `websocketPlugin`, `healthPlugin`
 4. **Business modules** — all registered with `/api/v1` prefix
-5. Default workspace seed (`workspaceId = "default"`)
+5. Default workspace seed (`workspaceId` from `LUMINA_DEFAULT_WORKSPACE_ID`, default `"default"`)
 
 Each module under `src/modules/<name>/` follows the same shape:
 
@@ -198,6 +199,21 @@ sweep.py         sweep / agent
 
 When modifying the SDK, prefer extending `lumina/backend/` modules over touching WandB-derived code (`lumina/sdk/`, `lumina/apis/`), unless the change is a WandB-compatible bug fix.
 
+## Benchmarks (`benchmarks/`)
+
+The WandB scenario benchmark is the product-acceptance harness. It lives in `benchmarks/scenario_runner.py` and covers 23 scenarios across experiment tracking, artifacts, model registry, sweeps, launch, evaluations, traces, reports, public API, auth, and multi-workspace.
+
+```bash
+# Full acceptance run against docker compose stack
+cd python/lumina
+uv run python ../../benchmarks/scenario_runner.py --mode real --level S
+
+# Single scenario, fake backend (contract regression)
+python benchmarks/scenario_runner.py --mode fake --level S --scenario ET-2
+```
+
+When adding a major SDK or server feature, add a matching `Scenario` subclass in `benchmarks/scenarios/` and register it in `scenario_runner.py`.
+
 ## Design system (`lumina-design/`)
 
 Research-driven design language (LDL). Phases per `How-To-Design.md`. Current state: Phase 1 (Foundation tokens). Important conventions:
@@ -210,7 +226,7 @@ Research-driven design language (LDL). Phases per `How-To-Design.md`. Current st
 
 - Server modules: handler validates with Zod, service publishes domain events, repository owns DB. Never reach into Prisma from handlers.
 - New domain events: extend `KnownDomainEvent` in `src/core/events/domain-event.ts` and add a matching entry in `src/jobs/types.ts` if a durable job is needed.
-- Workspace: every project belongs to a workspace. The seed bootstrap creates `workspaceId="default"` if missing; new code should not hardcode this — accept it via env or membership.
+- Workspace: every project belongs to a workspace. The seed bootstrap creates the default workspace if missing; new code should not hardcode `"default"` — accept it via env or membership. SDK and dashboard switch workspaces via the `X-Lumina-Workspace` header.
 - Run IDs: always `run.runId` (UUID v7), not the internal `Run.id` PK. The internal PK is opaque.
 - API style: REST under `/api/v1`, JSON, mutating endpoints accept `Authorization: Bearer <apiKey>`. The dashboard reads `VITE_LUMINA_API_KEY` to attach it client-side.
 - Frontend data fetching: TanStack Vue Query in `composables/use*.ts`. Services in `services/*.service.ts` are plain functions that call `fetchApi`.
@@ -253,10 +269,13 @@ Research-driven design language (LDL). Phases per `How-To-Design.md`. Current st
 
 ## Documentation references
 
+- `AGENTS.md` — agent working conventions for this repo (read this first)
 - `docs/MasterPlan.md` — feature progress against WandB parity (P0/P1 checklist)
 - `docs/DataModel.md` — Prisma schema notes
-- `docs/服务端架构.md`, `docs/服务端架构Gap.md` — backend architecture and remaining gaps
+- `docs/Next-Steps.md` — verified execution snapshot and prioritized next steps
+- `docs/Design-Multiworkspace-Cookie-Auth.md` — multi-workspace + cookie auth design
+- `benchmarks/Wandb-Scenario-Benchmark.md` — WandB scenario benchmark matrix and runbook
+- `docs/服务端架构.md` — backend architecture
 - `docs/前端架构.md` — frontend architecture
-- `docs/前端设计-v1.md` — frontend product design baseline (Layout / Routing / Pages / Interactions)
-- `docs/服务端SDK-Wandb能力Gap.md` — server+SDK feature parity gaps vs WandB
+- `docs/前端设计-v1.md` — frontend product design baseline
 - `lumina-design/How-To-Design.md` — design system phases
