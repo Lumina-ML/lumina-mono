@@ -969,10 +969,148 @@ export function createFakePrisma(options: {
     },
   };
 
+  // ===== Step 3.2 sender tables (alerts, use-artifact, portfolio links) =====
+  //
+  // The auto-stub Proxy further down returns `{ count: 0 }` for `create`,
+  // which makes the handler crash trying to read e.g. `alert.id`. These
+  // explicit stubs mirror the runModel shape (just enough methods for the
+  // handlers' actual calls).
+
+  const runAlertRows = new Map<string, {
+    id: string;
+    runId: string;
+    title: string;
+    text: string;
+    level: string;
+    createdAt: Date;
+  }>();
+  const runAlertModel = {
+    create: async ({ data }: { data: { runId: string; title: string; text: string; level?: string } }) => {
+      const row = {
+        id: uuidv7(),
+        runId: data.runId,
+        title: data.title,
+        text: data.text,
+        level: data.level ?? "INFO",
+        createdAt: new Date(),
+      };
+      runAlertRows.set(row.id, row);
+      return row;
+    },
+    findMany: async ({ where }: { where?: { runId?: string } } = {}) => {
+      const all = Array.from(runAlertRows.values());
+      return where?.runId ? all.filter((r) => r.runId === where.runId) : all;
+    },
+  };
+
+  const runUseArtifactRows = new Map<string, {
+    id: string;
+    runId: string;
+    artifactVersionId: string;
+    useType: string | null;
+    createdAt: Date;
+  }>();
+  const runUseArtifactModel = {
+    create: async ({ data }: { data: { runId: string; artifactVersionId: string; useType?: string | null } }) => {
+      const row = {
+        id: uuidv7(),
+        runId: data.runId,
+        artifactVersionId: data.artifactVersionId,
+        useType: data.useType ?? null,
+        createdAt: new Date(),
+      };
+      runUseArtifactRows.set(row.id, row);
+      return row;
+    },
+    upsert: async ({
+      where,
+      create,
+    }: {
+      where: { runId_artifactVersionId_useType_key?: { runId: string; artifactVersionId: string; useType: string | null } };
+      create: { runId: string; artifactVersionId: string; useType?: string | null };
+    }) => {
+      // Dedup by (runId, artifactVersionId, useType).
+      const existing = Array.from(runUseArtifactRows.values()).find(
+        (r) =>
+          r.runId === create.runId &&
+          r.artifactVersionId === create.artifactVersionId &&
+          r.useType === (create.useType ?? null),
+      );
+      if (existing) return existing;
+      return runUseArtifactModel.create({ data: create });
+    },
+  };
+
+  const artifactPortfolioLinkRows = new Map<string, {
+    id: string;
+    artifactVersionId: string;
+    portfolioName: string;
+    portfolioProject: string;
+    portfolioEntity: string | null;
+    aliases: string[];
+    versionIndex: number;
+    createdAt: Date;
+  }>();
+  const artifactPortfolioLinkModel = {
+    findMany: async ({
+      where,
+      orderBy,
+      take,
+      select,
+    }: {
+      where?: { portfolioProject?: string; portfolioName?: string };
+      orderBy?: { versionIndex?: "asc" | "desc" };
+      take?: number;
+      select?: { versionIndex?: boolean };
+    } = {}) => {
+      let all = Array.from(artifactPortfolioLinkRows.values());
+      if (where?.portfolioProject) {
+        all = all.filter((r) => r.portfolioProject === where.portfolioProject);
+      }
+      if (where?.portfolioName) {
+        all = all.filter((r) => r.portfolioName === where.portfolioName);
+      }
+      if (orderBy?.versionIndex === "desc") {
+        all = all.sort((a, b) => b.versionIndex - a.versionIndex);
+      }
+      if (typeof take === "number") all = all.slice(0, take);
+      if (select?.versionIndex) {
+        return all.map((r) => ({ versionIndex: r.versionIndex }));
+      }
+      return all;
+    },
+    create: async ({ data }: {
+      data: {
+        artifactVersionId: string;
+        portfolioName: string;
+        portfolioProject: string;
+        portfolioEntity?: string | null;
+        aliases?: string[];
+        versionIndex?: number;
+      };
+    }) => {
+      const row = {
+        id: uuidv7(),
+        artifactVersionId: data.artifactVersionId,
+        portfolioName: data.portfolioName,
+        portfolioProject: data.portfolioProject,
+        portfolioEntity: data.portfolioEntity ?? null,
+        aliases: data.aliases ?? [],
+        versionIndex: data.versionIndex ?? 0,
+        createdAt: new Date(),
+      };
+      artifactPortfolioLinkRows.set(row.id, row);
+      return row;
+    },
+  };
+
   const extended: Record<string, unknown> = {
     ...baseExposed,
     trace: traceModel,
     span: spanModel,
+    runAlert: runAlertModel,
+    runUseArtifact: runUseArtifactModel,
+    artifactPortfolioLink: artifactPortfolioLinkModel,
     // Test hook so buildTestApp can wire the in-memory traceStorage onto
     // the fake prisma after construction. The traceStorage isn't known at
     // createFakePrisma call time — see fake-prisma.ts header for context.

@@ -36,6 +36,11 @@ import { workspaceMembershipRoutes } from "./modules/workspace-membership/routes
 import { runRoutes } from "./modules/run/routes.js";
 import { runFileRoutes } from "./modules/run-file/routes.js";
 import { runStopRoutes } from "./modules/run-stop/routes.js";
+import { runResumeRoutes } from "./modules/run-resume/routes.js";
+import { runRewindRoutes } from "./modules/run-rewind/routes.js";
+import { runAlertRoutes } from "./modules/run-alert/routes.js";
+import { runUseArtifactRoutes } from "./modules/run-use-artifact/routes.js";
+import { artifactLinkRoutes } from "./modules/artifact-link/routes.js";
 import { sweepRoutes } from "./modules/sweep/routes.js";
 import { systemMetricRoutes } from "./modules/system-metric/routes.js";
 import { tagRoutes } from "./modules/tag/routes.js";
@@ -149,6 +154,11 @@ export async function buildApp() {
   await app.register(projectRoutes, { prefix: "/api/v1" });
   await app.register(runRoutes, { prefix: "/api/v1" });
   await app.register(runStopRoutes, { prefix: "/api/v1" });
+  await app.register(runResumeRoutes, { prefix: "/api/v1" });
+  await app.register(runRewindRoutes, { prefix: "/api/v1" });
+  await app.register(runAlertRoutes, { prefix: "/api/v1" });
+  await app.register(runUseArtifactRoutes, { prefix: "/api/v1" });
+  await app.register(artifactLinkRoutes, { prefix: "/api/v1" });
   await app.register(runFileRoutes, { prefix: "/api/v1" });
   await app.register(metricRoutes, { prefix: "/api/v1" });
   await app.register(systemMetricRoutes, { prefix: "/api/v1" });
