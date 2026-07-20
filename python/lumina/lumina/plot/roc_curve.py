@@ -1,7 +1,6 @@
-import numbers
-
-
 from __future__ import annotations
+
+import numbers
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 

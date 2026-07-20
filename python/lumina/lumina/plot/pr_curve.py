@@ -1,6 +1,6 @@
-import numbers
-
 from __future__ import annotations
+
+import numbers
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, TypeVar
 

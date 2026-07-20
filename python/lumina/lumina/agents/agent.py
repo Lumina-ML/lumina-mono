@@ -16,8 +16,8 @@ from lumina.apis import InternalApi
 from lumina.sdk.launch.sweeps import SweepNotFoundError
 from lumina.sdk.launch.sweeps import utils as sweep_utils
 from lumina.sdk.lib import config_util
-from lumina.lumina.agents.run import RunStatus
-from lumina.lumina.agents.job import Job, JobError
+from lumina.agents.run import RunStatus
+from lumina.agents.job import Job, JobError
 
 
 logger = getLogger(__name__)
