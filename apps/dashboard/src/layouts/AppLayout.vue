@@ -717,7 +717,14 @@ watch(
         </div>
       </header>
 
-      <main class="flex-1 p-4 md:p-6">
+      <a
+        href="#main-content"
+        class="sr-only absolute left-2 top-2 z-50 rounded bg-accent-primary px-3 py-2 text-sm font-medium text-white focus:not-sr-only focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2"
+      >
+        Skip to main content
+      </a>
+
+      <main id="main-content" class="flex-1 p-4 md:p-6" tabindex="-1">
         <RouterView />
       </main>
     </div>

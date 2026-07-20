@@ -1,7 +1,7 @@
 import type { MetricStorage } from "../../core/storage/metric-storage.js";
 import type { EventBus } from "../../core/bus/event-bus.js";
 import type { Queue } from "../../core/queue/queue.js";
-import type { LogMetricsInput } from "./schema.js";
+import type { LogMetricsInput, CompareMetricsInput } from "./schema.js";
 
 export class MetricService {
   constructor(
@@ -43,4 +43,22 @@ export class MetricService {
   async list(runId: string, params: { keys?: string[]; limit: number }) {
     return this.storage.listMetrics(runId, params);
   }
+
+  async compare(input: CompareMetricsInput) {
+    const keys = normalizeKeys(input.keys);
+    const results = await Promise.all(
+      input.runIds.map((runId) =>
+        this.storage.listMetrics(runId, { keys, limit: input.limit }),
+      ),
+    );
+    return { runs: results };
+  }
+}
+
+function normalizeKeys(keys: CompareMetricsInput["keys"]): string[] | undefined {
+  if (!keys) return undefined;
+  if (Array.isArray(keys)) {
+    return keys.flatMap((k) => k.split(",")).map((k) => k.trim()).filter(Boolean);
+  }
+  return keys.split(",").map((k) => k.trim()).filter(Boolean);
 }

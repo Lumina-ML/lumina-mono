@@ -16,6 +16,7 @@
  * leak any user data — only the dependency status.
  */
 import fp from "fastify-plugin";
+import { Redis } from "ioredis";
 import type { FastifyInstance } from "fastify";
 
 interface DependencyStatus {
@@ -63,6 +64,30 @@ async function checkClickHouse(
   }
 }
 
+async function checkRedis(app: FastifyInstance): Promise<DependencyStatus> {
+  if (!app.config.redisUrl) {
+    return { name: "redis", ok: true, detail: "not configured" };
+  }
+  let redis: Redis | undefined;
+  try {
+    // multi instances?
+    redis = new Redis(app.config.redisUrl, {
+      maxRetriesPerRequest: 1,
+      lazyConnect: true,
+    });
+    await redis.ping();
+    return { name: "redis", ok: true };
+  } catch (e) {
+    return {
+      name: "redis",
+      ok: false,
+      detail: (e as Error).message.slice(0, 200),
+    };
+  } finally {
+    await redis?.quit();
+  }
+}
+
 export const healthPlugin = fp(async (app: FastifyInstance) => {
   app.get("/healthz", async () => ({
     status: "ok",
@@ -73,6 +98,7 @@ export const healthPlugin = fp(async (app: FastifyInstance) => {
     const checks = await Promise.all([
       checkPrisma(app),
       checkClickHouse(app),
+      checkRedis(app),
     ]);
     const allOk = checks.every((c) => c.ok);
     reply.status(allOk ? 200 : 503);

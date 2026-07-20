@@ -2,7 +2,7 @@
 import { computed, onScopeDispose, ref, watch } from "vue";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
-import { LineChart, BarChart, ScatterChart } from "echarts/charts";
+import { LineChart, BarChart, ScatterChart, HeatmapChart, ParallelChart } from "echarts/charts";
 import {
   GridComponent,
   TooltipComponent,
@@ -13,6 +13,8 @@ import {
   MarkPointComponent,
   ToolboxComponent,
   BrushComponent,
+  VisualMapComponent,
+  ParallelComponent,
 } from "echarts/components";
 import VChart from "vue-echarts";
 import type { ChartConfig } from "./types";
@@ -25,6 +27,8 @@ use([
   LineChart,
   BarChart,
   ScatterChart,
+  HeatmapChart,
+  ParallelChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
@@ -34,6 +38,8 @@ use([
   MarkPointComponent,
   ToolboxComponent,
   BrushComponent,
+  VisualMapComponent,
+  ParallelComponent,
 ]);
 
 interface Props {

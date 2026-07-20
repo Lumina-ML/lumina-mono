@@ -5,10 +5,12 @@ import type {
   ChartConfig,
   ChartDataZoom,
   ChartLegend,
+  ChartParallelAxis,
   ChartPerformance,
   ChartSeries,
   ChartToolbox,
   ChartTooltip,
+  ChartVisualMap,
 } from "../types";
 import type { ChartThemeColors } from "../theme";
 import { getChartThemeColors, resolveHsl } from "../theme";
@@ -22,6 +24,7 @@ function buildAxisBase(axis: ChartAxis, theme: ChartThemeColors) {
     name: axis.name,
     min: axis.min,
     max: axis.max,
+    data: axis.data,
     axisLine: axis.axisLine === false ? { show: false } : { lineStyle: { color: theme.mutedTextColor } },
     axisLabel:
       axis.axisLabel === false
@@ -79,7 +82,11 @@ function applyPerformance(
   return result;
 }
 
-function buildSeries(series: ChartSeries, performance?: ChartPerformance): SeriesOption {
+function buildSeries(
+  series: ChartSeries,
+  performance: ChartPerformance | undefined,
+  theme: ChartThemeColors,
+): SeriesOption {
   const perf = applyPerformance(series, performance);
 
   const base = {
@@ -120,6 +127,30 @@ function buildSeries(series: ChartSeries, performance?: ChartPerformance): Serie
       return {
         ...base,
         type: "scatter",
+      } as SeriesOption;
+    case "parallel":
+      return {
+        name: series.name,
+        type: "parallel",
+        data: series.data,
+        lineStyle: {
+          width: series.lineWidth ?? 2,
+          color: series.color,
+        },
+        smooth: series.smooth ?? false,
+      } as SeriesOption;
+    case "heatmap":
+      return {
+        name: series.name,
+        type: "heatmap",
+        data: series.data,
+        label: { show: false },
+        emphasis: {
+          itemStyle: {
+            borderColor: theme.mutedTextColor,
+            borderWidth: 1,
+          },
+        },
       } as SeriesOption;
     default:
       return { ...base, type: "line" } as SeriesOption;
@@ -248,6 +279,54 @@ function buildBrush(brush: ChartBrush | undefined): EChartsOption["brush"] {
   };
 }
 
+function buildParallelAxis(
+  axes: ChartParallelAxis[] | undefined,
+  theme: ChartThemeColors,
+): EChartsOption["parallelAxis"] {
+  if (!axes) return undefined;
+  return axes.map((axis) => ({
+    dim: axis.dim,
+    name: axis.name,
+    type: axis.type,
+    data: axis.data,
+    nameTextStyle: { color: theme.textColor },
+    axisLine: { lineStyle: { color: theme.mutedTextColor } },
+    axisLabel: { color: theme.mutedTextColor },
+  })) as EChartsOption["parallelAxis"];
+}
+
+function buildParallel(): EChartsOption["parallel"] {
+  return {
+    left: "5%",
+    right: "13%",
+    bottom: "10%",
+    top: "20%",
+  };
+}
+
+function buildVisualMap(
+  vm: ChartVisualMap | undefined,
+  theme: ChartThemeColors,
+): EChartsOption["visualMap"] {
+  if (!vm) return undefined;
+  return {
+    min: vm.min,
+    max: vm.max,
+    calculable: true,
+    orient: "horizontal",
+    left: "center",
+    bottom: 0,
+    inRange: {
+      color: vm.inRange?.color ?? [
+        theme.backgroundColor,
+        resolveHsl("--primary", 0.6),
+        resolveHsl("--primary"),
+      ],
+    },
+    textStyle: { color: theme.textColor },
+  } as EChartsOption["visualMap"];
+}
+
 /**
  * 把 Lumina ChartConfig 转成 ECharts option。
  */
@@ -256,8 +335,10 @@ export function toEChartsOption(
   themeColors?: ChartThemeColors,
 ): EChartsOption {
   const theme = themeColors ?? getChartThemeColors();
+  const hasParallel = config.series.some((s) => s.type === "parallel");
+  const hasHeatmap = config.series.some((s) => s.type === "heatmap");
 
-  return {
+  const base: EChartsOption = {
     backgroundColor: config.backgroundColor ?? theme.backgroundColor,
     color: theme.palette,
     title: config.title
@@ -278,14 +359,26 @@ export function toEChartsOption(
       bottom: config.grid?.bottom ?? "15%",
       containLabel: config.grid?.containLabel ?? true,
     },
-    xAxis: buildXAxis(config.xAxis, theme),
-    yAxis: buildYAxis(config.yAxis, theme),
     dataZoom: config.dataZoom?.map((dz) => buildDataZoom(dz, theme)) as
       | DataZoomComponentOption[]
       | undefined,
-    series: config.series.map((s) => buildSeries(s, config.performance)) as SeriesOption[],
+    series: config.series.map((s) => buildSeries(s, config.performance, theme)) as SeriesOption[],
     animation: config.animation?.enabled ?? true,
     animationDuration: config.animation?.duration ?? 300,
     animationEasing: config.animation?.easing ?? "cubicOut",
   };
+
+  if (hasParallel) {
+    base.parallelAxis = buildParallelAxis(config.parallelAxes, theme);
+    base.parallel = buildParallel();
+  } else {
+    if (config.xAxis) base.xAxis = buildXAxis(config.xAxis, theme);
+    if (config.yAxis) base.yAxis = buildYAxis(config.yAxis, theme);
+  }
+
+  if (hasHeatmap) {
+    base.visualMap = buildVisualMap(config.visualMap, theme);
+  }
+
+  return base;
 }

@@ -29,7 +29,7 @@ lumina demo --reset       # wipe everything under __demo__
 
 ## Status
 
-MVP V1 in progress. Current end-to-end flow works:
+MVP V1 in progress. Current end-to-end flow works. Note: workspace context and guard plugin are now shipped; multi-workspace UI switching works, but API key storage still uses `localStorage` (HttpOnly cookie mode is planned, see `docs/Design-Multiworkspace-Cookie-Auth.md`).
 
 ```bash
 # Terminal 1: start backend + database
@@ -149,6 +149,7 @@ See [`examples/basic_experiment.py`](./examples/basic_experiment.py) for a full 
 
 - `POST /api/v1/runs/:runId/metrics` - Log metrics
 - `GET /api/v1/runs/:runId/metrics` - Get metrics
+- `POST /api/v1/runs/metrics` - Compare metrics across multiple runs
 - `POST /api/v1/runs/:runId/system-metrics` - Log system metrics
 - `GET /api/v1/runs/:runId/system-metrics` - Get system metrics
 - `POST /api/v1/runs/:runId/logs` - Log lines

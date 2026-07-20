@@ -2,8 +2,20 @@
 import { computed, ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { Pencil, X } from "lucide-vue-next";
-import { LCard, LSpinner, LTooltip, LIconButton, LTag, ChartRenderer } from "@lumina/ui";
-import type { ChartConfig } from "@lumina/ui";
+import {
+  LCard,
+  LSpinner,
+  LTooltip,
+  LIconButton,
+  LTag,
+  ChartRenderer,
+  smoothSeries,
+  clipOutliers,
+  mapXAxis,
+  buildAggregatedSeries,
+  deriveMetric,
+} from "@lumina/ui";
+import type { ChartConfig, MetricPoint } from "@lumina/ui";
 import { MetricService } from "@/services/metric.service";
 import { RunService } from "@/services/run.service";
 import { colorForRunId } from "@/composables/useRunColor";
@@ -57,7 +69,7 @@ const configOpen = ref(false);
 
 interface PanelSeries {
   run: Run;
-  metrics: Record<string, Array<{ step: number; value: number }>>;
+  metrics: Record<string, MetricPoint[]>;
   color: string;
 }
 
@@ -95,8 +107,8 @@ const panelQuery = useQuery({
     const metricsByRun = Object.fromEntries(metricsEntries);
     return validRuns.map((run) => ({
       run,
-      metrics: metricsByRun[run.runId] ?? {},
-      color: colorForRunId(run.runId),
+      metrics: (metricsByRun[run.runId] ?? {}) as Record<string, MetricPoint[]>,
+      color: props.config.colorOverrides?.[run.runId] ?? colorForRunId(run.runId),
     }));
   },
 });
@@ -104,36 +116,135 @@ const panelQuery = useQuery({
 const series = computed<PanelSeries[]>(() => panelQuery.data.value ?? []);
 const loading = computed(() => panelQuery.isLoading.value);
 
+const dataCfg = computed(() => props.config.data ?? {});
+const chartCfg = computed(() => props.config.chart ?? {});
+
+const xAxisMode = computed(() => dataCfg.value.xAxis ?? "step");
+const yAxisType = computed<"value" | "log">(() =>
+  dataCfg.value.yAxis === "log" ? "log" : "value",
+);
+const chartType = computed(() => dataCfg.value.chartType ?? "line");
+const smoothing = computed(() => dataCfg.value.smoothing ?? 0);
+const sampling = computed(() => dataCfg.value.sampling ?? "lttb");
+const samplingThreshold = computed(() => dataCfg.value.samplingThreshold ?? 2_000);
+const outlierClip = computed(() => dataCfg.value.outlierClip ?? false);
+
+const xAxisTitle = computed(() => {
+  if (chartCfg.value.xAxisTitle) return chartCfg.value.xAxisTitle;
+  switch (xAxisMode.value) {
+    case "wall":
+      return "Wall time";
+    case "relative":
+      return "Relative time";
+    case "metric":
+      return "Metric value";
+    default:
+      return "Step";
+  }
+});
+
 const chartConfig = computed<ChartConfig>(() => {
   const seriesOut: ChartConfig["series"] = [];
-  for (const s of series.value) {
-    for (const key of props.config.metricKeys) {
+  const aggregation = props.config.grouping?.aggregation;
+  const shouldAggregate =
+    aggregation && aggregation !== "none" && series.value.length >= 3;
+
+  const addSeries = (
+    name: string,
+    _key: string,
+    color: string | undefined,
+    pts: MetricPoint[],
+    extra: { lineWidth?: number; areaOpacity?: number } = {},
+  ) => {
+    if (!pts || pts.length === 0) return;
+    let data = pts.slice();
+    if (smoothing.value > 0) {
+      data = smoothSeries(data, smoothing.value, "movingAverage");
+    }
+    if (outlierClip.value) {
+      data = clipOutliers(data);
+    }
+    // metric 模式需要选择另一 metric 作为 x；当前 UI 未提供选择器，暂时回退到 step。
+    const mode = xAxisMode.value;
+    const mapped =
+      mode === "metric"
+        ? mapXAxis(data, "step")
+        : mapXAxis(data, mode);
+    seriesOut.push({
+      type: chartType.value,
+      name,
+      data: mapped,
+      smooth: chartType.value === "line",
+      showSymbol: mapped.length < 200,
+      color,
+      lineWidth: extra.lineWidth ?? 1.5,
+      areaOpacity: extra.areaOpacity,
+      sampling: sampling.value === "raw" ? undefined : sampling.value,
+    });
+  };
+
+  for (const key of props.config.metricKeys) {
+    if (shouldAggregate) {
+      const runSeries = series.value
+        .filter((s) => s.metrics[key]?.length)
+        .map((s) => ({
+          name: s.run.name,
+          key,
+          runId: s.run.runId,
+          color: s.color,
+          data: s.metrics[key]!,
+        }));
+      if (runSeries.length > 0) {
+        const agg = buildAggregatedSeries(runSeries, aggregation, {
+          color: runSeries[0]?.color,
+        });
+        for (const s of agg) {
+          addSeries(s.name, key, s.color, s.data);
+        }
+      }
+      continue;
+    }
+
+    for (const s of series.value) {
       const pts = s.metrics[key];
-      if (!pts || pts.length === 0) continue;
-      seriesOut.push({
-        type: "line",
-        name: `${s.run.name} · ${key}`,
-        data: pts.map((p) => [p.step, p.value] as [number, number]),
-        smooth: true,
-        showSymbol: pts.length < 200,
-        color: s.color,
-        lineWidth: 1.5,
-      });
+      if (!pts?.length) continue;
+      const color = props.config.colorOverrides?.[s.run.runId] ?? s.color;
+      addSeries(`${s.run.name} · ${key}`, key, color, pts);
     }
   }
+
+  // Derived metrics computed per run from the modal expression tab.
+  for (const expr of props.config.expressions ?? []) {
+    if (!expr.name || !expr.expression) continue;
+    for (const s of series.value) {
+      const metricsByKey: Record<string, MetricPoint[]> = {};
+      for (const key of Object.keys(s.metrics)) {
+        metricsByKey[key] = s.metrics[key]!;
+      }
+      const derived = deriveMetric(metricsByKey, expr.expression, {
+        name: `${s.run.name} · ${expr.name}`,
+      });
+      if (derived.data.length === 0) continue;
+      const color = props.config.colorOverrides?.[s.run.runId] ?? s.color;
+      addSeries(derived.name, expr.name, color, derived.data);
+    }
+  }
+
   return {
     title: undefined,
     xAxis: {
-      type: "value",
-      name: "Step",
+      type: xAxisMode.value === "wall" ? "time" : "value",
+      name: xAxisTitle.value,
       splitLine: false,
     },
     yAxis: {
-      type: "value",
+      type: yAxisType.value,
+      name: chartCfg.value.yAxisTitle ?? "Value",
       splitLine: { lineStyle: { type: "dashed" } },
     },
     legend: {
-      position: "bottom",
+      show: chartCfg.value.legendVisible ?? true,
+      position: chartCfg.value.legendPosition ?? "bottom",
       type: "scroll",
     },
     tooltip: {
@@ -145,7 +256,7 @@ const chartConfig = computed<ChartConfig>(() => {
       { type: "slider", xAxisIndex: 0 },
     ],
     series: seriesOut,
-    performance: { samplingThreshold: 2_000 },
+    performance: { samplingThreshold: samplingThreshold.value },
   };
 });
 

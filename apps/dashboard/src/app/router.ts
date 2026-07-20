@@ -104,6 +104,11 @@ const router = createRouter({
               props: true,
             },
             {
+              path: "runs/compare",
+              name: "RunCompare",
+              component: () => import("@/modules/run/pages/RunCompare.vue"),
+            },
+            {
               path: "sweeps",
               name: "ProjectSweeps",
               component: () => import("@/modules/project/pages/ProjectSweeps.vue"),
