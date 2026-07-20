@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 from lumina.sdk.internal.internal_api import Api as InternalApi
 from lumina.sdk.lib.paths import FilePathStr, URIStr
 if TYPE_CHECKING:
-    from lumina.filesync.step_prepare import StepPrepare
     from lumina.sdk.artifacts._models.storage import StoragePolicyConfig
     from lumina.sdk.artifacts.artifact import Artifact
     from lumina.sdk.artifacts.artifact_manifest_entry import ArtifactManifestEntry
@@ -45,7 +44,7 @@ class StoragePolicy(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def store_file(self, artifact_id: str, artifact_manifest_id: str, entry: ArtifactManifestEntry, preparer: StepPrepare, progress_callback: ProgressFn | None=None) -> bool:
+    def store_file(self, artifact_id: str, artifact_manifest_id: str, entry: ArtifactManifestEntry, preparer: Any, progress_callback: ProgressFn | None=None) -> bool:
         raise NotImplementedError
 
     @abstractmethod
