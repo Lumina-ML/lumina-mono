@@ -275,7 +275,7 @@ type Token =
 
 function tokenText(t: Token): string {
   if (t.type === "eof") return "EOF";
-  return t.value;
+  return String(t.value);
 }
 
 class Parser {
@@ -378,7 +378,9 @@ class Parser {
       // 允许 metric key 里带 "/"（如 train/loss），只要整体命中 context。
       // 如果拼不出来就回退，让 "/" 作为除号处理。
       let name = t.value;
-      while (this.peek().type === "op" && this.peek().value === "/") {
+      while (true) {
+        const current = this.peek();
+        if (current.type !== "op" || current.value !== "/") break;
         const slashPos = this.pos;
         const identPos = slashPos + 1;
         const nextToken = this.tokens[identPos];
@@ -408,9 +410,12 @@ class Parser {
   private callFunction(name: string): number {
     this.consume("(");
     const args: number[] = [];
-    if (this.peek().type !== "op" || this.peek().value !== ")") {
+    const first = this.peek();
+    if (first.type !== "op" || first.value !== ")") {
       args.push(this.expr());
-      while (this.peek().type === "op" && this.peek().value === ",") {
+      while (true) {
+        const current = this.peek();
+        if (current.type !== "op" || current.value !== ",") break;
         this.consume(",");
         args.push(this.expr());
       }
