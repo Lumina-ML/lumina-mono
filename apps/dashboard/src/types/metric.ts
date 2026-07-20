@@ -9,6 +9,16 @@ export interface MetricsResponse {
   metrics: Record<string, MetricPoint[]>;
 }
 
+export interface CompareMetricsInput {
+  runIds: string[];
+  keys?: string;
+  limit?: number;
+}
+
+export interface CompareMetricsResponse {
+  runs: MetricsResponse[];
+}
+
 export interface LogMetricsInput {
   metrics: Array<{
     key: string;

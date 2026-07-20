@@ -20,5 +20,12 @@ export const ListMetricsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50000).default(10000),
 });
 
+export const CompareMetricsSchema = z.object({
+  runIds: z.array(z.string().uuid()).min(1).max(10),
+  keys: z.union([z.string(), z.array(z.string())]).optional(),
+  limit: z.coerce.number().int().min(1).max(50000).default(10000),
+});
+
 export type LogMetricsInput = z.infer<typeof LogMetricsSchema>;
 export type ListMetricsQuery = z.infer<typeof ListMetricsQuerySchema>;
+export type CompareMetricsInput = z.infer<typeof CompareMetricsSchema>;

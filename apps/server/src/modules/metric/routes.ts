@@ -14,4 +14,5 @@ export async function metricRoutes(app: FastifyInstance) {
   app.get("/runs/:runId/metrics", {
     config: { authz: { kind: "run", param: "runId" } },
   }, handler.list.bind(handler));
+  app.post("/runs/metrics", handler.compare.bind(handler));
 }
