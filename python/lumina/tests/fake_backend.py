@@ -32,6 +32,18 @@ _SWEEP_RUNS: list[dict[str, Any]] = []  # per-sweep run rows for observations
 _LAUNCH_QUEUES: dict[str, dict[str, Any]] = {}
 _LAUNCH_JOBS: dict[str, dict[str, Any]] = {}
 _LAUNCH_RUNS_FB: dict[str, dict[str, Any]] = {}
+# Step 3.2 — additional stores for the rewired SendManager.
+_RUN_METRICS: dict[str, list[dict[str, Any]]] = {}      # run_id -> [{key,step,value,loggedAt}]
+_RUN_SYSTEM_METRICS: dict[str, list[dict[str, Any]]] = {}
+_RUN_LOGS: dict[str, list[dict[str, Any]]] = {}
+_RUN_ALERTS: dict[str, list[dict[str, Any]]] = {}
+_RUN_USE_ARTIFACTS: dict[str, list[dict[str, Any]]] = {}
+_PORTFOLIO_LINKS: dict[str, list[dict[str, Any]]] = {}  # version_id -> links
+_CURRENT_USER: dict[str, Any] = {
+    "id": "user-1",
+    "email": "test@example.com",
+    "entity": "default",
+}
 
 
 def _reset_state() -> None:
@@ -49,6 +61,16 @@ def _reset_state() -> None:
     _SWEEP_RUNS.clear()
     _LAUNCH_QUEUES.clear()
     _LAUNCH_JOBS.clear()
+    _LAUNCH_RUNS_FB.clear()
+    _RUN_METRICS.clear()
+    _RUN_SYSTEM_METRICS.clear()
+    _RUN_LOGS.clear()
+    _RUN_ALERTS.clear()
+    _RUN_USE_ARTIFACTS.clear()
+    _PORTFOLIO_LINKS.clear()
+    _CURRENT_USER.update({
+        "id": "user-1", "email": "test@example.com", "entity": "default",
+    })
     _LAUNCH_RUNS_FB.clear()
 
 
@@ -112,6 +134,13 @@ def _handle(method: str, path: str, body: dict[str, Any], *, upload_base: str = 
             run["status"] = body["status"]
         if "metadata" in body:
             run["metadata"] = body["metadata"]
+        # Step 3.2: extended PATCH surface.
+        for field in ("summary", "config", "telemetry", "metricDefs",
+                      "displayName", "notes", "group", "jobType"):
+            if field in body:
+                run[field] = body[field]
+        if "tags" in body and isinstance(body["tags"], list):
+            run["tags"] = list(body["tags"])
         return run, 200
     if method == "POST" and base_path == "/api/v1/runs":
         run_id = body.get("runId") or body.get("name", "fake-run")
@@ -121,11 +150,18 @@ def _handle(method: str, path: str, body: dict[str, Any], *, upload_base: str = 
             {
                 "runId": run_id,
                 "status": "running",
-                "metadata": {},
+                "metadata": body.get("metadata", {}),
                 "config": body.get("config", {}),
                 "summary": {},
                 "projectId": _project_id_for(project) if project else None,
                 "sweepId": body.get("sweepId"),
+                # Step 3.2: new optional identity fields
+                "displayName": body.get("displayName"),
+                "entity": body.get("entity"),
+                "tags": list(body.get("tags", [])),
+                "group": body.get("group"),
+                "jobType": body.get("jobType"),
+                "notes": body.get("notes"),
             },
         )
         # If attached to a sweep, record a stub row in _SWEEP_RUNS so the
@@ -144,8 +180,15 @@ def _handle(method: str, path: str, body: dict[str, Any], *, upload_base: str = 
         run_id = base_path.split("/")[4]
         run = _RUNS.setdefault(run_id, {"runId": run_id, "status": "running", "summary": {}, "config": {}, "sweepId": None})
         summary = run.setdefault("summary", {})
+        log = _RUN_METRICS.setdefault(run_id, [])
         for m in body.get("metrics", []):
             summary[m["key"]] = m["value"]
+            log.append({
+                "key": m["key"],
+                "step": m.get("step", 0),
+                "value": m["value"],
+                "loggedAt": "2024-01-01T00:00:00Z",
+            })
         # Mirror into _SWEEP_RUNS so observations + should-terminate endpoints see it.
         sweep_id = run.get("sweepId")
         if sweep_id:
@@ -450,6 +493,157 @@ def _launch_handle(method: str, base_path: str, body: dict[str, Any]):
         row = candidates[0]
         row["status"] = "running"
         return {**row, "job": _LAUNCH_JOBS.get(row["jobId"], {})}, 200
+
+    # ============================================================
+    # Step 3.2 — routes for the rewired SendManager.
+    # ============================================================
+
+    # /api/v1/users/me (used by lumina sync to resolve entity)
+    if method == "GET" and base_path == "/api/v1/users/me":
+        return dict(_CURRENT_USER), 200
+
+    # /api/v1/runs/{id}/should-stop
+    if method == "GET" and base_path.endswith("/should-stop") and "/api/v1/runs/" in base_path:
+        run_id = base_path.split("/")[4]
+        run = _RUNS.get(run_id)
+        stop = bool((run or {}).get("metadata", {}).get("stopRequested"))
+        return {"shouldStop": stop}, 200
+
+    # /api/v1/runs/{id}/resume-state — returns tail + counts + config/summary.
+    if method == "GET" and base_path.endswith("/resume-state") and "/api/v1/runs/" in base_path:
+        run_id = base_path.split("/")[4]
+        run = _RUNS.get(run_id, {})
+        history = list(_RUN_METRICS.get(run_id, []))
+        events = list(_RUN_SYSTEM_METRICS.get(run_id, []))
+        history.sort(key=lambda r: (r.get("step", 0), r.get("loggedAt", "")))
+        events.sort(key=lambda r: r.get("loggedAt", ""))
+        return {
+            "historyTail": history[-100:],
+            "eventsTail": events[-100:],
+            "config": run.get("config", {}),
+            "summaryMetrics": run.get("summary", {}),
+            "historyLineCount": len(history),
+            "eventsLineCount": len(events),
+            "logLineCount": len(_RUN_LOGS.get(run_id, [])),
+            "tags": run.get("tags", []),
+            "wandbConfig": run.get("config", {}),
+        }, 200
+
+    # /api/v1/runs/{id}/rewind — mirrors resume-state.
+    if method == "POST" and base_path.endswith("/rewind") and "/api/v1/runs/" in base_path:
+        run_id = base_path.split("/")[4]
+        metric_name = body.get("metricName")
+        metric_value = body.get("metricValue")
+        if metric_name and metric_value is not None:
+            metrics = _RUN_METRICS.get(run_id, [])
+            _RUN_METRICS[run_id] = [
+                m for m in metrics
+                if not (m.get("key") == metric_name and m.get("value") == metric_value)
+            ]
+        run = _RUNS.get(run_id, {})
+        history = list(_RUN_METRICS.get(run_id, []))
+        events = list(_RUN_SYSTEM_METRICS.get(run_id, []))
+        return {
+            "historyTail": history[-100:],
+            "eventsTail": events[-100:],
+            "config": run.get("config", {}),
+            "summaryMetrics": run.get("summary", {}),
+            "historyLineCount": len(history),
+            "eventsLineCount": len(events),
+            "logLineCount": len(_RUN_LOGS.get(run_id, [])),
+            "tags": run.get("tags", []),
+            "wandbConfig": run.get("config", {}),
+        }, 200
+
+    # /api/v1/runs/{id}/system-metrics
+    if method == "POST" and base_path.endswith("/system-metrics") and "/api/v1/runs/" in base_path:
+        run_id = base_path.split("/")[4]
+        log = _RUN_SYSTEM_METRICS.setdefault(run_id, [])
+        for entry in body.get("entries", body if isinstance(body, list) else [body]):
+            log.append({
+                "key": entry.get("key"),
+                "step": entry.get("step", 0),
+                "value": entry.get("value"),
+                "loggedAt": entry.get("_timestamp", "2024-01-01T00:00:00Z"),
+            })
+        return {"ok": True}, 201
+
+    # /api/v1/runs/{id}/logs
+    if method == "POST" and base_path.endswith("/logs") and "/api/v1/runs/" in base_path:
+        run_id = base_path.split("/")[4]
+        log = _RUN_LOGS.setdefault(run_id, [])
+        for line in body.get("lines", body if isinstance(body, list) else [body]):
+            log.append({
+                "level": line.get("level", "INFO"),
+                "message": line.get("message", ""),
+                "loggedAt": "2024-01-01T00:00:00Z",
+            })
+        return {"ok": True}, 201
+
+    # /api/v1/runs/{id}/alerts
+    if method == "POST" and base_path.endswith("/alerts") and "/api/v1/runs/" in base_path:
+        run_id = base_path.split("/")[4]
+        log = _RUN_ALERTS.setdefault(run_id, [])
+        row = {
+            "id": f"alert-{len(log) + 1}",
+            "runId": run_id,
+            "title": body.get("title", ""),
+            "text": body.get("text", ""),
+            "level": body.get("level", "INFO"),
+            "createdAt": "2024-01-01T00:00:00Z",
+        }
+        log.append(row)
+        return {
+            "alertId": row["id"],
+            "runId": run_id,
+            "level": row["level"],
+            "createdAt": row["createdAt"],
+        }, 201
+
+    # /api/v1/runs/{id}/use-artifact
+    if method == "POST" and base_path.endswith("/use-artifact") and "/api/v1/runs/" in base_path:
+        run_id = base_path.split("/")[4]
+        log = _RUN_USE_ARTIFACTS.setdefault(run_id, [])
+        row = {
+            "id": f"use-{len(log) + 1}",
+            "runId": run_id,
+            "artifactVersionId": body.get("artifactVersionId", ""),
+            "useType": body.get("type"),
+            "createdAt": "2024-01-01T00:00:00Z",
+        }
+        log.append(row)
+        return {
+            "runId": run_id,
+            "useArtifactId": row["id"],
+            "artifactVersionId": row["artifactVersionId"],
+            "createdAt": row["createdAt"],
+        }, 201
+
+    # /api/v1/versions/{id}/link
+    if method == "POST" and base_path.endswith("/link") and "/api/v1/versions/" in base_path:
+        version_id = base_path.split("/")[4]
+        log = _PORTFOLIO_LINKS.setdefault(version_id, [])
+        row = {
+            "id": f"link-{len(log) + 1}",
+            "artifactVersionId": version_id,
+            "portfolioName": body.get("portfolioName", ""),
+            "portfolioProject": body.get("portfolioProject", ""),
+            "portfolioEntity": body.get("portfolioEntity"),
+            "aliases": list(body.get("aliases", [])),
+            "versionIndex": len(log),
+            "createdAt": "2024-01-01T00:00:00Z",
+        }
+        log.append(row)
+        return {
+            "linkId": row["id"],
+            "artifactVersionId": version_id,
+            "portfolioName": row["portfolioName"],
+            "portfolioProject": row["portfolioProject"],
+            "aliases": row["aliases"],
+            "versionIndex": row["versionIndex"],
+            "createdAt": row["createdAt"],
+        }, 201
+
     return None
 
 
@@ -542,6 +736,35 @@ class FakeLuminaBackend:
 
     def get_run_files(self, run_id: str) -> dict[str, bytes]:
         return dict(_RUN_FILES.get(run_id, {}))
+
+    # Step 3.2 — new introspection helpers used by test_sender.py.
+    def get_run_metrics(self, run_id: str) -> list[dict[str, Any]]:
+        return list(_RUN_METRICS.get(run_id, []))
+
+    def get_run_system_metrics(self, run_id: str) -> list[dict[str, Any]]:
+        return list(_RUN_SYSTEM_METRICS.get(run_id, []))
+
+    def get_run_logs(self, run_id: str) -> list[dict[str, Any]]:
+        return list(_RUN_LOGS.get(run_id, []))
+
+    def get_run_alerts(self, run_id: str) -> list[dict[str, Any]]:
+        return list(_RUN_ALERTS.get(run_id, []))
+
+    def get_run_used_artifacts(self, run_id: str) -> list[dict[str, Any]]:
+        return list(_RUN_USE_ARTIFACTS.get(run_id, []))
+
+    def get_portfolio_links(self, version_id: str) -> list[dict[str, Any]]:
+        return list(_PORTFOLIO_LINKS.get(version_id, []))
+
+    def set_should_stop(self, run_id: str, stop: bool) -> None:
+        run = _RUNS.setdefault(
+            run_id, {"runId": run_id, "status": "running", "metadata": {}},
+        )
+        meta = run.setdefault("metadata", {})
+        meta["stopRequested"] = stop
+
+    def set_current_user(self, **fields: Any) -> None:
+        _CURRENT_USER.update(fields)
 
     # Artifact test introspection
     def get_artifact_files(self, version_id: str) -> list[dict[str, Any]]:
