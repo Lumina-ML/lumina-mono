@@ -1,2 +1,0 @@
--- RenameIndex
-ALTER INDEX "ArtifactPortfolioLink_artifactVersionId_portfolioProject_portfo" RENAME TO "ArtifactPortfolioLink_artifactVersionId_portfolioProject_po_key";
