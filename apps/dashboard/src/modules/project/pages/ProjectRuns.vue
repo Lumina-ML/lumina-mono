@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useQueryClient } from "@tanstack/vue-query";
 import { LCard, LButton, LSelect, LEmpty } from "@lumina/ui";
 import { useProject } from "@/modules/project/composables/useProjects";
@@ -11,6 +11,7 @@ import RunTable from "@/widgets/run-table/RunTable.vue";
 import type { RunStatus } from "@/types/run";
 
 const route = useRoute();
+const router = useRouter();
 const queryClient = useQueryClient();
 const toast = useToast();
 const projectId = computed(() => route.params.projectId as string);
@@ -60,7 +61,15 @@ function onBulk(action: string, ids: string[]) {
 }
 
 function onCompare(ids: string[]) {
-  toast.info(`Compare view for ${ids.length} runs (coming soon).`);
+  if (ids.length < 2) {
+    toast.info("Select at least two runs to compare.");
+    return;
+  }
+  void router.push({
+    name: "RunCompare",
+    params: { projectId: projectId.value },
+    query: { runIds: ids.join(",") },
+  });
 }
 </script>
 
