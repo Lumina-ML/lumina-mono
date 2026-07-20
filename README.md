@@ -149,6 +149,7 @@ See [`examples/basic_experiment.py`](./examples/basic_experiment.py) for a full 
 
 - `POST /api/v1/runs/:runId/metrics` - Log metrics
 - `GET /api/v1/runs/:runId/metrics` - Get metrics
+- `POST /api/v1/runs/metrics` - Compare metrics across multiple runs
 - `POST /api/v1/runs/:runId/system-metrics` - Log system metrics
 - `GET /api/v1/runs/:runId/system-metrics` - Get system metrics
 - `POST /api/v1/runs/:runId/logs` - Log lines
