@@ -241,7 +241,9 @@ class SendManager:
             logger.warning("sender: ignoring unknown record type %r", record_type)
 
     def send_request(self, record: "Record") -> None:
-        req_type = record.WhichOneof("request_type")
+        req_type = record.request.WhichOneof("request_type")
+        if not req_type:
+            return  # empty req_resp with no payload — nothing to dispatch
         if req_type == "stop_status":
             self.send_request_stop_status(record)
         elif req_type == "summary_record":
@@ -274,7 +276,9 @@ class SendManager:
         run = record.run
         is_init = self._run is None
         config_dict = self._consolidated_config.non_internal_config()
-        if run.config:
+        # `ConfigRecord` is truthy even when empty in protobuf-py, so check
+        # `ListFields()` for actual content.
+        if run.config.ListFields():
             self._consolidated_config.update_from_proto(run.config)
             config_dict = self._config_backend_dict()
             self._config_save(config_dict)
@@ -330,7 +334,7 @@ class SendManager:
             display_name=run.display_name or None,
             entity=run.entity or None,
             tags=list(run.tags) or None,
-            group=run.group or None,
+            group=run.run_group or None,
             job_type=run.job_type or None,
             notes=run.notes or None,
         )
@@ -503,7 +507,12 @@ class SendManager:
             logger.warning("Seen metric with glob (shouldn't happen)")
             return
         old = self._config_metric_dict.get(metric.name, {})
-        merge = dict(metric) if metric._control.overwrite else {**old, **dict(metric)}
+        # `MetricRecord` (protobuf) is also truthy when empty; only merge
+        # when the record carries actual fields.
+        new_fields = {k: v for k, _ in metric.ListFields()}
+        if not new_fields:
+            return
+        merge = new_fields if metric._control.overwrite else {**old, **new_fields}
         self._config_metric_dict[metric.name] = merge
         try:
             self._client.update_run(

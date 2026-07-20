@@ -135,7 +135,14 @@ def _handle(method: str, path: str, body: dict[str, Any], *, upload_base: str = 
         if "metadata" in body:
             run["metadata"] = body["metadata"]
         # Step 3.2: extended PATCH surface.
-        for field in ("summary", "config", "telemetry", "metricDefs",
+        # `config` and `summary` deep-merge so the SDK's per-push
+        # payloads (which only contain the changed keys) accumulate over
+        # time without overwriting unrelated entries.
+        for field in ("config", "summary"):
+            if field in body and isinstance(body[field], dict):
+                existing = run.setdefault(field, {})
+                existing.update(body[field])
+        for field in ("telemetry", "metricDefs",
                       "displayName", "notes", "group", "jobType"):
             if field in body:
                 run[field] = body[field]
@@ -559,7 +566,14 @@ def _launch_handle(method: str, base_path: str, body: dict[str, Any]):
     if method == "POST" and base_path.endswith("/system-metrics") and "/api/v1/runs/" in base_path:
         run_id = base_path.split("/")[4]
         log = _RUN_SYSTEM_METRICS.setdefault(run_id, [])
-        for entry in body.get("entries", body if isinstance(body, list) else [body]):
+        # Accept either `entries` (preferred) or top-level `metrics` /
+        # flat object shape — LuminaClient currently posts per-call.
+        entries = body.get("entries") or body.get("metrics") or []
+        if not entries and isinstance(body, dict) and any(
+            k in body for k in ("key", "value", "_timestamp")
+        ):
+            entries = [body]
+        for entry in entries:
             log.append({
                 "key": entry.get("key"),
                 "step": entry.get("step", 0),
@@ -572,7 +586,11 @@ def _launch_handle(method: str, base_path: str, body: dict[str, Any]):
     if method == "POST" and base_path.endswith("/logs") and "/api/v1/runs/" in base_path:
         run_id = base_path.split("/")[4]
         log = _RUN_LOGS.setdefault(run_id, [])
-        for line in body.get("lines", body if isinstance(body, list) else [body]):
+        # Accept `logs` (LuminaClient default) or `lines` (older alias).
+        lines = body.get("logs") or body.get("lines") or []
+        if not lines and isinstance(body, dict) and "message" in body:
+            lines = [body]
+        for line in lines:
             log.append({
                 "level": line.get("level", "INFO"),
                 "message": line.get("message", ""),
@@ -753,8 +771,22 @@ class FakeLuminaBackend:
     def get_run_used_artifacts(self, run_id: str) -> list[dict[str, Any]]:
         return list(_RUN_USE_ARTIFACTS.get(run_id, []))
 
-    def get_portfolio_links(self, version_id: str) -> list[dict[str, Any]]:
-        return list(_PORTFOLIO_LINKS.get(version_id, []))
+    def seed_artifact_version(self, version_id: str) -> None:
+        """Pre-populate an artifact version so link/artifact tests can
+        reference it. Avoids spinning up the full artifact create flow."""
+        _ARTIFACT_VERSIONS[version_id] = {
+            "id": version_id,
+            "artifactId": f"art-{version_id}",
+            "version": "v0",
+            "aliases": [],
+            "metadata": {},
+            "state": "committed",
+            "digest": None,
+            "manifest": None,
+            "createdAt": "2024-01-01T00:00:00Z",
+            "updatedAt": "2024-01-01T00:00:00Z",
+        }
+        _ARTIFACT_FILES.setdefault(version_id, [])
 
     def set_should_stop(self, run_id: str, stop: bool) -> None:
         run = _RUNS.setdefault(
@@ -765,6 +797,9 @@ class FakeLuminaBackend:
 
     def set_current_user(self, **fields: Any) -> None:
         _CURRENT_USER.update(fields)
+
+    def get_portfolio_links(self, version_id: str) -> list[dict[str, Any]]:
+        return list(_PORTFOLIO_LINKS.get(version_id, []))
 
     # Artifact test introspection
     def get_artifact_files(self, version_id: str) -> list[dict[str, Any]]:
