@@ -228,7 +228,6 @@ from lumina.data_types import Molecule
 from lumina.data_types import Histogram
 from lumina.data_types import Classes
 from lumina.data_types import JoinedTable
-from lumina.wandb_agent import agent as _wandb_agent
 from lumina.backend.sweep import sweep, agent, get_sweep
 from lumina.plot import visualize, plot_table
 from lumina.integration.sagemaker import sagemaker_auth

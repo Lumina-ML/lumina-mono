@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "lumina"
 version = "0.1.0.dev1"
-description = "Lumina Python SDK for experiment tracking and machine learning operations. Based on WandB."
+description = "Lumina Python SDK for experiment tracking and machine learning operations."
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.9"
 authors = [
     { name = "Lumina Contributors" }
 ]
-keywords = ["ml", "machine-learning", "experiment-tracking", "lumina", "wandb"]
+keywords = ["ml", "machine-learning", "experiment-tracking", "lumina"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
