@@ -1,12 +1,25 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { buildTestApp } from "../helpers/build-app.js";
 import { createFakePrisma } from "../helpers/fake-prisma.js";
 import { healthPlugin } from "../../src/plugins/health.js";
+
+const mockPing = vi.fn();
+const mockQuit = vi.fn();
+
+vi.mock("ioredis", () => ({
+  Redis: vi.fn().mockImplementation(() => ({
+    ping: mockPing,
+    quit: mockQuit,
+  })),
+}));
 
 describe("/healthz and /readyz", () => {
   let app: Awaited<ReturnType<typeof buildTestApp>>;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
+    mockPing.mockReset();
+    mockQuit.mockReset();
     app = await buildTestApp({
       prisma: createFakePrisma(),
     });
@@ -58,5 +71,40 @@ describe("/healthz and /readyz", () => {
     expect(body.status).toBe("ready");
     expect(Array.isArray(body.checks)).toBe(true);
     for (const c of body.checks) expect(c.ok).toBe(true);
+  });
+
+  it("GET /readyz reports redis as not configured when REDIS_URL is absent", async () => {
+    const res = await app.inject({ method: "GET", url: "/readyz" });
+    expect(res.statusCode).toBe(200);
+    const redisCheck = res.json().checks.find(
+      (c: { name: string }) => c.name === "redis",
+    );
+    expect(redisCheck.ok).toBe(true);
+    expect(redisCheck.detail).toBe("not configured");
+  });
+
+  it("GET /readyz reports redis as ok when ping succeeds", async () => {
+    mockPing.mockResolvedValueOnce("PONG");
+    app.config.redisUrl = "redis://localhost:6379";
+    const res = await app.inject({ method: "GET", url: "/readyz" });
+    expect(res.statusCode).toBe(200);
+    const redisCheck = res.json().checks.find(
+      (c: { name: string }) => c.name === "redis",
+    );
+    expect(redisCheck.ok).toBe(true);
+    expect(mockQuit).toHaveBeenCalled();
+  });
+
+  it("GET /readyz reports redis as degraded when ping fails", async () => {
+    mockPing.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    app.config.redisUrl = "redis://localhost:6379";
+    const res = await app.inject({ method: "GET", url: "/readyz" });
+    expect(res.statusCode).toBe(503);
+    const redisCheck = res.json().checks.find(
+      (c: { name: string }) => c.name === "redis",
+    );
+    expect(redisCheck.ok).toBe(false);
+    expect(redisCheck.detail).toContain("ECONNREFUSED");
+    expect(mockQuit).toHaveBeenCalled();
   });
 });

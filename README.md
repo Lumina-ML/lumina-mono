@@ -29,7 +29,7 @@ lumina demo --reset       # wipe everything under __demo__
 
 ## Status
 
-MVP V1 in progress. Current end-to-end flow works:
+MVP V1 in progress. Current end-to-end flow works. Note: workspace context and guard plugin are now shipped; multi-workspace UI switching works, but API key storage still uses `localStorage` (HttpOnly cookie mode is planned, see `docs/Design-Multiworkspace-Cookie-Auth.md`).
 
 ```bash
 # Terminal 1: start backend + database
