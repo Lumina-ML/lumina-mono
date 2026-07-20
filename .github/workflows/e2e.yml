@@ -1,0 +1,171 @@
+name: e2e
+
+# End-to-end CI: brings up the full Lumina infra (Postgres, ClickHouse,
+# Redis, MinIO, server) in containers, then exercises both the server
+# (vitest + testcontainers e2e suite) and the Python SDK against the
+# live server (real HTTP, no fake_backend).
+#
+# What it catches:
+#   - Server contract changes that break the SDK init/log/finish path
+#   - Schema migrations that fail on a fresh database
+#   - Cross-service wiring bugs (ClickHouse metric writes, Redis event
+#     bus, MinIO artifact uploads)
+#   - WebSocket fan-out regressions
+#
+# What it doesn't catch (covered by `unit-tests.yml` instead):
+#   - In-process SDK logic with `fake_backend` (fast, no Docker)
+#
+# Run locally with: `bash scripts/e2e/run-ci-locally.sh`
+
+on:
+  push:
+    branches: [main, refactor/drop_wandb_choas]
+  pull_request:
+    branches: [main, refactor/drop_wandb_choas]
+  workflow_dispatch: {}
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: server + SDK end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      LUMINA_API_URL: http://localhost:8000
+      LUMINA_API_KEY: ci-test-key
+      LUMINA_WORKSPACE_ID: default
+      # The server reads these from docker-compose env vars; we
+      # duplicate them so SDK / vitest use the same host ports.
+      DATABASE_URL: postgresql://lumina:lumina@localhost:15432/lumina?schema=public
+      CLICKHOUSE_URL: http://localhost:8123
+      REDIS_URL: redis://localhost:16379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Cache pnpm modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install monorepo deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python SDK
+        working-directory: python/lumina
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install -e .
+          pip install pytest anyio
+
+      - name: Bring up infra (postgres + minio + clickhouse + redis + server)
+        run: |
+          docker compose up -d postgres minio clickhouse redis
+          # Wait for each healthcheck individually so we don't
+          # race the docker-compose `depends_on: service_healthy`.
+          for svc in postgres minio clickhouse redis; do
+            echo "  waiting for $svc..."
+            for i in $(seq 1 60); do
+              status=$(docker inspect --format='{{.State.Health.Status}}' "lumina-$svc" 2>/dev/null || echo "missing")
+              if [ "$status" = "healthy" ]; then
+                echo "  $svc healthy"
+                break
+              fi
+              sleep 2
+            done
+            if [ "$status" != "healthy" ]; then
+              echo "::error::$svc failed healthcheck after 120s"
+              docker logs "lumina-$svc" | tail -50
+              exit 1
+            fi
+          done
+
+      - name: Build + start server
+        run: |
+          docker compose build server
+          docker compose up -d server
+          for i in $(seq 1 60); do
+            status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/healthz || echo "000")
+            if [ "$status" = "200" ]; then
+              echo "  server healthy at /healthz"
+              break
+            fi
+            sleep 2
+          done
+          if [ "$status" != "200" ]; then
+            echo "::error::server failed healthcheck"
+            docker logs lumina-server | tail -80
+            exit 1
+          fi
+
+      - name: Server unit tests (no docker)
+        working-directory: apps/server
+        run: pnpm test
+
+      - name: Server e2e (vitest + testcontainers)
+        working-directory: apps/server
+        run: pnpm test:e2e
+        env:
+          # The testcontainers-managed suite is hermetic; we still set
+          # the public URL for the few places that hit the running stack.
+          LUMINA_API_URL: http://localhost:8000
+
+      - name: SDK unit tests (fake_backend, no docker)
+        working-directory: python/lumina
+        run: . .venv/bin/activate && pytest tests/
+
+      - name: SDK e2e against live server
+        working-directory: python/lumina
+        run: . .venv/bin/activate && pytest tests/e2e/ -v
+        env:
+          LUMINA_API_URL: http://localhost:8000
+          LUMINA_API_KEY: ci-test-key
+          LUMINA_WORKSPACE_ID: default
+
+      - name: Smoke — drive the SDK through basic_experiment.py
+        working-directory: python/lumina
+        run: . .venv/bin/activate && python ../examples/basic_experiment.py
+        env:
+          LUMINA_API_URL: http://localhost:8000
+          LUMINA_API_KEY: ci-test-key
+          LUMINA_WORKSPACE_ID: default
+
+      - name: Dump server logs on failure
+        if: failure()
+        run: |
+          echo "::group::lumina-server logs"
+          docker logs lumina-server | tail -200
+          echo "::endgroup::"
+          echo "::group::postgres logs"
+          docker logs lumina-postgres | tail -50
+          echo "::endgroup::"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
