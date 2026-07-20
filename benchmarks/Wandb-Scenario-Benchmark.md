@@ -7,6 +7,8 @@
 > 更新 2026-07-21：第一批核心场景（ET-1 / ET-2 / AR-1 / SW-1 / PA-1）已实现并接入 `scenario_runner.py`。本地 docker compose 执行 AR-1 时，对象存储 presigned URL 使用内部 hostname（`minio:9000`），从宿主机无法直接访问，当前会标记为 skip；需在容器网络内执行或配置公共 S3 endpoint。
 >
 > 更新 2026-07-21：第二批核心场景（AR-2 / AR-3 / SW-2 / TR-1 / AW-1）已实现并接入 runner。AR-2 与 AR-1 受同一 S3 内网 hostname 限制会 skip；TR-1 当前验证 trace 创建与 project-scoped 列表，span tree 细节验证需等 workspace-guard 对 ClickHouse trace 的 authz 查询统一后补齐。
+>
+> 更新 2026-07-21：第三批核心场景（MR-1 / MD-1 / MD-2 / LN-1 / LN-2 / EV-1 / EV-2）已实现并接入 runner。MR-1 / MD-1 / MD-2 与 AR-1 同样受 S3 内网 hostname 限制会 skip；LN / EV 在本地 docker 通过。
 
 ## 1. 设计原则
 

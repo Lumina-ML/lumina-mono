@@ -289,3 +289,112 @@ class ArtifactLineageScenario(Scenario):
                 "lineage_non_empty": len(parents) > 0,
             },
         )
+
+
+class ModelRegistryScenario(Scenario):
+    """MR-1: log a model to the registry and retrieve it by alias."""
+
+    scenario_id = "MR-1"
+    name = "Model registry log/use"
+
+    def run(self) -> ScenarioResult:
+        check_server()
+        ensure_auth()
+        params = self.params()
+        size_mb = params["artifact_size_mb"]
+
+        if size_mb > 500:
+            return ScenarioResult(
+                scenario_id=self.scenario_id,
+                level=self.level,
+                mode=self.mode,
+                status="skipped",
+                metrics={"artifact_size_mb": size_mb},
+                error="Artifact size capped at 500 MB for this benchmark",
+            )
+
+        project = "benchmark-models"
+        client = LuminaClient()
+        project_id = _resolve_project(client, project)
+
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            data = os.urandom(1024 * 1024) * size_mb
+            f.write(data)
+            src_path = Path(f.name)
+
+        original_digest = _sha256_file(src_path)
+        model_name = f"bench-model-{int(time.time())}"
+
+        try:
+            with Timer() as t:
+                artifact = client.create_artifact(
+                    project_id, model_name, "model", description=f"{size_mb} MB benchmark model"
+                )
+                version = client.create_artifact_version(
+                    artifact["id"], "v0", aliases=["latest"]
+                )
+                file_meta = client.add_artifact_file(
+                    version["id"],
+                    src_path.name,
+                    size=len(data),
+                    sha256=original_digest,
+                    content_type="application/octet-stream",
+                )
+                upload_url = file_meta.get("uploadUrl")
+                if upload_url:
+                    try:
+                        client.upload_file_to_url(upload_url, data)
+                    except Exception:
+                        if "minio" in upload_url:
+                            return _s3_skip_result(
+                                self.scenario_id, self.level, self.mode, upload_url
+                            )
+                        raise
+                client.finalize_artifact_version(version["id"])
+
+                model = client.create_registry_model(project_id, model_name)
+                registry_version = client.create_registry_model_version(
+                    model["id"],
+                    version["id"],
+                    aliases=["latest"],
+                    metadata={"benchmark": True},
+                )
+
+            version_detail = client.get_registry_model_version(registry_version["id"])
+            artifact_version = version_detail.get("artifactVersion", {})
+            files = artifact_version.get("files", [])
+
+            with tempfile.TemporaryDirectory() as tmp:
+                downloaded: list[Path] = []
+                for file_meta in files:
+                    download_url = file_meta.get("downloadUrl")
+                    if not download_url:
+                        continue
+                    download_url = _rewrite_storage_url(download_url)
+                    file_data = client.download_file_from_url(download_url)
+                    dest = Path(tmp) / file_meta["path"]
+                    dest.write_bytes(file_data)
+                    downloaded.append(dest)
+
+                download_digest = _sha256_file(downloaded[0]) if downloaded else None
+
+            return ScenarioResult(
+                scenario_id=self.scenario_id,
+                level=self.level,
+                mode=self.mode,
+                status="passed" if download_digest == original_digest else "failed",
+                metrics={
+                    "model_name": model_name,
+                    "artifact_size_mb": size_mb,
+                    "bytes": len(data),
+                    "elapsed_sec": round(t.elapsed, 3),
+                    "registry_version_id": registry_version["id"],
+                },
+                assertions={
+                    "digest_match": download_digest == original_digest,
+                    "registry_version_created": bool(registry_version.get("id")),
+                    "files_downloaded": len(downloaded) == 1,
+                },
+            )
+        finally:
+            src_path.unlink(missing_ok=True)

@@ -24,13 +24,20 @@ from scenarios.artifacts import (
     ArtifactLineageScenario,
     ArtifactUploadDownloadScenario,
     ManySmallFilesArtifactScenario,
+    ModelRegistryScenario,
 )
 from scenarios.auth_workspace import WorkspaceIsolationScenario
 from scenarios.base import Scenario, ScenarioResult
+from scenarios.evaluations import (
+    EvaluationLifecycleScenario,
+    EvaluationResultThroughputScenario,
+)
 from scenarios.experiment_tracking import (
     ExperimentLifecycleScenario,
     MetricThroughputScenario,
 )
+from scenarios.launch import ConcurrentLaunchAgentsScenario, LaunchEnqueueExecuteScenario
+from scenarios.media_tables import ImageMediaScenario, TableMediaScenario
 from scenarios.public_api import PublicApiQueryScenario
 from scenarios.sweeps import BayesianSweepScenario, ConcurrentSweepAgentsScenario
 from scenarios.traces import TraceSpanTreeScenario
@@ -41,10 +48,17 @@ SCENARIOS: dict[str, type[Scenario]] = {
     ArtifactUploadDownloadScenario.scenario_id: ArtifactUploadDownloadScenario,
     ManySmallFilesArtifactScenario.scenario_id: ManySmallFilesArtifactScenario,
     ArtifactLineageScenario.scenario_id: ArtifactLineageScenario,
+    ModelRegistryScenario.scenario_id: ModelRegistryScenario,
     BayesianSweepScenario.scenario_id: BayesianSweepScenario,
     ConcurrentSweepAgentsScenario.scenario_id: ConcurrentSweepAgentsScenario,
     TraceSpanTreeScenario.scenario_id: TraceSpanTreeScenario,
     WorkspaceIsolationScenario.scenario_id: WorkspaceIsolationScenario,
+    ImageMediaScenario.scenario_id: ImageMediaScenario,
+    TableMediaScenario.scenario_id: TableMediaScenario,
+    LaunchEnqueueExecuteScenario.scenario_id: LaunchEnqueueExecuteScenario,
+    ConcurrentLaunchAgentsScenario.scenario_id: ConcurrentLaunchAgentsScenario,
+    EvaluationLifecycleScenario.scenario_id: EvaluationLifecycleScenario,
+    EvaluationResultThroughputScenario.scenario_id: EvaluationResultThroughputScenario,
     PublicApiQueryScenario.scenario_id: PublicApiQueryScenario,
 }
 

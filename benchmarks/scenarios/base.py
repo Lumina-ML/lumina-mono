@@ -73,6 +73,7 @@ LEVEL_PARAMS: dict[str, dict[str, Any]] = {
         "files_per_artifact": 1,
         "spans_per_trace": 10,
         "concurrent_runs": 1,
+        "results_per_eval": 100,
     },
     "M": {
         "metrics_per_run": 1_000,
@@ -82,6 +83,7 @@ LEVEL_PARAMS: dict[str, dict[str, Any]] = {
         "files_per_artifact": 100,
         "spans_per_trace": 100,
         "concurrent_runs": 4,
+        "results_per_eval": 10_000,
     },
     "L": {
         "metrics_per_run": 100_000,
@@ -91,6 +93,7 @@ LEVEL_PARAMS: dict[str, dict[str, Any]] = {
         "files_per_artifact": 1_000,
         "spans_per_trace": 1_000,
         "concurrent_runs": 16,
+        "results_per_eval": 100_000,
     },
     "XL": {
         "metrics_per_run": 1_000_000,
@@ -100,5 +103,6 @@ LEVEL_PARAMS: dict[str, dict[str, Any]] = {
         "files_per_artifact": 10_000,
         "spans_per_trace": 10_000,
         "concurrent_runs": 64,
+        "results_per_eval": 1_000_000,
     },
 }
