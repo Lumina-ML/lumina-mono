@@ -17,6 +17,7 @@ _wb_logging.configure_wandb_logger()
 from lumina import sdk as wandb_sdk
 import lumina
 import os as _os
+import warnings
 from typing import Any, Optional
 lumina.wandb_lib = wandb_sdk.lib
 
@@ -194,6 +195,53 @@ def finish(**kwargs):
 setup = wandb_sdk.setup
 attach = _attach = wandb_sdk._attach
 teardown = _teardown = wandb_sdk.teardown
+
+
+def _deprecated_setup_shim(settings: Any = None) -> Any:
+    """No-op shim for the wandb-cloud `setup()` call.
+
+    Step 3.1c — under the Lumina backend, the wandb-core service
+    process that `setup()` used to bootstrap is no longer used
+    (`lumina.init()` is self-contained). Kept as a public-API stub
+    so existing callers don't AttributeError; emits a one-shot
+    deprecation warning pointing at `lumina.init()`.
+    """
+    warnings.warn(
+        "lumina.setup() is a no-op under the Lumina backend; "
+        "use lumina.init() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return None
+
+
+def _deprecated_attach_shim(*args: Any, **kwargs: Any) -> Any:
+    warnings.warn(
+        "lumina.attach() / lumina._attach() is unsupported under the "
+        "Lumina backend; load a saved run via the PublicApi instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return None
+
+
+def _deprecated_teardown_shim(exit_code: int | None = None) -> None:
+    warnings.warn(
+        "lumina.teardown() / lumina._teardown() is a no-op under the "
+        "Lumina backend; runs self-finalize when their context exits.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+
+# Override the wandb_sdk.* bindings with no-op + deprecation-warning
+# shims. The `wandb_sdk.setup/_attach/teardown` functions are kept
+# importable (line 194-196) for legacy code that imports them via
+# `from lumina import wandb_sdk`; the public-API names below get the
+# shim.
+lumina_setup = _deprecated_setup_shim  # type: ignore[assignment]
+lumina_attach = _deprecated_attach_shim  # type: ignore[assignment]
+lumina_teardown = _deprecated_teardown_shim  # type: ignore[assignment]
 join = finish
 helper = wandb_sdk.helper
 controller = wandb_sdk.controller

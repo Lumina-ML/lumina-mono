@@ -960,7 +960,7 @@ def link_model(path: StrPath, registered_model_name: str, name: str | None=None,
     """
     ...
 
-def plot_table(vega_spec_name: str, data_table: wandb.Table, fields: dict[str, Any], string_fields: dict[str, Any] | None=None, split_table: bool=False) -> CustomChart:
+def plot_table(vega_spec_name: str, data_table: lumina.Table, fields: dict[str, Any], string_fields: dict[str, Any] | None=None, split_table: bool=False) -> CustomChart:
     """Creates a custom charts using a Vega-Lite specification and a `wandb.Table`.
 
     This function creates a custom chart based on a Vega-Lite specification and

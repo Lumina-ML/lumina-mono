@@ -57,7 +57,7 @@ class SupportsLeveledLogging(Protocol):
     def error(self, msg: str) -> None:
         ...
 
-def termsetup(settings: wandb.Settings, logger: SupportsLeveledLogging | None) -> None:
+def termsetup(settings: lumina.Settings, logger: SupportsLeveledLogging | None) -> None:
     """Configure the global logging functions.
 
     Args:

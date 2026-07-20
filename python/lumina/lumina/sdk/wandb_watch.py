@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger('wandb')
 _global_watch_idx = 0
 
-def _watch(run: wandb.Run, models: torch.nn.Module | Sequence[torch.nn.Module], criterion: torch.F | None=None, log: Literal['gradients', 'parameters', 'all'] | None='gradients', log_freq: int=1000, idx: int | None=None, log_graph: bool=False):
+def _watch(run: lumina.Run, models: torch.nn.Module | Sequence[torch.nn.Module], criterion: torch.F | None=None, log: Literal['gradients', 'parameters', 'all'] | None='gradients', log_freq: int=1000, idx: int | None=None, log_graph: bool=False):
     """Hooks into the given PyTorch model(s) to monitor gradients and the model's computational graph.
 
     This function can track parameters, gradients, or both during training. It should be
@@ -76,7 +76,7 @@ def _watch(run: wandb.Run, models: torch.nn.Module | Sequence[torch.nn.Module], 
             graphs.append(graph)
     return graphs
 
-def _unwatch(run: wandb.Run, models: torch.nn.Module | Sequence[torch.nn.Module] | None=None) -> None:
+def _unwatch(run: lumina.Run, models: torch.nn.Module | Sequence[torch.nn.Module] | None=None) -> None:
     """Remove pytorch model topology, gradient and parameter hooks.
 
     Args:
