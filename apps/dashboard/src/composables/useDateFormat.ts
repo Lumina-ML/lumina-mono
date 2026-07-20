@@ -1,7 +1,10 @@
 import { format, formatDistanceToNow } from "date-fns";
 import { zhCN, enUS } from "date-fns/locale";
 
-const locale = navigator.language.startsWith("zh") ? zhCN : enUS;
+const locale =
+  typeof navigator !== "undefined" && navigator.language.startsWith("zh")
+    ? zhCN
+    : enUS;
 
 export function useDateFormat() {
   function formatDate(date: string | Date | number, fmt = "yyyy-MM-dd HH:mm"): string {
