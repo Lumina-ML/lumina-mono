@@ -1,4 +1,4 @@
-"""Experiment tracking scenarios: ET-1 ~ ET-2."""
+"""Experiment tracking scenarios: ET-1 ~ ET-5."""
 
 from __future__ import annotations
 
@@ -109,5 +109,176 @@ class MetricThroughputScenario(Scenario):
             assertions={
                 "count_match": received == total_points,
                 "run_finished": client.get_run(run_id).get("status") == "finished",
+            },
+        )
+
+
+class SystemMetricsAndLogsScenario(Scenario):
+    """ET-3: system metrics and console logs ingestion."""
+
+    scenario_id = "ET-3"
+    name = "System metrics and logs"
+
+    def run(self) -> ScenarioResult:
+        check_server()
+        ensure_auth()
+        params = self.params()
+        log_lines = min(params["log_lines"], 100)
+        steps = min(params["steps"], 20)
+
+        run = lumina.init(
+            project="benchmark-et-system",
+            name=f"et3-{self.level}-{int(time.time())}",
+            config={"steps": steps, "log_lines": log_lines},
+        )
+        run_id = run.run_id
+
+        with Timer() as t:
+            for step in range(steps):
+                lumina.log_system(
+                    {
+                        "cpu_percent": 20.0 + step * 2.5,
+                        "memory_percent": 40.0 + step * 1.5,
+                        "gpu_utilization": step * 5.0,
+                    },
+                    step=step,
+                )
+
+            for i in range(log_lines):
+                level = "INFO" if i % 10 != 0 else "WARNING"
+                lumina.log_line(f"benchmark log line {i}", level=level, step=i % steps)
+
+        client = LuminaClient()
+        system_metrics = client._request(
+            "GET", f"/api/v1/runs/{run_id}/system-metrics?limit={steps * 10}"
+        )
+        logs = client._request("GET", f"/api/v1/runs/{run_id}/logs?limit={log_lines + 10}")
+
+        lumina.finish()
+
+        metrics_by_key = system_metrics.get("metrics", {})
+        metric_points = sum(len(points) for points in metrics_by_key.values())
+        log_items = logs.get("logs", [])
+
+        expected_metrics = steps * 3  # 3 keys per step
+        return ScenarioResult(
+            scenario_id=self.scenario_id,
+            level=self.level,
+            mode=self.mode,
+            status="passed" if metric_points >= expected_metrics and len(log_items) >= log_lines else "failed",
+            metrics={
+                "steps": steps,
+                "log_lines": log_lines,
+                "system_metric_points": metric_points,
+                "returned_logs": len(log_items),
+                "elapsed_ms": round(t.elapsed * 1000, 2),
+            },
+            assertions={
+                "system_metrics_recorded": metric_points >= expected_metrics,
+                "logs_recorded": len(log_items) >= log_lines,
+                "run_finished": client.get_run(run_id).get("status") == "finished",
+            },
+        )
+
+
+class RunResumeRewindScenario(Scenario):
+    """ET-4: run resume-state, should-stop, and rewind endpoints."""
+
+    scenario_id = "ET-4"
+    name = "Run resume/rewind"
+
+    def run(self) -> ScenarioResult:
+        check_server()
+        ensure_auth()
+        project = "benchmark-et-resume"
+
+        client = LuminaClient()
+        project_id = resolve_project(project)
+
+        run = client.create_run(
+            project=project,
+            name=f"et4-{int(time.time())}",
+            config={"lr": 0.01},
+        )
+        run_id = run["runId"]
+
+        # Log some metrics so resume-state has data.
+        for step in range(5):
+            client.log_metrics(run_id, {"train/loss": 1.0 / (step + 1)}, step=step)
+
+        with Timer() as t:
+            resume_state = client.get_run_resume_state(run_id)
+            should_stop = client.should_stop(run_id)
+
+            # Rewind to the step whose train/loss == 0.5 (step 1).
+            rewound = client.rewind_run(
+                run_id,
+                metric_name="train/loss",
+                metric_value=0.5,
+                program_path="train.py",
+            )
+
+        return ScenarioResult(
+            scenario_id=self.scenario_id,
+            level=self.level,
+            mode=self.mode,
+            status="passed" if bool(resume_state and rewound) else "failed",
+            metrics={
+                "run_id": run_id,
+                "elapsed_ms": round(t.elapsed * 1000, 2),
+            },
+            assertions={
+                "resume_state_non_empty": bool(resume_state),
+                "should_stop_false": should_stop is False,
+                "rewind_returned_state": bool(rewound),
+            },
+        )
+
+
+class TagsAndNotesScenario(Scenario):
+    """ET-5: attach tags and notes to a run."""
+
+    scenario_id = "ET-5"
+    name = "Tags and notes"
+
+    def run(self) -> ScenarioResult:
+        check_server()
+        ensure_auth()
+        project = "benchmark-et-tags"
+
+        client = LuminaClient()
+        project_id = resolve_project(project)
+
+        run = client.create_run(
+            project=project,
+            name=f"et5-{int(time.time())}",
+            config={"lr": 0.01},
+        )
+        run_id = run["runId"]
+
+        with Timer() as t:
+            notes = "Benchmark run notes for ET-5"
+            client.update_run(run_id, notes=notes)
+            client.add_tag(run_id, "baseline", color="#3b82f6")
+            client.add_tag(run_id, "benchmark", color="#10b981")
+
+        run_data = client.get_run(run_id)
+        run_tags = client._request("GET", f"/api/v1/runs/{run_id}/tags").get("items", [])
+        tag_names = {tag.get("name") for tag in run_tags}
+
+        return ScenarioResult(
+            scenario_id=self.scenario_id,
+            level=self.level,
+            mode=self.mode,
+            status="passed" if run_data.get("notes") == notes and {"baseline", "benchmark"}.issubset(tag_names) else "failed",
+            metrics={
+                "run_id": run_id,
+                "tag_count": len(run_tags),
+                "elapsed_ms": round(t.elapsed * 1000, 2),
+            },
+            assertions={
+                "notes_persisted": run_data.get("notes") == notes,
+                "baseline_tag_present": "baseline" in tag_names,
+                "benchmark_tag_present": "benchmark" in tag_names,
             },
         )

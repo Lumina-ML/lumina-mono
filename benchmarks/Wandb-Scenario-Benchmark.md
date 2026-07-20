@@ -9,6 +9,8 @@
 > 更新 2026-07-21：第二批核心场景（AR-2 / AR-3 / SW-2 / TR-1 / AW-1）已实现并接入 runner。AR-2 与 AR-1 受同一 S3 内网 hostname 限制会 skip；TR-1 当前验证 trace 创建与 project-scoped 列表，span tree 细节验证需等 workspace-guard 对 ClickHouse trace 的 authz 查询统一后补齐。
 >
 > 更新 2026-07-21：第三批核心场景（MR-1 / MD-1 / MD-2 / LN-1 / LN-2 / EV-1 / EV-2）已实现并接入 runner。MR-1 / MD-1 / MD-2 与 AR-1 同样受 S3 内网 hostname 限制会 skip；LN / EV 在本地 docker 通过。
+>
+> 更新 2026-07-21：第四批核心场景（ET-3 / ET-4 / ET-5 / RP-1 / AW-2 / TR-2）已实现并接入 runner。至此设计稿 23 个场景全部实现；本地 docker compose 全量 S 级验证 PASSED=17 / FAILED=0 / SKIPPED=6。SKIP 原因：AR-1/AR-2/MR-1/MD-1/MD-2 因 S3 presigned URL 指向 `minio:9000`（宿主机不可达）；AW-2 因本地 compose 未配置 `LUMINA_ROTATE_KEY_EMAILS` 导致 rotate-key 404。
 
 ## 1. 设计原则
 
@@ -26,13 +28,13 @@
 
 | 维度 | 说明 | 当前缺口 |
 |---|---|---|
-| **API Coverage** | 每个 SDK public API 至少一条 happy path | 缺少统一的 API smoke benchmark |
-| **Data Volume** | Small / Medium / Large / XLarge | 现有 benchmark 数据量偏小（≤1k metrics） |
-| **Concurrency** | 多 run 并行、多 agent 并发 sweep | 无并发 benchmark |
-| **Read/Query** | metric 列表、summary 聚合、Public API 查询 | 无读侧 benchmark |
-| **Correctness** | summary 聚合、artifact digest、lineage、sweep early-stop | 未系统验证 |
-| **Multi-workspace** | 切换 workspace、跨 workspace 隔离 | AW-1 已实现 |
-| **Storage Backend** | Postgres vs ClickHouse metrics；本地 vs S3 artifacts | 无后端对比 benchmark；TR-1 span 验证受 ClickHouse authz 缺口影响 |
+| **API Coverage** | 每个 SDK public API 至少一条 happy path | SDK API smoke benchmark 已覆盖，但缺 API 级负面用例 |
+| **Data Volume** | Small / Medium / Large / XLarge | 已实现四级参数，M/L/XL 尚未全量跑通 |
+| **Concurrency** | 多 run 并行、多 agent 并发 sweep | SW-2 / LN-2 已覆盖；缺多 run 并行写 benchmark |
+| **Read/Query** | metric 列表、summary 聚合、Public API 查询 | PA-1 已覆盖 PublicApi；读侧 metric 聚合 benchmark 待补 |
+| **Correctness** | summary 聚合、artifact digest、lineage、sweep early-stop | AR-3 / EV-1 / SW-1 已覆盖；SW-1 `best_run_recorded` 仍为 false |
+| **Multi-workspace** | 切换 workspace、跨 workspace 隔离 | AW-1 / AW-2 已实现（AW-2 需配置 rotate-key allowlist） |
+| **Storage Backend** | Postgres vs ClickHouse metrics；本地 vs S3 artifacts | 无后端对比 benchmark；TR-1 span 树验证受 ClickHouse authz 缺口影响 |
 
 ## 3. 数据量级定义
 
@@ -128,19 +130,19 @@
 ```
 benchmarks/
   Wandb-Scenario-Benchmark.md      # 本文档
-  scenario_runner.py               # 统一入口（已接入 10 个场景）
+  scenario_runner.py               # 统一入口（已接入 23 个场景）
   scenarios/
     __init__.py                    # 已创建
     base.py                        # Scenario 抽象基类 + LEVEL_PARAMS（已创建）
-    experiment_tracking.py         # ET-1, ET-2 已实现；ET-3 ~ ET-5 待补充
-    artifacts.py                   # AR-1 ~ AR-3 已实现（AR-1/AR-2 本地 docker 可能 skip）
-    media_tables.py                # MD-1 ~ MD-2 待实现
+    experiment_tracking.py         # ET-1 ~ ET-5 已实现
+    artifacts.py                   # AR-1 ~ AR-3 + MR-1 已实现（AR-1/AR-2/MR-1 本地 docker 因 S3 内网 hostname skip）
+    media_tables.py                # MD-1 ~ MD-2 已实现（本地 docker 因 S3 内网 hostname skip）
     sweeps.py                      # SW-1, SW-2 已实现
-    launch.py                      # LN-1 ~ LN-2 待实现
-    evaluations.py                 # EV-1 ~ EV-2 待实现
-    traces.py                      # TR-1 已实现（span 树细节验证待补齐）；TR-2 待实现
-    reports_public_api.py          # PA-1 已实现；RP-1 待实现
-    auth_workspace.py              # AW-1 已实现；AW-2 待实现
+    launch.py                      # LN-1 ~ LN-2 已实现
+    evaluations.py                 # EV-1 ~ EV-2 已实现
+    traces.py                      # TR-1, TR-2 已实现（TR-1 span 树细节验证待补齐）
+    public_api.py                  # PA-1, RP-1 已实现
+    auth_workspace.py              # AW-1, AW-2 已实现（AW-2 需配置 rotate-key allowlist）
 ```
 
 ### 5.2 `Scenario` 基类约定
@@ -200,8 +202,9 @@ python benchmarks/scenario_runner.py --mode real --level M --scenario ET-2 AR-1
 1. ✅ **先实现 `scenarios/base.py` + `scenario_runner.py` 骨架**
 2. ✅ **ET-1 / ET-2 / AR-1 / SW-1 / PA-1** 作为第一批核心场景
 3. ✅ **AR-2 / AR-3 / SW-2 / TR-1 / AW-1** 作为第二批核心场景
-4. **MR-1 / MD-1 / MD-2 / LN-1 / EV-1** 补齐（2d）
-5. **XL 级别 + 真实后端压测 + TR-1 span 树完整验证**（1-2d）
+4. ✅ **MR-1 / MD-1 / MD-2 / LN-1 / LN-2 / EV-1 / EV-2** 作为第三批核心场景
+5. ✅ **ET-3 / ET-4 / ET-5 / RP-1 / AW-2 / TR-2** 作为第四批核心场景
+6. **M/L/XL 级别全量压测 + S3 公共 endpoint / 容器内执行 + TR-1 span 树完整验证 + SW-1 best_run 断言修复**
 
 ## 8. 验收标准
 

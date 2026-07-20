@@ -26,7 +26,7 @@ from scenarios.artifacts import (
     ManySmallFilesArtifactScenario,
     ModelRegistryScenario,
 )
-from scenarios.auth_workspace import WorkspaceIsolationScenario
+from scenarios.auth_workspace import ApiKeyRotationScenario, WorkspaceIsolationScenario
 from scenarios.base import Scenario, ScenarioResult
 from scenarios.evaluations import (
     EvaluationLifecycleScenario,
@@ -35,16 +35,22 @@ from scenarios.evaluations import (
 from scenarios.experiment_tracking import (
     ExperimentLifecycleScenario,
     MetricThroughputScenario,
+    RunResumeRewindScenario,
+    SystemMetricsAndLogsScenario,
+    TagsAndNotesScenario,
 )
 from scenarios.launch import ConcurrentLaunchAgentsScenario, LaunchEnqueueExecuteScenario
 from scenarios.media_tables import ImageMediaScenario, TableMediaScenario
-from scenarios.public_api import PublicApiQueryScenario
+from scenarios.public_api import PublicApiQueryScenario, ReportLifecycleScenario
 from scenarios.sweeps import BayesianSweepScenario, ConcurrentSweepAgentsScenario
-from scenarios.traces import TraceSpanTreeScenario
+from scenarios.traces import RagAgentTraceScenario, TraceSpanTreeScenario
 
 SCENARIOS: dict[str, type[Scenario]] = {
     ExperimentLifecycleScenario.scenario_id: ExperimentLifecycleScenario,
     MetricThroughputScenario.scenario_id: MetricThroughputScenario,
+    SystemMetricsAndLogsScenario.scenario_id: SystemMetricsAndLogsScenario,
+    RunResumeRewindScenario.scenario_id: RunResumeRewindScenario,
+    TagsAndNotesScenario.scenario_id: TagsAndNotesScenario,
     ArtifactUploadDownloadScenario.scenario_id: ArtifactUploadDownloadScenario,
     ManySmallFilesArtifactScenario.scenario_id: ManySmallFilesArtifactScenario,
     ArtifactLineageScenario.scenario_id: ArtifactLineageScenario,
@@ -52,13 +58,16 @@ SCENARIOS: dict[str, type[Scenario]] = {
     BayesianSweepScenario.scenario_id: BayesianSweepScenario,
     ConcurrentSweepAgentsScenario.scenario_id: ConcurrentSweepAgentsScenario,
     TraceSpanTreeScenario.scenario_id: TraceSpanTreeScenario,
+    RagAgentTraceScenario.scenario_id: RagAgentTraceScenario,
     WorkspaceIsolationScenario.scenario_id: WorkspaceIsolationScenario,
+    ApiKeyRotationScenario.scenario_id: ApiKeyRotationScenario,
     ImageMediaScenario.scenario_id: ImageMediaScenario,
     TableMediaScenario.scenario_id: TableMediaScenario,
     LaunchEnqueueExecuteScenario.scenario_id: LaunchEnqueueExecuteScenario,
     ConcurrentLaunchAgentsScenario.scenario_id: ConcurrentLaunchAgentsScenario,
     EvaluationLifecycleScenario.scenario_id: EvaluationLifecycleScenario,
     EvaluationResultThroughputScenario.scenario_id: EvaluationResultThroughputScenario,
+    ReportLifecycleScenario.scenario_id: ReportLifecycleScenario,
     PublicApiQueryScenario.scenario_id: PublicApiQueryScenario,
 }
 

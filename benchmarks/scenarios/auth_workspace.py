@@ -110,3 +110,64 @@ class WorkspaceIsolationScenario(Scenario):
             },
             error=None if (default_ok and isolated_blocked) else isolated_error,
         )
+
+
+class ApiKeyRotationScenario(Scenario):
+    """AW-2: self-service API-key rotation via POST /users/:email/rotate-key.
+
+    The endpoint is unauthenticated but protected by an email allowlist. The
+    default local docker compose stack leaves the allowlist empty, so this
+    scenario reports ``skipped`` when rotation is disabled.
+    """
+
+    scenario_id = "AW-2"
+    name = "API key rotation"
+
+    def run(self) -> ScenarioResult:
+        check_server()
+        client = LuminaClient()
+        email = f"aw2-{int(time.time())}@lumina.ai"
+        user = client.create_user(email, name="AW-2 user")
+        old_key = user["apiKey"]
+
+        with Timer() as t:
+            try:
+                resp = client._request("POST", f"/api/v1/users/{email}/rotate-key")
+            except LuminaClientError as exc:
+                code = _http_code(exc)
+                return ScenarioResult(
+                    scenario_id=self.scenario_id,
+                    level=self.level,
+                    mode=self.mode,
+                    status="skipped" if code == 404 else "failed",
+                    metrics={"rotate_status_code": code},
+                    error=str(exc),
+                )
+
+        new_key = resp.get("apiKey")
+        new_client = LuminaClient(api_key=new_key)
+        me = new_client.get_current_user()
+        new_key_ok = me.get("email") == email
+
+        old_client = LuminaClient(api_key=old_key)
+        old_code: int | None = None
+        try:
+            old_client.get_current_user()
+        except LuminaClientError as exc:
+            old_code = _http_code(exc)
+        old_key_invalid = old_code in (401, 403)
+
+        return ScenarioResult(
+            scenario_id=self.scenario_id,
+            level=self.level,
+            mode=self.mode,
+            status="passed" if new_key_ok and old_key_invalid else "failed",
+            metrics={
+                "rotate_ms": round(t.elapsed * 1000, 2),
+                "old_key_status": old_code,
+            },
+            assertions={
+                "new_key_works": new_key_ok,
+                "old_key_rejected": old_key_invalid,
+            },
+        )
