@@ -82,13 +82,29 @@ const LTabPaneStub = {
   template: '<div class="mock-tab-pane" :data-name="name" :data-tab="tab"><span>{{ tab }}</span><slot /></div>',
 };
 
+const LParallelChartStub = {
+  props: ["axes", "rows", "title", "height"],
+  template: '<div class="mock-parallel-chart">ParallelChart</div>',
+};
+
+const LHeatmapChartStub = {
+  props: ["xLabels", "yLabels", "data", "title", "height"],
+  template: '<div class="mock-heatmap-chart">HeatmapChart</div>',
+};
+
 describe("RunCompare", () => {
   it("renders run names and comparison tabs", async () => {
     const queryClient = new QueryClient();
     const wrapper = mount(RunCompare, {
       global: {
         plugins: [[VueQueryPlugin, { queryClient }]],
-        stubs: { RouterLink: RouterLinkStub, LTabs: LTabsStub, LTabPane: LTabPaneStub },
+        stubs: {
+          RouterLink: RouterLinkStub,
+          LTabs: LTabsStub,
+          LTabPane: LTabPaneStub,
+          LParallelChart: LParallelChartStub,
+          LHeatmapChart: LHeatmapChartStub,
+        },
       },
     });
 
@@ -107,7 +123,13 @@ describe("RunCompare", () => {
     const wrapper = mount(RunCompare, {
       global: {
         plugins: [[VueQueryPlugin, { queryClient }]],
-        stubs: { RouterLink: RouterLinkStub, LTabs: LTabsStub, LTabPane: LTabPaneStub },
+        stubs: {
+          RouterLink: RouterLinkStub,
+          LTabs: LTabsStub,
+          LTabPane: LTabPaneStub,
+          LParallelChart: LParallelChartStub,
+          LHeatmapChart: LHeatmapChartStub,
+        },
       },
     });
 

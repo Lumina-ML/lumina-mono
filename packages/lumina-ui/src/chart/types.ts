@@ -12,6 +12,8 @@ export interface ChartAxis {
   name?: string;
   min?: number | "auto";
   max?: number | "auto";
+  /** category 轴的类目数据 */
+  data?: (string | number)[];
   /** 是否显示分隔线 */
   splitLine?: boolean | { lineStyle?: { type?: "solid" | "dashed" } };
   /** 是否显示坐标轴 */
@@ -20,13 +22,13 @@ export interface ChartAxis {
   axisLabel?: boolean | { formatter?: string | ((value: unknown) => string) };
 }
 
-export type ChartSeriesType = "line" | "bar" | "scatter" | "area";
+export type ChartSeriesType = "line" | "bar" | "scatter" | "area" | "parallel" | "heatmap";
 
 export interface ChartSeries {
   type: ChartSeriesType;
   name: string;
-  /** [x, y] 数据点数组 */
-  data: Array<[number | string, number]>;
+  /** 数据点数组。普通直角坐标系为 [x, y]，parallel/heatmap 按对应维度传入 */
+  data: Array<(number | string | null)[]>;
   /** 覆盖默认颜色 */
   color?: string;
   /** 折线平滑 */
@@ -135,10 +137,25 @@ export interface ChartPerformance {
   notMerge?: boolean;
 }
 
+export interface ChartParallelAxis {
+  dim: number;
+  name: string;
+  type: "value" | "category";
+  /** category 轴需要传入完整类目 */
+  data?: (string | number)[];
+}
+
+export interface ChartVisualMap {
+  min?: number;
+  max?: number;
+  inRange?: { color?: string[] };
+}
+
 export interface ChartConfig {
   title?: string;
-  xAxis: ChartAxis;
-  yAxis: ChartAxis;
+  /** 普通直角坐标轴；parallel/heatmap 按需传入 */
+  xAxis?: ChartAxis;
+  yAxis?: ChartAxis;
   series: ChartSeries[];
   legend?: ChartLegend;
   tooltip?: ChartTooltip;
@@ -147,6 +164,10 @@ export interface ChartConfig {
   toolbox?: ChartToolbox;
   brush?: ChartBrush;
   animation?: ChartAnimation;
+  /** parallel 坐标系维度定义 */
+  parallelAxes?: ChartParallelAxis[];
+  /** heatmap 数值映射 */
+  visualMap?: ChartVisualMap;
   /** 覆盖默认背景色 */
   backgroundColor?: string;
   /** 性能调优 */

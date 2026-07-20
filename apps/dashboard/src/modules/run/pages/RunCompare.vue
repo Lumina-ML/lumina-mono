@@ -8,6 +8,8 @@ import {
   LSkeleton,
   LTabs,
   LTabPane,
+  LParallelChart,
+  LHeatmapChart,
 } from "@lumina/ui";
 import { ArrowLeft } from "lucide-vue-next";
 import { useRunsByIds } from "@/modules/run/composables/useRunsByIds";
@@ -87,6 +89,62 @@ const summaryKeys = computed(() => {
     }
   });
   return [...keys].sort();
+});
+
+const numericSummaryKeys = computed(() =>
+  summaryKeys.value.filter((k) =>
+    orderedRuns.value.some(
+      (run) => typeof (run!.summary as Record<string, unknown>)?.[k] === "number",
+    ),
+  ),
+);
+
+const numericConfigKeys = computed(() =>
+  configKeys.value.filter((k) =>
+    orderedRuns.value.some(
+      (run) => typeof (run!.config as Record<string, unknown>)?.[k] === "number",
+    ),
+  ),
+);
+
+const hasParallelData = computed(
+  () => orderedRuns.value.length >= 2 && numericSummaryKeys.value.length + numericConfigKeys.value.length > 0,
+);
+
+const parallelAxes = computed(() => {
+  const dims = ["Run", ...numericSummaryKeys.value, ...numericConfigKeys.value];
+  return dims.map((name, idx) => ({
+    dim: idx,
+    name,
+    type: name === "Run" ? ("category" as const) : ("value" as const),
+    data: name === "Run" ? orderedRuns.value.map((run) => run!.name) : undefined,
+  }));
+});
+
+const parallelRows = computed(() =>
+  orderedRuns.value.map((run) => [
+    run!.name,
+    ...numericSummaryKeys.value.map(
+      (k) => ((run!.summary as Record<string, unknown>)?.[k] as number) ?? 0,
+    ),
+    ...numericConfigKeys.value.map(
+      (k) => ((run!.config as Record<string, unknown>)?.[k] as number) ?? 0,
+    ),
+  ]),
+);
+
+const heatmapData = computed(() => {
+  const rows: Array<[number, number, number]> = [];
+  numericSummaryKeys.value.forEach((key, xIdx) => {
+    orderedRuns.value.forEach((run, yIdx) => {
+      const raw = (run!.summary as Record<string, unknown>)?.[key];
+      const value = typeof raw === "number" ? raw : Number(raw);
+      if (Number.isFinite(value)) {
+        rows.push([xIdx, yIdx, value]);
+      }
+    });
+  });
+  return rows;
 });
 
 function goBack() {
@@ -254,6 +312,41 @@ function goBack() {
                   </tr>
                 </tbody>
               </table>
+            </LCard>
+          </LTabPane>
+
+          <LTabPane name="parallel" tab="Parallel">
+            <div v-if="!hasParallelData" class="py-8">
+              <LEmpty
+                title="No numeric dimensions"
+                description="Parallel coordinates need numeric summary or config values."
+              />
+            </div>
+            <LCard v-else class="p-4">
+              <LParallelChart
+                title="Run dimensions"
+                :axes="parallelAxes"
+                :rows="parallelRows"
+                height="420px"
+              />
+            </LCard>
+          </LTabPane>
+
+          <LTabPane name="heatmap" tab="Heatmap">
+            <div v-if="heatmapData.length === 0" class="py-8">
+              <LEmpty
+                title="No numeric summary data"
+                description="Heatmap needs numeric summary values to compare across runs."
+              />
+            </div>
+            <LCard v-else class="p-4">
+              <LHeatmapChart
+                title="Summary values by run"
+                :x-labels="numericSummaryKeys"
+                :y-labels="orderedRuns.map((r) => r!.name)"
+                :data="heatmapData"
+                height="420px"
+              />
             </LCard>
           </LTabPane>
         </LTabs>
