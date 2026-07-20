@@ -1,16 +1,28 @@
-from __future__ import annotations
 import numbers
+
+from __future__ import annotations
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, TypeVar
+
 import lumina
+
 from lumina import util
 from lumina.plot.custom_chart import plot_table
 from lumina.plot.utils import test_missing, test_types
+
 if TYPE_CHECKING:
     from lumina.plot.custom_chart import CustomChart
 T = TypeVar('T')
 
-def pr_curve(y_true: Iterable[T] | None=None, y_probas: Iterable[numbers.Number] | None=None, labels: list[str] | None=None, classes_to_plot: list[T] | None=None, interp_size: int=21, title: str='Precision-Recall Curve', split_table: bool=False) -> CustomChart | None:
+def pr_curve(
+        y_true: Iterable[T] | None=None, 
+        y_probas: Iterable[numbers.Number] | None=None, 
+        labels: list[str] | None=None, 
+        classes_to_plot: list[T] | None=None, 
+        interp_size: int=21, 
+        title: str='Precision-Recall Curve', 
+        split_table: bool=False
+    ) -> CustomChart | None:
     """Constructs a Precision-Recall (PR) curve.
 
     The Precision-Recall curve is particularly useful for evaluating classifiers
@@ -87,18 +99,22 @@ def pr_curve(y_true: Iterable[T] | None=None, y_probas: Iterable[numbers.Number]
         for i in range(1, len(y)):
             y[i] = max(y[i], y[i - 1])
         return y
+    
     y_true = np.array(y_true)
     y_probas = np.array(y_probas)
     if not test_missing(y_true=y_true, y_probas=y_probas):
         return
     if not test_types(y_true=y_true, y_probas=y_probas):
         return
+    
     classes = np.unique(y_true)
     if classes_to_plot is None:
         classes_to_plot = classes
+
     precision = {}
     interp_recall = np.linspace(0, 1, interp_size)[::-1]
     indices_to_plot = np.where(np.isin(classes, classes_to_plot))[0]
+    
     for i in indices_to_plot:
         if labels is not None and (isinstance(classes[i], int) or isinstance(classes[0], np.integer)):
             class_label = labels[classes[i]]
@@ -111,7 +127,20 @@ def pr_curve(y_true: Iterable[T] | None=None, y_probas: Iterable[numbers.Number]
         indices = np.searchsorted(cur_recall, interp_recall, side='left')
         precision[class_label] = cur_precision[indices]
     df = pd.DataFrame({'class': np.hstack([[k] * len(v) for k, v in precision.items()]), 'precision': np.hstack(list(precision.values())), 'recall': np.tile(interp_recall, len(precision))}).round(3)
+
     if len(df) > lumina.Table.MAX_ROWS:
         lumina.termwarn(f'Table has a limit of {lumina.Table.MAX_ROWS} rows. Resampling to fit.')
-        df = sklearn_utils.resample(df, replace=False, n_samples=lumina.Table.MAX_ROWS, random_state=42, stratify=df['class']).sort_values(['precision', 'recall', 'class'])
-    return plot_table(data_table=lumina.Table(dataframe=df), vega_spec_name='wandb/area-under-curve/v0', fields={'x': 'recall', 'y': 'precision', 'class': 'class'}, string_fields={'title': title, 'x-axis-title': 'Recall', 'y-axis-title': 'Precision'}, split_table=split_table)
+        df = sklearn_utils.resample(
+            df, 
+            replace=False,
+            n_samples=lumina.Table.MAX_ROWS, 
+            random_state=42, 
+            stratify=df['class']
+        ).sort_values(['precision', 'recall', 'class'])
+    return plot_table(
+        data_table=lumina.Table(dataframe=df), 
+        vega_spec_name='wandb/area-under-curve/v0', 
+        fields={'x': 'recall', 'y': 'precision', 'class': 'class'}, 
+        string_fields={'title': title, 'x-axis-title': 'Recall', 'y-axis-title': 'Precision'}, 
+        split_table=split_table
+    )

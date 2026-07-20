@@ -1,11 +1,11 @@
 from __future__ import annotations
-import logging
+
 from urllib.parse import urlsplit, urlunsplit
 from lumina import util
 from lumina.errors import links, term
 from . import saas, validation, wbnetrc
 from .host_url import HostUrl
-_logger = logging.getLogger(__name__)
+
 _LOGIN_CHOICE_NEW = 'Create a W&B account'
 _LOGIN_CHOICE_EXISTS = 'Use an existing W&B account'
 _LOGIN_CHOICE_OFFLINE = "Don't visualize my results"

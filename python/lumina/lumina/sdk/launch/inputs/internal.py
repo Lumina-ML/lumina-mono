@@ -1,6 +1,6 @@
-"""The layer between launch sdk user code and the wandb internal process.
+"""The layer between launch sdk user code and the lumina internal process.
 
-If there is an active run this communication is done through the wandb run's
+If there is an active run this communication is done through the lumina run's
 backend interface.
 
 If there is no active run, the messages are staged on the StagedLaunchInputs
@@ -13,7 +13,6 @@ import shutil
 import tempfile
 from typing import Any
 import lumina
-import lumina.data_types
 from lumina.sdk.launch.errors import LaunchError
 from lumina.sdk.launch.inputs.schema import META_SCHEMA
 from lumina.util import get_module
@@ -75,17 +74,17 @@ class StagedLaunchInputs:
     def add_staged_input(self, input_arguments: JobInputArguments):
         self._staged_inputs.append(input_arguments)
 
-    def apply(self, run: wandb.Run):
+    def apply(self, run: lumina.Run):
         """Apply the staged inputs to the given run."""
         for input in self._staged_inputs:
             _publish_job_input(input, run)
 
-def _publish_job_input(input: JobInputArguments, run: wandb.Run) -> None:
+def _publish_job_input(input: JobInputArguments, run: lumina.Run) -> None:
     """Publish a job input to the backend interface of the given run.
 
     Arguments:
         input (JobInputArguments): The arguments for the job input.
-        run (wandb.Run): The run to publish the job input to.
+        run (lumina.Run): The run to publish the job input to.
     """
     assert run._interface is not None
     assert input.run_config is not None
@@ -145,7 +144,7 @@ def _prepare_schema(schema: Any) -> dict:
     return _replace_refs_and_allofs(schema, defs)
 
 def _validate_schema(schema: dict) -> None:
-    jsonschema = get_module('jsonschema', required="Setting job schema requires the jsonschema package. Please install it with `pip install 'wandb[launch]'`.", lazy=False)
+    jsonschema = get_module('jsonschema', required="Setting job schema requires the jsonschema package. Please install it with `pip install 'lumina[launch]'`.", lazy=False)
     validator = jsonschema.Draft202012Validator(META_SCHEMA)
     errs = sorted(validator.iter_errors(schema), key=str)
     if errs:
@@ -180,7 +179,7 @@ def handle_config_file_input(path: str, include: list[str] | None=None, exclude:
         staged_inputs.add_staged_input(arguments)
 
 def handle_run_config_input(include: list[str] | None=None, exclude: list[str] | None=None, schema: Any | None=None):
-    """Declare wandb.config as an overridable configuration for a launch job.
+    """Declare lumina.config as an overridable configuration for a launch job.
 
     The include and exclude paths are sent to the backend interface of the
     active run and used to configure the job builder.

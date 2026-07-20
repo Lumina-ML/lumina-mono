@@ -37,7 +37,13 @@ class CustomChart:
         """Sets the key for the spec and updates dependent configurations."""
         self.spec.key = key
 
-def plot_table(vega_spec_name: str, data_table: wandb.Table, fields: dict[str, Any], string_fields: dict[str, Any] | None=None, split_table: bool=False) -> CustomChart:
+def plot_table(
+        vega_spec_name: str, 
+        data_table: lumina.Table, 
+        fields: dict[str, Any], 
+        string_fields: dict[str, Any] | None=None, 
+        split_table: bool=False
+    ) -> CustomChart:
     """Creates a custom charts using a Vega-Lite specification and a `wandb.Table`.
 
     This function creates a custom chart based on a Vega-Lite specification and
@@ -90,4 +96,12 @@ def plot_table(vega_spec_name: str, data_table: wandb.Table, fields: dict[str, A
     """
     if not isinstance(data_table, lumina.Table):
         raise lumina.Error(f'Expected `data_table` to be `wandb.Table` type, instead got {type(data_table).__name__}')
-    return CustomChart(table=data_table, spec=CustomChartSpec(spec_name=vega_spec_name, fields=fields, string_fields=string_fields or {}, split_table=split_table))
+    return CustomChart(
+        table=data_table, 
+        spec=CustomChartSpec(
+            spec_name=vega_spec_name, 
+            fields=fields, 
+            string_fields=string_fields or {}, 
+            split_table=split_table
+        )
+    )

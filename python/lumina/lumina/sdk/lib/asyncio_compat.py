@@ -2,7 +2,8 @@
 from __future__ import annotations
 import asyncio
 import concurrent
-import concurrent.futures
+# import concurrent.futures
+from concurrent import futures
 import contextlib
 import threading
 from collections.abc import AsyncGenerator, Callable, Coroutine
@@ -19,10 +20,10 @@ def run(fn: Callable[[], Coroutine[Any, Any, _T]]) -> _T:
 
     Note that due to starting a new thread, this is slightly slow.
     """
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+    with futures.ThreadPoolExecutor(max_workers=1) as executor:
         runner = CancellableRunner()
         try:
-            future: concurrent.futures.Future[_T] = executor.submit(runner.run, fn)
+            future: futures.Future[_T] = executor.submit(runner.run, fn)
             return future.result()
         finally:
             runner.cancel()

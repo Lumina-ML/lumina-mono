@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     import lumina
     from lumina.plot.custom_chart import CustomChart
 
-def scatter(table: wandb.Table, x: str, y: str, title: str='', split_table: bool=False) -> CustomChart:
+def scatter(table: lumina.Table, x: str, y: str, title: str='', split_table: bool=False) -> CustomChart:
     """Constructs a scatter plot from a wandb.Table of data.
 
     Args:

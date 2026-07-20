@@ -1,15 +1,27 @@
-from __future__ import annotations
 import numbers
+
+
+from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
+
+
 import lumina
 from lumina import util
 from lumina.plot.custom_chart import plot_table
 from lumina.plot.utils import test_missing, test_types
+
 if TYPE_CHECKING:
     from lumina.plot.custom_chart import CustomChart
 
-def roc_curve(y_true: Sequence[numbers.Number], y_probas: Sequence[Sequence[float]] | None=None, labels: list[str] | None=None, classes_to_plot: list[numbers.Number] | None=None, title: str='ROC Curve', split_table: bool=False) -> CustomChart | None:
+def roc_curve(
+        y_true: Sequence[numbers.Number], 
+        y_probas: Sequence[Sequence[float]] | None=None, 
+        labels: list[str] | None=None, 
+        classes_to_plot: list[numbers.Number] | None=None, 
+        title: str='ROC Curve',
+        split_table: bool=False
+    ) -> CustomChart | None:
     """Constructs Receiver Operating Characteristic (ROC) curve chart.
 
     Args:
@@ -73,14 +85,17 @@ def roc_curve(y_true: Sequence[numbers.Number], y_probas: Sequence[Sequence[floa
     """
     np = util.get_module('numpy', required='roc requires the numpy library, install with `pip install numpy`')
     pd = util.get_module('pandas', required='roc requires the pandas library, install with `pip install pandas`')
+
     sklearn_metrics = util.get_module('sklearn.metrics', 'roc requires the scikit library, install with `pip install scikit-learn`')
     sklearn_utils = util.get_module('sklearn.utils', 'roc requires the scikit library, install with `pip install scikit-learn`')
+    
     y_true = np.array(y_true)
     y_probas = np.array(y_probas)
     if not test_missing(y_true=y_true, y_probas=y_probas):
         return
     if not test_types(y_true=y_true, y_probas=y_probas):
         return
+    
     classes = np.unique(y_true)
     if classes_to_plot is None:
         classes_to_plot = classes

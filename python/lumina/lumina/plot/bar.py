@@ -5,7 +5,12 @@ if TYPE_CHECKING:
     import lumina
     from lumina.plot.custom_chart import CustomChart
 
-def bar(table: wandb.Table, label: str, value: str, title: str='', split_table: bool=False) -> CustomChart:
+def bar(
+    table: lumina.Table, 
+    label: str, 
+    value: str, 
+    title: str='', 
+    split_table: bool=False) -> CustomChart:
     """Constructs a bar chart from a wandb.Table of data.
 
     Args:
@@ -52,4 +57,10 @@ def bar(table: wandb.Table, label: str, value: str, title: str='', split_table: 
         run.log({"bar_plot": bar_plot})
     ```
     """
-    return plot_table(data_table=table, vega_spec_name='wandb/bar/v0', fields={'label': label, 'value': value}, string_fields={'title': title}, split_table=split_table)
+    return plot_table(
+        data_table=table, 
+        vega_spec_name='wandb/bar/v0', 
+        fields={'label': label, 'value': value}, 
+        string_fields={'title': title}, 
+        split_table=split_table
+    )
