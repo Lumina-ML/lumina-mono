@@ -20,15 +20,21 @@ from typing import Literal
 BENCH_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BENCH_DIR))
 
+from scenarios.artifacts import ArtifactUploadDownloadScenario
 from scenarios.base import Scenario, ScenarioResult
 from scenarios.experiment_tracking import (
     ExperimentLifecycleScenario,
     MetricThroughputScenario,
 )
+from scenarios.public_api import PublicApiQueryScenario
+from scenarios.sweeps import BayesianSweepScenario
 
 SCENARIOS: dict[str, type[Scenario]] = {
     ExperimentLifecycleScenario.scenario_id: ExperimentLifecycleScenario,
     MetricThroughputScenario.scenario_id: MetricThroughputScenario,
+    ArtifactUploadDownloadScenario.scenario_id: ArtifactUploadDownloadScenario,
+    BayesianSweepScenario.scenario_id: BayesianSweepScenario,
+    PublicApiQueryScenario.scenario_id: PublicApiQueryScenario,
 }
 
 
