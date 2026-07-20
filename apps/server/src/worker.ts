@@ -1,4 +1,5 @@
 import fastify from "fastify";
+import { buildLoggerOptions } from "./core/logging/index.js";
 import { configPlugin } from "./plugins/config.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { clickhousePlugin } from "./plugins/clickhouse.js";
@@ -12,7 +13,7 @@ import type { JobContext } from "./jobs/types.js";
 
 async function buildWorker() {
   const app = fastify({
-    logger: { level: process.env.LOG_LEVEL ?? "info" },
+    logger: buildLoggerOptions({ name: "lumina-worker" }),
   });
 
   await app.register(configPlugin);

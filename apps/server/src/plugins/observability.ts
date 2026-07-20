@@ -1,7 +1,5 @@
 import fp from "fastify-plugin";
-import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import * as promClient from "prom-client";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -12,11 +10,14 @@ declare module "fastify" {
 export const observabilityPlugin = fp(async (app: FastifyInstance) => {
   const config = app.config;
 
-  // Request ID
+  // Request ID. `req.id` is already resolved by `genReqId` in bootstrap
+  // (honoring the inbound request-id header, else a fresh UUID) and is
+  // bound onto the per-request child logger. Mirror it onto `req.reqId`
+  // for consumers that read that field (otel spans) and echo it back on
+  // the response so clients can correlate.
   app.addHook("onRequest", async (req: FastifyRequest, reply: FastifyReply) => {
-    const id = (req.headers[config.requestIdHeader.toLowerCase()] as string) || randomUUID();
-    req.reqId = id;
-    reply.header(config.requestIdHeader, id);
+    req.reqId = req.id;
+    reply.header(config.requestIdHeader, req.id);
   });
 
   // Request timing & logging

@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import fastify from "fastify";
 import { ZodError } from "zod";
 import { Prisma } from "./generated/prisma/index.js";
+import { buildLoggerOptions, requestIdHeader } from "./core/logging/index.js";
 import { configPlugin } from "./plugins/config.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { clickhousePlugin } from "./plugins/clickhouse.js";
@@ -44,11 +45,26 @@ import { storageLocalRoutes } from "./infra/storage/routes.js";
 // See `apps/server/src/config/index.ts`.
 
 export async function buildApp() {
+  // Honor a client-supplied request id header (falling back to a fresh
+  // UUID) at `genReqId` time so Fastify binds it onto `req.id` *and* the
+  // per-request child logger (`req.log`) — every downstream log line is
+  // then tagged with the same reqId without any manual plumbing. The
+  // observability plugin mirrors it onto `req.reqId` for otel/spans.
+  const reqIdHeader = requestIdHeader();
   const app = fastify({
-    logger: {
-      level: process.env.LOG_LEVEL ?? "info",
+    logger: buildLoggerOptions({ name: "lumina-server" }),
+    genReqId: (req) => {
+      const fromHeader = req.headers[reqIdHeader];
+      if (typeof fromHeader === "string" && fromHeader.length > 0) {
+        return fromHeader;
+      }
+      return randomUUID();
     },
-    genReqId: () => randomUUID(),
+    // The observability plugin logs a single structured "request completed"
+    // line (with metrics) per request. Fastify's built-in "incoming
+    // request" / "request completed" pair would double every request, so
+    // disable it and keep our one canonical line.
+    disableRequestLogging: true,
   });
 
   await app.register(cors, {
