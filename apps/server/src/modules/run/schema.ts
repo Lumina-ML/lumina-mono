@@ -30,6 +30,12 @@ export const UpdateRunSchema = z.object({
   // value (including `null` / `""`) as an explicit write.
   notes: z.string().nullable().optional(),
   metadata: z.record(z.unknown()).optional(),
+  /// SDK telemetry envelope (CLI/library versions, GPU/CPU flags). Step 3.2
+  /// folds wandb's TelemetryRecord into the existing PATCH /runs/:id.
+  telemetry: z.record(z.unknown()).optional(),
+  /// Metric definitions keyed by name. Step 3.2 replaces the wandb
+  /// MetricRecord push (which used to be embedded in the next config push).
+  metricDefs: z.record(z.unknown()).optional(),
 });
 
 export const ListRunsQuerySchema = z.object({

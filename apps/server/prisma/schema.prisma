@@ -114,6 +114,12 @@ model Run {
   summary     Json     @default("{}")
   notes       String?
   metadata    Json     @default("{}")
+  /// SDK telemetry envelope (CLI/library versions, GPU/CPU flags).
+  /// Mirrors wandb's TelemetryRecord proto; full schema lives in metadata.
+  telemetry   Json     @default("{}")
+  /// Metric definitions (name -> {step, hidden, summaryType, ...}). Folded
+  /// into the existing PATCH /runs/:id route via UpdateRunSchema.
+  metricDefs  Json     @default("{}")
   startedAt   DateTime @default(now())
   finishedAt  DateTime?
   createdAt   DateTime @default(now())
@@ -129,6 +135,8 @@ model Run {
   traces        Trace[]
   runMedia      RunMedia[]
   launchRuns    LaunchRun[]
+  alerts        RunAlert[]
+  useArtifacts  RunUseArtifact[]
 
   @@index([projectId, createdAt])
   @@index([projectId, status])
@@ -315,6 +323,8 @@ model ArtifactVersion {
   evaluationsAsModel   Evaluation[] @relation("EvaluationModel")
   registryModelVersions RegistryModelVersion[]
   runMedia RunMedia[]
+  portfolioLinks ArtifactPortfolioLink[]
+  useByRuns RunUseArtifact[]
 
   @@unique([artifactId, version])
   @@index([artifactId, createdAt])
@@ -361,6 +371,60 @@ model ArtifactLineage {
 
   @@unique([artifactVersionId, parentArtifactVersionId])
   @@index([parentArtifactVersionId])
+}
+
+/// Mirrors wandb's LinkArtifact mutation. A version is "linked" to a
+/// portfolio (registry) with a list of aliases (e.g. "latest", "v1.2").
+model ArtifactPortfolioLink {
+  id                String   @id @default(uuid())
+  artifactVersionId String
+  portfolioName     String
+  portfolioEntity   String?
+  portfolioProject  String
+  aliases           String[] @default([])
+  versionIndex      Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  artifactVersion ArtifactVersion @relation(fields: [artifactVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([artifactVersionId, portfolioProject, portfolioName])
+  @@index([portfolioProject, portfolioName])
+}
+
+// ============================================================
+// Run-scoped append-only events (alerts, use_artifact)
+// ============================================================
+
+/// Mirrors wandb's notify_scriptable_run_alert mutation. Append-only.
+model RunAlert {
+  id        String   @id @default(uuid())
+  runId     String
+  title     String
+  text      String
+  /// One of "INFO" | "WARN" | "ERROR".
+  level     String   @default("INFO")
+  createdAt DateTime @default(now())
+
+  run Run @relation(fields: [runId], references: [runId], onDelete: Cascade)
+
+  @@index([runId, createdAt])
+}
+
+/// Mirrors wandb's UseArtifact mutation. Records that a run referenced
+/// a specific artifact version.
+model RunUseArtifact {
+  id                String   @id @default(uuid())
+  runId             String
+  artifactVersionId String
+  /// Free-form tag from the SDK ("input", "output", "job", etc.).
+  useType           String?
+  createdAt         DateTime @default(now())
+
+  run             Run             @relation(fields: [runId], references: [runId], onDelete: Cascade)
+  artifactVersion ArtifactVersion @relation(fields: [artifactVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, artifactVersionId, useType])
+  @@index([artifactVersionId])
 }
 
 // ============================================================

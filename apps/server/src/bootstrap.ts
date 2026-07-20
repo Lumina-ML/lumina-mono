@@ -35,6 +35,7 @@ import { userRoutes } from "./modules/user/routes.js";
 import { workspaceMembershipRoutes } from "./modules/workspace-membership/routes.js";
 import { runRoutes } from "./modules/run/routes.js";
 import { runFileRoutes } from "./modules/run-file/routes.js";
+import { runStopRoutes } from "./modules/run-stop/routes.js";
 import { sweepRoutes } from "./modules/sweep/routes.js";
 import { systemMetricRoutes } from "./modules/system-metric/routes.js";
 import { tagRoutes } from "./modules/tag/routes.js";
@@ -147,6 +148,7 @@ export async function buildApp() {
   await app.register(workspaceMembershipRoutes, { prefix: "/api/v1" });
   await app.register(projectRoutes, { prefix: "/api/v1" });
   await app.register(runRoutes, { prefix: "/api/v1" });
+  await app.register(runStopRoutes, { prefix: "/api/v1" });
   await app.register(runFileRoutes, { prefix: "/api/v1" });
   await app.register(metricRoutes, { prefix: "/api/v1" });
   await app.register(systemMetricRoutes, { prefix: "/api/v1" });
