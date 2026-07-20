@@ -1,14 +1,18 @@
-__all__ = ['CREATE_AUTOMATION_GQL', 'CREATE_GENERIC_WEBHOOK_INTEGRATION_GQL', 'DELETE_AUTOMATION_GQL', 'GET_AUTOMATIONS_LEGACY_GQL', 'GET_ENTITY_AUTOMATIONS_GQL', 'GET_ENTITY_AUTOMATIONS_LEGACY_GQL', 'GET_ORG_AUTOMATIONS_GQL', 'INTEGRATIONS_BY_ENTITY_GQL', 'UPDATE_AUTOMATION_GQL', 'GetAutomationsLegacy', 'GetEntityAutomationsLegacy', 'GetEntityAutomations', 'GetOrgAutomations', 'CreateAutomation', 'UpdateAutomation', 'DeleteAutomation', 'IntegrationsByEntity', 'CreateGenericWebhookIntegration', 'CreateFilterTriggerInput', 'CreateGenericWebhookIntegrationInput', 'GenericWebhookActionInput', 'NoOpTriggeredActionInput', 'NotificationActionInput', 'PushNotificationActionInput', 'QueueJobActionInput', 'TriggeredActionConfig', 'UpdateFilterTriggerInput', 'ArtifactPortfolioScopeFields', 'ArtifactSequenceScopeFields', 'EntityScopeFields', 'FilterEventFields', 'GenericWebhookActionFields', 'NoOpActionFields', 'NotificationActionFields', 'PageInfoFields', 'ProjectScopeFields', 'ProjectTriggersFields', 'QueueJobActionFields', 'SlackIntegrationFields', 'TriggerFields', 'WebhookIntegrationFields', 'AlertSeverity', 'EventTriggeringConditionType', 'TriggerScopeType', 'TriggeredActionType']
-from .create_automation import CreateAutomation
-from .create_generic_webhook_integration import CreateGenericWebhookIntegration
-from .delete_automation import DeleteAutomation
-from .enums import AlertSeverity, EventTriggeringConditionType, TriggeredActionType, TriggerScopeType
-from .fragments import ArtifactPortfolioScopeFields, ArtifactSequenceScopeFields, EntityScopeFields, FilterEventFields, GenericWebhookActionFields, NoOpActionFields, NotificationActionFields, PageInfoFields, ProjectScopeFields, ProjectTriggersFields, QueueJobActionFields, SlackIntegrationFields, TriggerFields, WebhookIntegrationFields
-from .get_automations_legacy import GetAutomationsLegacy
-from .get_entity_automations import GetEntityAutomations
-from .get_entity_automations_legacy import GetEntityAutomationsLegacy
-from .get_org_automations import GetOrgAutomations
-from .input_types import CreateFilterTriggerInput, CreateGenericWebhookIntegrationInput, GenericWebhookActionInput, NoOpTriggeredActionInput, NotificationActionInput, PushNotificationActionInput, QueueJobActionInput, TriggeredActionConfig, UpdateFilterTriggerInput
-from .integrations_by_entity import IntegrationsByEntity
-from .operations import CREATE_AUTOMATION_GQL, CREATE_GENERIC_WEBHOOK_INTEGRATION_GQL, DELETE_AUTOMATION_GQL, GET_AUTOMATIONS_LEGACY_GQL, GET_ENTITY_AUTOMATIONS_GQL, GET_ENTITY_AUTOMATIONS_LEGACY_GQL, GET_ORG_AUTOMATIONS_GQL, INTEGRATIONS_BY_ENTITY_GQL, UPDATE_AUTOMATION_GQL
-from .update_automation import UpdateAutomation
+"""Stub for the wandb-cloud GraphQL `_generated` package.
+
+Step 3.6 — see `lumina.sdk.artifacts._generated` for the full
+explanation. Module-level `__getattr__` makes every
+`from ._generated import XYZ` resolve to `Any` so importers don't
+need changes; actual GraphQL calls hit `ServiceApi.execute_graphql`
+which raises `NotImplementedError` under the Lumina backend.
+"""
+from __future__ import annotations
+from typing import Any
+
+
+def __getattr__(name: str) -> Any:
+    return Any
+
+
+def __dir__() -> list[str]:
+    return []
