@@ -11,11 +11,19 @@ import {
   LTabPane,
   LSlider,
   LStatistic,
+  LDialog,
+  LInput,
+  LButton,
 } from "@lumina/ui";
-import { ArrowLeft } from "lucide-vue-next";
+import { ArrowLeft, PackageOpen } from "lucide-vue-next";
 import { useEvaluation } from "@/modules/evaluation/composables/useEvaluations";
 import { EvaluationService } from "@/services/evaluation.service";
+import { RegistryService } from "@/services/registry.service";
+import { useModels } from "@/modules/registry-model/composables/useModels";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useToast } from "@/composables/useToast";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { ApiError } from "@/services/api";
 import {
   confusionMatrixStats,
   perClassMetrics,
@@ -136,6 +144,78 @@ const statusVariant = computed(() => {
   if (s === "failed") return "error" as const;
   return "default" as const;
 });
+
+// ── Promote evaluation to model registry ────────────────────────────────
+const toast = useToast();
+const queryClient = useQueryClient();
+const promoteOpen = ref(false);
+const promoteModelName = ref("");
+const promoteAliasText = ref("latest");
+const promoteError = ref<string | null>(null);
+
+const { data: models } = useModels(
+  computed(() => ({ projectId: evaluation.value?.projectId, limit: 200 })),
+);
+
+const modelOptions = computed(() =>
+  (models.value?.items ?? []).map((m) => ({ label: m.name, value: m.name })),
+);
+
+const promoteMutation = useMutation({
+  mutationFn: async () => {
+    if (!evaluation.value) throw new Error("No evaluation");
+    const projectId = evaluation.value.projectId;
+    const artifactVersionId = evaluation.value.modelArtifactVersionId;
+    if (!artifactVersionId) {
+      throw new Error("Evaluation has no linked model artifact version");
+    }
+    if (!promoteModelName.value.trim()) {
+      throw new Error("Model name is required");
+    }
+
+    let modelId: string;
+    try {
+      const created = await RegistryService.create(projectId, {
+        name: promoteModelName.value.trim(),
+      });
+      modelId = created.id;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        const list = await RegistryService.list({ projectId, limit: 200 });
+        const found = list.items.find(
+          (m) => m.name === promoteModelName.value.trim(),
+        );
+        if (!found) throw new Error("Model exists but couldn't be loaded");
+        modelId = found.id;
+      } else {
+        throw e;
+      }
+    }
+
+    const aliases = promoteAliasText.value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return RegistryService.createVersion(modelId, artifactVersionId, aliases);
+  },
+  onSuccess: (version) => {
+    toast.success(
+      `Promoted to ${promoteModelName.value}@${version.version}`,
+    );
+    promoteOpen.value = false;
+    queryClient.invalidateQueries({ queryKey: ["registry-models"] });
+  },
+  onError: (e) => {
+    promoteError.value = (e as Error).message ?? "Unknown error";
+  },
+});
+
+function openPromote() {
+  promoteModelName.value = "";
+  promoteAliasText.value = "latest";
+  promoteError.value = null;
+  promoteOpen.value = true;
+}
 </script>
 
 <template>
@@ -166,7 +246,24 @@ const statusVariant = computed(() => {
             >
               {{ evaluation.runId.slice(0, 12) }}
             </RouterLink>
+            <RouterLink
+              v-if="evaluation.modelArtifactVersionId"
+              :to="`/projects/${projectId}/artifacts`"
+              class="font-mono text-xs hover:underline"
+            >
+              model artifact
+            </RouterLink>
           </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <LButton
+            size="sm"
+            :disabled="!evaluation.modelArtifactVersionId"
+            @click="openPromote"
+          >
+            <PackageOpen class="mr-1 h-3 w-3" />
+            Promote to registry
+          </LButton>
         </div>
       </div>
 
@@ -330,5 +427,81 @@ const statusVariant = computed(() => {
     <LCard v-else class="p-8 text-center text-fg-tertiary">
       Evaluation not found.
     </LCard>
+
+    <!-- Promote to registry dialog -->
+    <LDialog
+      v-model:show="promoteOpen"
+      title="Promote evaluation to model registry"
+      width="500px"
+      @close="promoteError = null"
+    >
+      <div class="space-y-3">
+        <p class="text-xs text-fg-tertiary">
+          Creates a registry model under this project (or fetches an existing
+          one by name) and points a new version at the evaluation's linked
+          model artifact.
+        </p>
+        <div>
+          <label
+            for="promote-model-name"
+            class="mb-1 block text-xs font-medium text-fg-secondary"
+          >
+            Registry model name <span class="text-accent-danger">*</span>
+          </label>
+          <LInput
+            id="promote-model-name"
+            v-model:value="promoteModelName"
+            placeholder="e.g. resnet50"
+          />
+          <div
+            v-if="modelOptions.length > 0"
+            class="mt-2 max-h-32 overflow-auto rounded-md border border-border"
+          >
+            <button
+              v-for="opt in modelOptions"
+              :key="opt.value"
+              type="button"
+              class="flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-canvas"
+              :class="promoteModelName === opt.value ? 'bg-accent-primary/10' : ''"
+              @click="promoteModelName = opt.value"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+        <div>
+          <label
+            for="promote-aliases"
+            class="mb-1 block text-xs font-medium text-fg-secondary"
+          >
+            Aliases (comma-separated)
+          </label>
+          <LInput
+            id="promote-aliases"
+            v-model:value="promoteAliasText"
+            placeholder="latest, production"
+          />
+        </div>
+        <div
+          v-if="promoteError"
+          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+        >
+          {{ promoteError }}
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton quaternary @click="promoteOpen = false">Cancel</LButton>
+          <LButton
+            :loading="promoteMutation.isPending.value"
+            :disabled="!promoteModelName.trim()"
+            @click="promoteMutation.mutate()"
+          >
+            <PackageOpen class="mr-1 h-3 w-3" />
+            Promote
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
   </div>
 </template>

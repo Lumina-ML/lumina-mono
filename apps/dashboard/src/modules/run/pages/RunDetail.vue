@@ -15,6 +15,9 @@ import {
   LTraceTimeline,
   LDialog,
   LTextarea,
+  LInput,
+  LSelect,
+  LIconButton,
 } from "@lumina/ui";
 import type { TraceSpan } from "@lumina/ui";
 import {
@@ -32,6 +35,13 @@ import {
   XCircle,
   Trash2,
   AlertTriangle,
+  RotateCcw,
+  Play,
+  Send,
+  FileText,
+  Folder,
+  FolderOpen,
+  Download,
 } from "lucide-vue-next";
 import { useRun } from "@/modules/run/composables/useRuns";
 import { useMetrics } from "@/modules/metric/composables/useMetrics";
@@ -50,6 +60,9 @@ import { useToast } from "@/composables/useToast";
 import { TraceService } from "@/services/trace.service";
 import { ArtifactService } from "@/services/artifact.service";
 import { RunService } from "@/services/run.service";
+import { RunLifecycleService } from "@/services/run-lifecycle.service";
+import { RunFileService } from "@/services/run-file.service";
+import { TagService } from "@/services/tag.service";
 import type { LogLevel } from "@/types/log-line";
 import { useRouter } from "vue-router";
 
@@ -450,6 +463,157 @@ const deleteMutation = useMutation({
 const canDelete = computed(
   () => !!run.value && deleteConfirm.value.trim() === run.value.name,
 );
+
+// ── Run lifecycle: resume / rewind / stop-signal / alert / use-artifact ─
+const {
+  data: resumeState,
+  isLoading: isResumeStateLoading,
+} = useQuery({
+  queryKey: computed(() => ["run-resume-state", runId.value]),
+  queryFn: () => RunLifecycleService.getResumeState(runId.value),
+  enabled: computed(() => !!run.value),
+});
+
+const rewindMutation = useMutation({
+  mutationFn: (data: { metricName: string; metricValue: number }) =>
+    RunLifecycleService.rewindRun(runId.value, data),
+  onSuccess: () => {
+    toast.success("Run rewound");
+    queryClient.invalidateQueries({ queryKey: ["run", runId.value] });
+    queryClient.invalidateQueries({ queryKey: ["metrics", runId.value] });
+    queryClient.invalidateQueries({ queryKey: ["run-resume-state", runId.value] });
+    rewindOpen.value = false;
+  },
+  onError: (e) => toast.error(`Rewind failed: ${(e as Error).message}`),
+});
+
+const sendAlertMutation = useMutation({
+  mutationFn: (data: { title: string; text: string; level: "INFO" | "WARN" | "ERROR" }) =>
+    RunLifecycleService.sendAlert(runId.value, data),
+  onSuccess: () => {
+    toast.success("Alert recorded");
+    alertOpen.value = false;
+    alertTitle.value = "";
+    alertText.value = "";
+  },
+  onError: (e) => toast.error(`Alert failed: ${(e as Error).message}`),
+});
+
+const useArtifactMutation = useMutation({
+  mutationFn: (artifactVersionId: string) =>
+    RunLifecycleService.useArtifact(runId.value, { artifactVersionId }),
+  onSuccess: () => {
+    toast.success("Artifact usage recorded");
+    useArtifactOpen.value = false;
+    queryClient.invalidateQueries({ queryKey: ["artifacts", "by-run", runId.value] });
+  },
+  onError: (e) => toast.error(`Record failed: ${(e as Error).message}`),
+});
+
+// ── Tag management ──────────────────────────────────────────────────────
+const attachTagMutation = useMutation({
+  mutationFn: async (name: string) => {
+    if (!run.value) throw new Error("No run");
+    await TagService.attachToRun(runId.value, { name });
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["run-tags", runId.value] });
+    queryClient.invalidateQueries({ queryKey: ["tags"] });
+  },
+  onError: (e) => toast.error(`Add tag failed: ${(e as Error).message}`),
+});
+
+const detachTagMutation = useMutation({
+  mutationFn: (tagId: string) => TagService.detachFromRun(runId.value, tagId),
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: ["run-tags", runId.value] }),
+  onError: (e) => toast.error(`Remove tag failed: ${(e as Error).message}`),
+});
+
+// ── Run files ───────────────────────────────────────────────────────────
+const { data: runFiles, isLoading: isRunFilesLoading } = useQuery({
+  queryKey: computed(() => ["run-files", runId.value]),
+  queryFn: () => RunFileService.list(runId.value),
+  enabled: computed(() => !!run.value),
+});
+
+const expandedFileFolders = ref<Set<string>>(new Set());
+function toggleFileFolder(path: string) {
+  const next = new Set(expandedFileFolders.value);
+  if (next.has(path)) next.delete(path);
+  else next.add(path);
+  expandedFileFolders.value = next;
+}
+
+async function downloadRunFile(path: string) {
+  try {
+    const file = await RunFileService.get(runId.value, path);
+    const blob = new Blob([Uint8Array.from(atob(file.contentBase64), (c) => c.charCodeAt(0))]);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = path.split("/").pop() ?? path;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    toast.error(`Download failed: ${(e as Error).message}`);
+  }
+}
+
+// ── Dialog state ────────────────────────────────────────────────────────
+const resumeOpen = ref(false);
+
+const rewindOpen = ref(false);
+const rewindMetricName = ref("");
+const rewindMetricValue = ref("");
+const rewindError = ref<string | null>(null);
+
+const alertOpen = ref(false);
+const alertTitle = ref("");
+const alertText = ref("");
+const alertLevel = ref<"INFO" | "WARN" | "ERROR">("INFO");
+
+const useArtifactOpen = ref(false);
+const useArtifactVersionId = ref("");
+
+function openRewindDialog() {
+  rewindMetricName.value = "";
+  rewindMetricValue.value = "";
+  rewindError.value = null;
+  rewindOpen.value = true;
+}
+
+function submitRewind() {
+  rewindError.value = null;
+  const name = rewindMetricName.value.trim();
+  const value = Number(rewindMetricValue.value);
+  if (!name) {
+    rewindError.value = "Metric name is required";
+    return;
+  }
+  if (Number.isNaN(value)) {
+    rewindError.value = "Metric value must be a number";
+    return;
+  }
+  rewindMutation.mutate({ metricName: name, metricValue: value });
+}
+
+function submitAlert() {
+  const title = alertTitle.value.trim();
+  const text = alertText.value.trim();
+  if (!title || !text) return;
+  sendAlertMutation.mutate({ title, text, level: alertLevel.value });
+}
+
+function toggleStopSignal() {
+  if (!run.value) return;
+  const next = !(run.value.metadata?.stopRequested === true);
+  RunService.update(runId.value, {
+    metadata: { ...(run.value.metadata ?? {}), stopRequested: next },
+  }).then(() => {
+    toast.success(next ? "Stop signal sent" : "Stop signal cleared");
+    queryClient.invalidateQueries({ queryKey: ["run", runId.value] });
+  }).catch((e: Error) => toast.error(`Failed: ${e.message}`));
+}
 </script>
 
 <template>
@@ -539,6 +703,36 @@ const canDelete = computed(
         </LTooltip>
         <LButton size="sm" @click="refetchRun()">Refresh</LButton>
         <LButton
+          size="sm"
+          quaternary
+          :loading="isResumeStateLoading"
+          @click="resumeOpen = true"
+        >
+          <Play class="mr-1 h-3 w-3" />
+          Resume
+        </LButton>
+        <LButton size="sm" quaternary @click="openRewindDialog">
+          <RotateCcw class="mr-1 h-3 w-3" />
+          Rewind
+        </LButton>
+        <LButton
+          size="sm"
+          quaternary
+          :type="run.metadata?.stopRequested === true ? 'warning' : 'default'"
+          @click="toggleStopSignal"
+        >
+          <StopCircle class="mr-1 h-3 w-3" />
+          {{ run.metadata?.stopRequested === true ? "Clear stop" : "Stop" }}
+        </LButton>
+        <LButton size="sm" quaternary @click="alertOpen = true">
+          <Send class="mr-1 h-3 w-3" />
+          Alert
+        </LButton>
+        <LButton size="sm" quaternary @click="useArtifactOpen = true">
+          <Box class="mr-1 h-3 w-3" />
+          Use artifact
+        </LButton>
+        <LButton
           v-if="isActive"
           size="sm"
           quaternary
@@ -604,6 +798,9 @@ const canDelete = computed(
               <TagList
                 :tags="runTags?.items ?? []"
                 :loading="isTagsLoading"
+                editable
+                @attach="attachTagMutation.mutate"
+                @detach="detachTagMutation.mutate"
               />
             </LCard>
 
@@ -685,6 +882,52 @@ const canDelete = computed(
           redact-secrets
           v-model:level="logLevelFilter"
         />
+      </LTabPane>
+
+      <!-- ── Files ───────────────────────────────────────────────────── -->
+      <LTabPane name="files" tab="Files">
+        <LCard v-if="isRunFilesLoading" class="p-8">
+          <LSkeleton text :repeat="3" />
+        </LCard>
+        <LCard v-else-if="(runFiles ?? []).length > 0" class="p-3">
+          <ul class="space-y-1 font-mono text-sm">
+            <li
+              v-for="file in runFiles"
+              :key="file.path"
+              class="flex items-center gap-2 rounded px-2 py-1 hover:bg-canvas"
+            >
+              <LIconButton
+                aria-label="Toggle folder"
+                size="small"
+                @click="toggleFileFolder(file.path)"
+              >
+                <FolderOpen
+                  v-if="expandedFileFolders.has(file.path)"
+                  class="h-3.5 w-3.5"
+                />
+                <Folder v-else class="h-3.5 w-3.5" />
+              </LIconButton>
+              <FileText class="h-3.5 w-3.5 text-fg-tertiary" />
+              <span class="truncate">{{ file.path }}</span>
+              <span class="ml-auto text-xs text-fg-tertiary">
+                {{ file.size }} bytes
+              </span>
+              <LIconButton
+                aria-label="Download file"
+                size="small"
+                @click="downloadRunFile(file.path)"
+              >
+                <Download class="h-3.5 w-3.5" />
+              </LIconButton>
+            </li>
+          </ul>
+        </LCard>
+        <LCard v-else class="p-8">
+          <LEmpty
+            title="No files yet"
+            description="Files saved via lumina.save() will appear here."
+          />
+        </LCard>
       </LTabPane>
 
       <!-- ── Traces ──────────────────────────────────────────────────── -->
@@ -1011,6 +1254,232 @@ const canDelete = computed(
           >
             <Trash2 class="mr-1 h-3 w-3" />
             Delete permanently
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
+
+    <!-- ── Resume state ──────────────────────────────────────────────── -->
+    <LDialog
+      v-model:show="resumeOpen"
+      title="Resume state"
+      width="600px"
+      @close="resumeOpen = false"
+    >
+      <div v-if="isResumeStateLoading" class="py-8">
+        <LSkeleton text :repeat="3" />
+      </div>
+      <div v-else-if="resumeState" class="space-y-4 text-sm">
+        <div class="grid grid-cols-3 gap-3">
+          <LCard class="p-3">
+            <div class="text-[10px] uppercase tracking-wider text-fg-tertiary">History rows</div>
+            <div class="font-mono text-lg">{{ resumeState.historyLineCount }}</div>
+          </LCard>
+          <LCard class="p-3">
+            <div class="text-[10px] uppercase tracking-wider text-fg-tertiary">Events rows</div>
+            <div class="font-mono text-lg">{{ resumeState.eventsLineCount }}</div>
+          </LCard>
+          <LCard class="p-3">
+            <div class="text-[10px] uppercase tracking-wider text-fg-tertiary">Log lines</div>
+            <div class="font-mono text-lg">{{ resumeState.logLineCount }}</div>
+          </LCard>
+        </div>
+        <div>
+          <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-fg-tertiary">Tags</h4>
+          <div class="flex flex-wrap gap-2">
+            <LTag
+              v-for="tag in resumeState.tags"
+              :key="tag"
+              size="small"
+              round
+            >
+              {{ tag }}
+            </LTag>
+            <span v-if="resumeState.tags.length === 0" class="text-fg-tertiary">No tags</span>
+          </div>
+        </div>
+        <div>
+          <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-fg-tertiary">Config</h4>
+          <LJsonView :data="resumeState.config" :deep="2" />
+        </div>
+      </div>
+      <LEmpty
+        v-else
+        title="No resume state"
+        description="The run could not be found."
+      />
+      <template #footer>
+        <div class="flex justify-end">
+          <LButton @click="resumeOpen = false">Close</LButton>
+        </div>
+      </template>
+    </LDialog>
+
+    <!-- ── Rewind run ────────────────────────────────────────────────── -->
+    <LDialog
+      v-model:show="rewindOpen"
+      title="Rewind run"
+      width="480px"
+      @close="rewindError = null"
+    >
+      <div class="space-y-3">
+        <p class="text-xs text-fg-tertiary">
+          Rewind truncates metric history to the last step where the chosen
+          metric equalled the given value. The SDK can then resume from that
+          point.
+        </p>
+        <div>
+          <label
+            for="rewind-metric"
+            class="mb-1 block text-xs font-medium text-fg-secondary"
+          >
+            Metric name <span class="text-accent-danger">*</span>
+          </label>
+          <LInput
+            id="rewind-metric"
+            v-model:value="rewindMetricName"
+            placeholder="e.g. train/loss"
+          />
+        </div>
+        <div>
+          <label
+            for="rewind-value"
+            class="mb-1 block text-xs font-medium text-fg-secondary"
+          >
+            Metric value <span class="text-accent-danger">*</span>
+          </label>
+          <LInput
+            id="rewind-value"
+            v-model:value="rewindMetricValue"
+            placeholder="e.g. 0.42"
+          />
+        </div>
+        <div
+          v-if="rewindError"
+          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+        >
+          {{ rewindError }}
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton quaternary @click="rewindOpen = false">Cancel</LButton>
+          <LButton
+            :loading="rewindMutation.isPending.value"
+            :disabled="!rewindMetricName.trim() || !rewindMetricValue.trim()"
+            @click="submitRewind"
+          >
+            <RotateCcw class="mr-1 h-3 w-3" />
+            Rewind
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
+
+    <!-- ── Send alert ────────────────────────────────────────────────── -->
+    <LDialog
+      v-model:show="alertOpen"
+      title="Send run alert"
+      width="480px"
+      @close="alertOpen = false"
+    >
+      <div class="space-y-3">
+        <div>
+          <label
+            for="alert-level"
+            class="mb-1 block text-xs font-medium text-fg-secondary"
+          >
+            Level
+          </label>
+          <LSelect
+            id="alert-level"
+            v-model:value="alertLevel"
+            :options="[
+              { value: 'INFO', label: 'Info' },
+              { value: 'WARN', label: 'Warning' },
+              { value: 'ERROR', label: 'Error' },
+            ]"
+          />
+        </div>
+        <div>
+          <label
+            for="alert-title"
+            class="mb-1 block text-xs font-medium text-fg-secondary"
+          >
+            Title <span class="text-accent-danger">*</span>
+          </label>
+          <LInput
+            id="alert-title"
+            v-model:value="alertTitle"
+            placeholder="e.g. Loss exploded"
+          />
+        </div>
+        <div>
+          <label
+            for="alert-text"
+            class="mb-1 block text-xs font-medium text-fg-secondary"
+          >
+            Message <span class="text-accent-danger">*</span>
+          </label>
+          <LTextarea
+            id="alert-text"
+            v-model:value="alertText"
+            :rows="3"
+            placeholder="Describe what happened..."
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton quaternary @click="alertOpen = false">Cancel</LButton>
+          <LButton
+            :loading="sendAlertMutation.isPending.value"
+            :disabled="!alertTitle.trim() || !alertText.trim()"
+            @click="submitAlert"
+          >
+            <Send class="mr-1 h-3 w-3" />
+            Send alert
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
+
+    <!-- ── Use artifact ──────────────────────────────────────────────── -->
+    <LDialog
+      v-model:show="useArtifactOpen"
+      title="Record artifact usage"
+      width="480px"
+      @close="useArtifactOpen = false"
+    >
+      <div class="space-y-3">
+        <p class="text-xs text-fg-tertiary">
+          Record that this run used an artifact version (input, output, job,
+          etc.). The link is stored in the run's artifact usage log.
+        </p>
+        <div>
+          <label
+            for="use-artifact-version"
+            class="mb-1 block text-xs font-medium text-fg-secondary"
+          >
+            Artifact version ID <span class="text-accent-danger">*</span>
+          </label>
+          <LInput
+            id="use-artifact-version"
+            v-model:value="useArtifactVersionId"
+            placeholder="e.g. 019234ab-…"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton quaternary @click="useArtifactOpen = false">Cancel</LButton>
+          <LButton
+            :loading="useArtifactMutation.isPending.value"
+            :disabled="!useArtifactVersionId.trim()"
+            @click="useArtifactMutation.mutate(useArtifactVersionId.trim())"
+          >
+            <Box class="mr-1 h-3 w-3" />
+            Record usage
           </LButton>
         </div>
       </template>

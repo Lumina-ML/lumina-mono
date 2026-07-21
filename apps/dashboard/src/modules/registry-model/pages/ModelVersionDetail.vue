@@ -13,6 +13,7 @@ import {
   LJsonView,
   LDialog,
   LInput,
+  LSelect,
 } from "@lumina/ui";
 import { ArrowLeft, Box, Link as LinkIcon, X as XIcon } from "lucide-vue-next";
 import { RegistryService } from "@/services/registry.service";
@@ -129,6 +130,72 @@ const unlinkMutation = useMutation({
     });
   },
 });
+
+// ── Alias editor ────────────────────────────────────────────────────────
+const aliasesOpen = ref(false);
+const aliasesDraft = ref("");
+const aliasesError = ref<string | null>(null);
+
+function openAliasesEditor() {
+  aliasesDraft.value = (matchedVersion.value?.aliases ?? []).join(", ");
+  aliasesError.value = null;
+  aliasesOpen.value = true;
+}
+
+const patchAliasesMutation = useMutation({
+  mutationFn: async () => {
+    if (!matchedVersion.value) throw new Error("No version");
+    const aliases = aliasesDraft.value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return RegistryService.patchVersion(matchedVersion.value.id, { aliases });
+  },
+  onSuccess: () => {
+    toast.success("Aliases updated");
+    aliasesOpen.value = false;
+    queryClient.invalidateQueries({
+      queryKey: computed(() => ["registry-model-versions", model.value?.id]).value,
+    });
+  },
+  onError: (e) => {
+    aliasesError.value = (e as Error).message ?? "Unknown error";
+  },
+});
+
+// ── Stage dropdown (soft field stored in metadata.stage) ────────────────
+const stageOptions = [
+  { value: "none", label: "None" },
+  { value: "development", label: "Development" },
+  { value: "staging", label: "Staging" },
+  { value: "production", label: "Production" },
+  { value: "archived", label: "Archived" },
+];
+
+const currentStage = computed(() => {
+  const stage = (matchedVersion.value?.metadata as Record<string, unknown> | undefined)?.stage;
+  return typeof stage === "string" ? stage : "none";
+});
+
+const patchStageMutation = useMutation({
+  mutationFn: async (stage: string) => {
+    if (!matchedVersion.value) throw new Error("No version");
+    const next = { ...(matchedVersion.value.metadata ?? {}) };
+    if (stage === "none") {
+      delete next.stage;
+    } else {
+      next.stage = stage;
+    }
+    return RegistryService.patchVersion(matchedVersion.value.id, { metadata: next });
+  },
+  onSuccess: () => {
+    toast.success("Stage updated");
+    queryClient.invalidateQueries({
+      queryKey: computed(() => ["registry-model-versions", model.value?.id]).value,
+    });
+  },
+  onError: (e) => toast.error(`Stage update failed: ${(e as Error).message}`),
+});
 </script>
 
 <template>
@@ -165,9 +232,22 @@ const unlinkMutation = useMutation({
             <span class="text-xs text-fg-tertiary">
               Created {{ formatDate(matchedVersion.createdAt) }}
             </span>
+            <LTag size="small" type="info">
+              {{ currentStage === "none" ? "No stage" : currentStage }}
+            </LTag>
           </div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <LSelect
+            :value="currentStage"
+            :options="stageOptions"
+            placeholder="Stage"
+            style="width: 160px"
+            @update:value="(v) => patchStageMutation.mutate(v as string)"
+          />
+          <LButton size="sm" quaternary @click="openAliasesEditor">
+            Edit aliases
+          </LButton>
           <LButton size="sm">Deploy</LButton>
         </div>
       </div>
@@ -274,6 +354,42 @@ const unlinkMutation = useMutation({
     <LCard v-else class="p-8 text-center text-fg-tertiary">
       Model version not found.
     </LCard>
+
+    <!-- Alias editor dialog -->
+    <LDialog
+      v-model:show="aliasesOpen"
+      title="Edit aliases"
+      width="460px"
+      @close="aliasesError = null"
+    >
+      <div class="space-y-3">
+        <p class="text-xs text-fg-tertiary">
+          Comma-separated aliases (e.g. <code class="font-mono">latest, production</code>).
+        </p>
+        <LInput
+          v-model:value="aliasesDraft"
+          placeholder="latest, production"
+          autofocus
+        />
+        <div
+          v-if="aliasesError"
+          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+        >
+          {{ aliasesError }}
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton quaternary @click="aliasesOpen = false">Cancel</LButton>
+          <LButton
+            :loading="patchAliasesMutation.isPending.value"
+            @click="patchAliasesMutation.mutate()"
+          >
+            Save
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
 
     <!-- Link-to-run dialog (Roadmap §M3-4). -->
     <LDialog

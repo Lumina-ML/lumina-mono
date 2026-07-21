@@ -35,6 +35,12 @@ const router = createRouter({
           component: () => import("@/modules/registry-model/pages/RegistryList.vue"),
         },
         {
+          path: "models/:name/versions",
+          name: "ModelVersions",
+          component: () => import("@/modules/registry-model/pages/ModelVersions.vue"),
+          props: true,
+        },
+        {
           path: "models/:name/versions/:version",
           name: "ModelVersionDetail",
           component: () => import("@/modules/registry-model/pages/ModelVersionDetail.vue"),
