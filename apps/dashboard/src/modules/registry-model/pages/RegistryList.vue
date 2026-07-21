@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, h } from "vue";
+import { ref, computed, h, watch } from "vue";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 import {
   LCard,
   LDataTable,
@@ -80,6 +80,18 @@ function openCreate() {
   createError.value = null;
   createOpen.value = true;
 }
+
+// `/models?new=1` deep-links straight into the create dialog so an
+// external "Register a model" CTA doesn't leave users stranded on an
+// empty list page.
+const route = useRoute();
+watch(
+  () => route.query.new,
+  (v) => {
+    if (v === "1" || v === "true") openCreate();
+  },
+  { immediate: true },
+);
 
 const createMutation = useMutation({
   mutationFn: () => {

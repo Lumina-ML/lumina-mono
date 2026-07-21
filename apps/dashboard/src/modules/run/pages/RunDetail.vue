@@ -13,10 +13,6 @@ import {
   LEmpty,
   LJsonView,
   LTraceTimeline,
-  LDialog,
-  LTextarea,
-  LInput,
-  LSelect,
   LIconButton,
 } from "@lumina/ui";
 import type { TraceSpan } from "@lumina/ui";
@@ -34,7 +30,6 @@ import {
   StopCircle,
   XCircle,
   Trash2,
-  AlertTriangle,
   RotateCcw,
   Play,
   Send,
@@ -52,6 +47,7 @@ import MetricChart from "@/widgets/metric-chart/MetricChart.vue";
 import LogViewer from "@/widgets/log-viewer/LogViewer.vue";
 import TagList from "@/widgets/tag-list/TagList.vue";
 import QueryBoundary from "@/components/QueryBoundary.vue";
+import RunDetailDialogs from "@/modules/run/components/RunDetailDialogs.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useAutoRefresh } from "@/composables/useAutoRefresh";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
@@ -417,10 +413,6 @@ function confirmCancel() {
   cancelOpen.value = false;
 }
 
-const canConfirmCancel = computed(
-  () => !!run.value && cancelConfirm.value.trim() === run.value.name,
-);
-
 // ── Notes editor dialog ─────────────────────────────────────────────────
 const notesOpen = ref(false);
 const notesDraft = ref("");
@@ -459,10 +451,6 @@ const deleteMutation = useMutation({
   },
   onError: (e) => toast.error(`Delete failed: ${(e as Error).message}`),
 });
-
-const canDelete = computed(
-  () => !!run.value && deleteConfirm.value.trim() === run.value.name,
-);
 
 // ── Run lifecycle: resume / rewind / stop-signal / alert / use-artifact ─
 const {
@@ -564,7 +552,7 @@ const resumeOpen = ref(false);
 
 const rewindOpen = ref(false);
 const rewindMetricName = ref("");
-const rewindMetricValue = ref("");
+const rewindMetricValue = ref(0);
 const rewindError = ref<string | null>(null);
 
 const alertOpen = ref(false);
@@ -577,7 +565,7 @@ const useArtifactVersionId = ref("");
 
 function openRewindDialog() {
   rewindMetricName.value = "";
-  rewindMetricValue.value = "";
+  rewindMetricValue.value = 0;
   rewindError.value = null;
   rewindOpen.value = true;
 }
@@ -585,7 +573,7 @@ function openRewindDialog() {
 function submitRewind() {
   rewindError.value = null;
   const name = rewindMetricName.value.trim();
-  const value = Number(rewindMetricValue.value);
+  const value = rewindMetricValue.value;
   if (!name) {
     rewindError.value = "Metric name is required";
     return;
@@ -1084,407 +1072,34 @@ function toggleStopSignal() {
       </LTabPane>
     </LTabs>
 
-    <!-- Notes editor -->
-    <LDialog
-      v-model:show="notesOpen"
-      title="Run notes"
-      width="540px"
-      @close="notesError = null"
-    >
-      <div class="space-y-3">
-        <p class="text-xs text-fg-tertiary">
-          Free-form notes for this run. Visible to everyone with access to the
-          project. Markdown is rendered as plain text.
-        </p>
-        <LTextarea
-          v-model:value="notesDraft"
-          :rows="8"
-          placeholder="Why did this run produce these metrics? What was tried?"
-          @keydown.meta.enter="saveNotes"
-          @keydown.ctrl.enter="saveNotes"
-        />
-        <div
-          v-if="notesError"
-          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
-        >
-          {{ notesError }}
-        </div>
-        <div class="flex items-center justify-between text-[11px] text-fg-tertiary">
-          <span>{{ notesDraft.length }} characters</span>
-          <span>Press ⌘+Enter to save</span>
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton quaternary @click="notesOpen = false">Cancel</LButton>
-          <LButton
-            :loading="updateMutation.isPending.value"
-            @click="saveNotes"
-          >
-            Save notes
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
+    <RunDetailDialogs
+      :run="run"
+      v-model:notes-open="notesOpen"
+      v-model:notes-draft="notesDraft"
+      v-model:cancel-open="cancelOpen"
+      v-model:cancel-confirm="cancelConfirm"
+      v-model:delete-open="deleteOpen"
+      v-model:delete-confirm="deleteConfirm"
+      v-model:resume-open="resumeOpen"
+      :resume-state="resumeState"
+      :is-resume-state-loading="isResumeStateLoading"
+      v-model:rewind-open="rewindOpen"
+      v-model:rewind-metric-name="rewindMetricName"
+      v-model:rewind-metric-value="rewindMetricValue"
+      :rewind-error="rewindError"
+      v-model:alert-open="alertOpen"
+      v-model:alert-level="alertLevel"
+      v-model:alert-title="alertTitle"
+      v-model:alert-text="alertText"
+      v-model:use-artifact-open="useArtifactOpen"
+      v-model:use-artifact-version-id="useArtifactVersionId"
+      @submit-notes="saveNotes"
+      @submit-cancel="confirmCancel"
+      @submit-delete="deleteMutation.mutate"
+      @submit-rewind="submitRewind"
+      @submit-alert="submitAlert"
+      @submit-use-artifact="useArtifactMutation.mutate(useArtifactVersionId.trim())"
+    />
 
-    <!-- ── Cancel run confirmation ─────────────────────────────────── -->
-    <LDialog
-      v-model:show="cancelOpen"
-      title="Cancel this run?"
-      width="480px"
-      @close="cancelConfirm = ''"
-    >
-      <div class="space-y-3">
-        <div
-          class="flex items-start gap-2 rounded-md border border-accent-warning/30 bg-accent-warning/10 p-3 text-xs"
-        >
-          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-warning" />
-          <div>
-            <div class="font-medium">
-              Cancellation flips the run's status to <code class="font-mono">killed</code>
-              and is recorded in the audit log.
-            </div>
-            <div class="text-fg-tertiary">
-              If you're still inside a training loop, the SDK will pick up the
-              status change on its next heartbeat. Use <em>preempt</em> instead
-              if you want a softer stop.
-            </div>
-          </div>
-        </div>
-
-        <div class="space-y-1">
-          <label
-            for="run-cancel-confirm"
-            class="text-xs font-medium text-fg-secondary"
-          >
-            Type the run name
-            <code class="font-mono text-fg-primary">{{ run.name }}</code>
-            to confirm.
-          </label>
-          <LInput
-            id="run-cancel-confirm"
-            v-model:value="cancelConfirm"
-            :placeholder="run.name"
-            autocomplete="off"
-            spellcheck="false"
-            :disabled="updateMutation.isPending.value"
-            @keydown.enter="canConfirmCancel && confirmCancel()"
-          />
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton
-            quaternary
-            :disabled="updateMutation.isPending.value"
-            @click="cancelOpen = false"
-          >
-            Keep running
-          </LButton>
-          <LButton
-            type="warning"
-            :disabled="!canConfirmCancel"
-            :loading="updateMutation.isPending.value"
-            @click="confirmCancel"
-          >
-            <XCircle class="mr-1 h-3 w-3" />
-            Cancel run
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Delete run confirmation ─────────────────────────────────── -->
-    <LDialog
-      v-model:show="deleteOpen"
-      title="Delete this run?"
-      width="480px"
-      @close="deleteConfirm = ''"
-    >
-      <div class="space-y-3">
-        <div
-          class="flex items-start gap-2 rounded-md border border-accent-danger/30 bg-accent-danger/10 p-3 text-xs"
-        >
-          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-danger" />
-          <div>
-            <div class="font-medium">
-              This permanently deletes the run, every metric, log line,
-              system metric, tag, and artifact attached to it.
-            </div>
-            <div class="text-fg-tertiary">
-              There is no undo. Consider preempting or adding notes instead.
-            </div>
-          </div>
-        </div>
-
-        <div class="space-y-1">
-          <label
-            for="run-delete-confirm"
-            class="text-xs font-medium text-fg-secondary"
-          >
-            Type the run name
-            <code class="font-mono text-fg-primary">{{ run.name }}</code>
-            to confirm.
-          </label>
-          <LInput
-            id="run-delete-confirm"
-            v-model:value="deleteConfirm"
-            :placeholder="run.name"
-            autocomplete="off"
-            spellcheck="false"
-            :disabled="deleteMutation.isPending.value"
-            @keydown.enter="canDelete && deleteMutation.mutate()"
-          />
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton
-            quaternary
-            :disabled="deleteMutation.isPending.value"
-            @click="deleteOpen = false"
-          >
-            Cancel
-          </LButton>
-          <LButton
-            type="error"
-            :disabled="!canDelete"
-            :loading="deleteMutation.isPending.value"
-            @click="deleteMutation.mutate()"
-          >
-            <Trash2 class="mr-1 h-3 w-3" />
-            Delete permanently
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Resume state ──────────────────────────────────────────────── -->
-    <LDialog
-      v-model:show="resumeOpen"
-      title="Resume state"
-      width="600px"
-      @close="resumeOpen = false"
-    >
-      <div v-if="isResumeStateLoading" class="py-8">
-        <LSkeleton text :repeat="3" />
-      </div>
-      <div v-else-if="resumeState" class="space-y-4 text-sm">
-        <div class="grid grid-cols-3 gap-3">
-          <LCard class="p-3">
-            <div class="text-[10px] uppercase tracking-wider text-fg-tertiary">History rows</div>
-            <div class="font-mono text-lg">{{ resumeState.historyLineCount }}</div>
-          </LCard>
-          <LCard class="p-3">
-            <div class="text-[10px] uppercase tracking-wider text-fg-tertiary">Events rows</div>
-            <div class="font-mono text-lg">{{ resumeState.eventsLineCount }}</div>
-          </LCard>
-          <LCard class="p-3">
-            <div class="text-[10px] uppercase tracking-wider text-fg-tertiary">Log lines</div>
-            <div class="font-mono text-lg">{{ resumeState.logLineCount }}</div>
-          </LCard>
-        </div>
-        <div>
-          <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-fg-tertiary">Tags</h4>
-          <div class="flex flex-wrap gap-2">
-            <LTag
-              v-for="tag in resumeState.tags"
-              :key="tag"
-              size="small"
-              round
-            >
-              {{ tag }}
-            </LTag>
-            <span v-if="resumeState.tags.length === 0" class="text-fg-tertiary">No tags</span>
-          </div>
-        </div>
-        <div>
-          <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-fg-tertiary">Config</h4>
-          <LJsonView :data="resumeState.config" :deep="2" />
-        </div>
-      </div>
-      <LEmpty
-        v-else
-        title="No resume state"
-        description="The run could not be found."
-      />
-      <template #footer>
-        <div class="flex justify-end">
-          <LButton @click="resumeOpen = false">Close</LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Rewind run ────────────────────────────────────────────────── -->
-    <LDialog
-      v-model:show="rewindOpen"
-      title="Rewind run"
-      width="480px"
-      @close="rewindError = null"
-    >
-      <div class="space-y-3">
-        <p class="text-xs text-fg-tertiary">
-          Rewind truncates metric history to the last step where the chosen
-          metric equalled the given value. The SDK can then resume from that
-          point.
-        </p>
-        <div>
-          <label
-            for="rewind-metric"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Metric name <span class="text-accent-danger">*</span>
-          </label>
-          <LInput
-            id="rewind-metric"
-            v-model:value="rewindMetricName"
-            placeholder="e.g. train/loss"
-          />
-        </div>
-        <div>
-          <label
-            for="rewind-value"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Metric value <span class="text-accent-danger">*</span>
-          </label>
-          <LInput
-            id="rewind-value"
-            v-model:value="rewindMetricValue"
-            placeholder="e.g. 0.42"
-          />
-        </div>
-        <div
-          v-if="rewindError"
-          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
-        >
-          {{ rewindError }}
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton quaternary @click="rewindOpen = false">Cancel</LButton>
-          <LButton
-            :loading="rewindMutation.isPending.value"
-            :disabled="!rewindMetricName.trim() || !rewindMetricValue.trim()"
-            @click="submitRewind"
-          >
-            <RotateCcw class="mr-1 h-3 w-3" />
-            Rewind
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Send alert ────────────────────────────────────────────────── -->
-    <LDialog
-      v-model:show="alertOpen"
-      title="Send run alert"
-      width="480px"
-      @close="alertOpen = false"
-    >
-      <div class="space-y-3">
-        <div>
-          <label
-            for="alert-level"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Level
-          </label>
-          <LSelect
-            id="alert-level"
-            v-model:value="alertLevel"
-            :options="[
-              { value: 'INFO', label: 'Info' },
-              { value: 'WARN', label: 'Warning' },
-              { value: 'ERROR', label: 'Error' },
-            ]"
-          />
-        </div>
-        <div>
-          <label
-            for="alert-title"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Title <span class="text-accent-danger">*</span>
-          </label>
-          <LInput
-            id="alert-title"
-            v-model:value="alertTitle"
-            placeholder="e.g. Loss exploded"
-          />
-        </div>
-        <div>
-          <label
-            for="alert-text"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Message <span class="text-accent-danger">*</span>
-          </label>
-          <LTextarea
-            id="alert-text"
-            v-model:value="alertText"
-            :rows="3"
-            placeholder="Describe what happened..."
-          />
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton quaternary @click="alertOpen = false">Cancel</LButton>
-          <LButton
-            :loading="sendAlertMutation.isPending.value"
-            :disabled="!alertTitle.trim() || !alertText.trim()"
-            @click="submitAlert"
-          >
-            <Send class="mr-1 h-3 w-3" />
-            Send alert
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Use artifact ──────────────────────────────────────────────── -->
-    <LDialog
-      v-model:show="useArtifactOpen"
-      title="Record artifact usage"
-      width="480px"
-      @close="useArtifactOpen = false"
-    >
-      <div class="space-y-3">
-        <p class="text-xs text-fg-tertiary">
-          Record that this run used an artifact version (input, output, job,
-          etc.). The link is stored in the run's artifact usage log.
-        </p>
-        <div>
-          <label
-            for="use-artifact-version"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Artifact version ID <span class="text-accent-danger">*</span>
-          </label>
-          <LInput
-            id="use-artifact-version"
-            v-model:value="useArtifactVersionId"
-            placeholder="e.g. 019234ab-…"
-          />
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton quaternary @click="useArtifactOpen = false">Cancel</LButton>
-          <LButton
-            :loading="useArtifactMutation.isPending.value"
-            :disabled="!useArtifactVersionId.trim()"
-            @click="useArtifactMutation.mutate(useArtifactVersionId.trim())"
-          >
-            <Box class="mr-1 h-3 w-3" />
-            Record usage
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
   </div>
 </template>
