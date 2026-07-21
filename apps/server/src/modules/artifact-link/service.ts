@@ -1,8 +1,11 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type { LinkArtifactInput } from "./schema.js";
 
+@injectable()
 export class ArtifactLinkService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(@inject(TOKENS.PrismaClient) private readonly prisma: PrismaClient) {}
 
   async link(versionId: string, data: LinkArtifactInput) {
     // Compute the next version index within this portfolio — the row is

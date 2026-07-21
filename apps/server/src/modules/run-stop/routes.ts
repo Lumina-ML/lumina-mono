@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { RunService } from "../run/service.js";
 import { RunStopHandler } from "./handler.js";
+import { container } from "../../core/di/container.js";
 
 /**
  * Run-stop module — exposes `GET /api/v1/runs/:id/should-stop` so the
@@ -11,11 +12,7 @@ import { RunStopHandler } from "./handler.js";
  * the existing PATCH /runs/:id route. No additional schema is needed.
  */
 export async function runStopRoutes(app: FastifyInstance) {
-  const runService = new RunService(
-    app.prisma,
-    app.eventBus,
-    app.config.defaultWorkspaceId,
-  );
+  const runService = container.resolve(RunService);
   const handler = new RunStopHandler(runService);
 
   app.get(

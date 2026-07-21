@@ -3,11 +3,12 @@ import { SweepService } from "./service.js";
 import { SweepHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
 import { RunService } from "../run/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function sweepRoutes(app: FastifyInstance) {
-  const sweepService = new SweepService(app.prisma);
-  const projectService = new ProjectService(app.prisma);
-  const runService = new RunService(app.prisma);
+  const sweepService = container.resolve(SweepService);
+  const projectService = container.resolve(ProjectService);
+  const runService = container.resolve(RunService);
   const handler = new SweepHandler(sweepService, projectService, runService);
 
   app.post("/projects/:projectId/sweeps", {

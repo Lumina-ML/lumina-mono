@@ -1,4 +1,6 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type { RewindRunInput } from "./schema.js";
 
 /// Cap on rows we walk when looking for the cutpoint. Real wandb rewinds
@@ -6,8 +8,9 @@ import type { RewindRunInput } from "./schema.js";
 /// runs typically O(thousands) of metrics, not millions.
 const REWIND_SCAN_LIMIT = 5000;
 
+@injectable()
 export class RunRewindService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(@inject(TOKENS.PrismaClient) private readonly prisma: PrismaClient) {}
 
   async rewind(runId: string, data: RewindRunInput) {
     // Find the last metric row where the named metric's value matches the

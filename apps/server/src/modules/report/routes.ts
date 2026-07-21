@@ -2,10 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { ReportService } from "./service.js";
 import { ReportHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function reportRoutes(app: FastifyInstance) {
-  const reportService = new ReportService(app.prisma);
-  const projectService = new ProjectService(app.prisma);
+  const reportService = container.resolve(ReportService);
+  const projectService = container.resolve(ProjectService);
   const handler = new ReportHandler(reportService, projectService);
 
   app.post("/projects/:projectId/reports", {

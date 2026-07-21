@@ -1,31 +1,25 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { EventBus } from "../../core/bus/event-bus.js";
 import type { Queue } from "../../core/queue/queue.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type { CreateRunInput, UpdateRunInput } from "./schema.js";
 import { RunRepository } from "./repository.js";
 
+@injectable()
 export class RunService {
   private readonly repository: RunRepository;
 
   constructor(
-    prisma: PrismaClient,
-    private readonly eventBus?: EventBus,
+    @inject(TOKENS.PrismaClient) prisma: PrismaClient,
+    @inject(TOKENS.EventBus) private readonly eventBus: EventBus,
     /**
      * Fallback workspaceId used when an event payload can't resolve one
-     * from the run's project (e.g. legacy callers or a publish path that
-     * happens before the include is available). Usually
-     * `app.config.defaultWorkspaceId`. Optional so older construction
-     * sites (system-metric / log-line routes) still type-check.
+     * from the run's project. Usually `app.config.defaultWorkspaceId`.
      */
-    private readonly defaultWorkspaceId?: string,
-    /**
-     * Durable job queue. Optional during the legacy construction sites;
-     * the composition root (`apps/server/src/plugins/di.ts`) wires the
-     * real implementation in. Without this, the durable side of
-     * `run.finished` (cache invalidation hooks, analytics aggregators)
-     * silently no-ops — events still publish on the in-process bus.
-     */
-    private readonly queue?: Queue,
+    @inject(TOKENS.defaultWorkspaceId)
+    private readonly defaultWorkspaceId: string,
+    @inject(TOKENS.Queue) private readonly queue: Queue,
   ) {
     this.repository = new RunRepository(prisma);
   }
@@ -33,17 +27,15 @@ export class RunService {
   async create(projectId: string, data: CreateRunInput) {
     const run = await this.repository.create(projectId, data);
 
-    if (this.eventBus) {
-      const workspaceId =
-        (await this.repository.findByRunId(run.runId))?.project?.workspaceId
-        ?? this.defaultWorkspaceId
-        ?? "";
-      await this.eventBus.publish({
-        type: "RunCreated",
-        payload: { runId: run.runId, projectId, workspaceId },
-        occurredAt: new Date(),
-      });
-    }
+    const workspaceId =
+      (await this.repository.findByRunId(run.runId))?.project?.workspaceId
+      ?? this.defaultWorkspaceId
+      ?? "";
+    await this.eventBus.publish({
+      type: "RunCreated",
+      payload: { runId: run.runId, projectId, workspaceId },
+      occurredAt: new Date(),
+    });
 
     return run;
   }
@@ -83,19 +75,15 @@ export class RunService {
         status: data.status,
       };
       // Publish for in-process subscribers (websocket fanout etc.).
-      if (this.eventBus) {
-        await this.eventBus.publish({
-          type: "RunFinished",
-          payload,
-          occurredAt: new Date(),
-        });
-      }
+      await this.eventBus.publish({
+        type: "RunFinished",
+        payload,
+        occurredAt: new Date(),
+      });
       // Enqueue durable job for side effects (cache invalidation, analytics).
       // Decoupled from the event so a failed subscriber doesn't block the
       // queue path and vice versa.
-      if (this.queue) {
-        await this.queue.enqueue({ name: "run.finished", payload });
-      }
+      await this.queue.enqueue({ name: "run.finished", payload });
     }
 
     return run;
@@ -111,16 +99,12 @@ export class RunService {
       workspaceId,
       status: "finished",
     };
-    if (this.eventBus) {
-      await this.eventBus.publish({
-        type: "RunFinished",
-        payload,
-        occurredAt: new Date(),
-      });
-    }
-    if (this.queue) {
-      await this.queue.enqueue({ name: "run.finished", payload });
-    }
+    await this.eventBus.publish({
+      type: "RunFinished",
+      payload,
+      occurredAt: new Date(),
+    });
+    await this.queue.enqueue({ name: "run.finished", payload });
 
     return run;
   }

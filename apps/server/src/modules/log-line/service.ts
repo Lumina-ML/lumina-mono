@@ -1,8 +1,11 @@
+import { inject, injectable } from "tsyringe";
 import type { TimeSeriesStorage } from "../../core/storage/time-series-storage.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type { LogLinesInput } from "./schema.js";
 
+@injectable()
 export class LogLineService {
-  constructor(private readonly storage: TimeSeriesStorage) {}
+  constructor(@inject(TOKENS.TimeSeriesStorage) private readonly storage: TimeSeriesStorage) {}
 
   async log(runId: string, projectId: string, data: LogLinesInput) {
     const rows = data.logs.map((log) => ({

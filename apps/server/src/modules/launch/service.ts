@@ -1,5 +1,7 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { Queue } from "../../core/queue/queue.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type {
   CreateLaunchQueueInput,
   CreateLaunchJobInput,
@@ -8,10 +10,14 @@ import type {
 } from "./schema.js";
 import { LaunchRepository } from "./repository.js";
 
+@injectable()
 export class LaunchService {
   private readonly repository: LaunchRepository;
 
-  constructor(prisma: PrismaClient, private readonly queue?: Queue) {
+  constructor(
+    @inject(TOKENS.PrismaClient) prisma: PrismaClient,
+    @inject(TOKENS.Queue) private readonly queue: Queue,
+  ) {
     this.repository = new LaunchRepository(prisma);
   }
 
@@ -82,7 +88,7 @@ export class LaunchService {
     // Repository return type is `unknown`; the actual shape (from
     // `prisma.launchRun.findUnique`) carries an `id` field.
     const claimedId = (claimed as { id: string } | null)?.id;
-    if (claimedId && this.queue) {
+    if (claimedId) {
       await this.queue.enqueue({
         name: "launch.run.claimed",
         payload: { launchRunId: claimedId, queueId },

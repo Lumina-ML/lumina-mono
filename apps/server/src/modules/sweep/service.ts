@@ -1,4 +1,6 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type {
   CreateSweepInput,
   UpdateSweepInput,
@@ -13,10 +15,11 @@ import type { Prisma } from "../../generated/prisma/index.js";
 type JsonObject = Prisma.JsonObject;
 type JsonValue = Prisma.JsonValue;
 
+@injectable()
 export class SweepService {
   private readonly repository: SweepRepository;
 
-  constructor(prisma: PrismaClient) {
+  constructor(@inject(TOKENS.PrismaClient) prisma: PrismaClient) {
     this.repository = new SweepRepository(prisma);
   }
 

@@ -1,12 +1,15 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 
 /// Tail size for history / events returned in the resume-state payload.
 /// The wandb contract used 100 lines per tail; we match that for parity.
 const HISTORY_TAIL = 100;
 const EVENTS_TAIL = 100;
 
+@injectable()
 export class RunResumeService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(@inject(TOKENS.PrismaClient) private readonly prisma: PrismaClient) {}
 
   async getState(runId: string) {
     const [run, historyTail, eventsTail, historyCount, eventsCount, logLineCount, runTags] =

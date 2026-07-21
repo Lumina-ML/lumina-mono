@@ -2,10 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { RunMediaService } from "./service.js";
 import { RunMediaHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function runMediaRoutes(app: FastifyInstance) {
-  const runMediaService = new RunMediaService(app.prisma);
-  const projectService = new ProjectService(app.prisma);
+  const runMediaService = container.resolve(RunMediaService);
+  const projectService = container.resolve(ProjectService);
   const handler = new RunMediaHandler(runMediaService, projectService);
 
   app.post("/projects/:projectId/run-media", {

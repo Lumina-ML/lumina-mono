@@ -2,14 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { RunService } from "./service.js";
 import { RunHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function runRoutes(app: FastifyInstance) {
-  const runService = new RunService(
-    app.prisma,
-    app.eventBus,
-    app.config.defaultWorkspaceId,
-  );
-  const projectService = new ProjectService(app.prisma);
+  const runService = container.resolve(RunService);
+  const projectService = container.resolve(ProjectService);
   const handler = new RunHandler(runService, projectService);
 
   app.post("/runs", handler.create.bind(handler));

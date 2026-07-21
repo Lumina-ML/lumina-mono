@@ -2,10 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { LaunchService } from "./service.js";
 import { LaunchHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function launchRoutes(app: FastifyInstance) {
-  const launchService = new LaunchService(app.prisma);
-  const projectService = new ProjectService(app.prisma);
+  const launchService = container.resolve(LaunchService);
+  const projectService = container.resolve(ProjectService);
   const handler = new LaunchHandler(launchService, projectService);
 
   app.post("/projects/:projectId/launch-queues", {

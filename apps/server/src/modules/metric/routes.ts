@@ -2,10 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { MetricService } from "./service.js";
 import { MetricHandler } from "./handler.js";
 import { RunService } from "../run/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function metricRoutes(app: FastifyInstance) {
-  const metricService = new MetricService(app.metricStorage, app.eventBus, app.queue);
-  const runService = new RunService(app.prisma);
+  const metricService = container.resolve(MetricService);
+  const runService = container.resolve(RunService);
   const handler = new MetricHandler(metricService, runService);
 
   app.post("/runs/:runId/metrics", {

@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
+import { inject, injectable } from "tsyringe";
 import type { ObjectStorage } from "../../core/storage/object-storage.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type {
   CreateRegistryModelInput,
   CreateRegistryModelVersionInput,
@@ -8,12 +10,13 @@ import type {
 } from "./schema.js";
 import { RegistryModelRepository } from "./repository.js";
 
+@injectable()
 export class RegistryModelService {
   private readonly repository: RegistryModelRepository;
 
   constructor(
-    prisma: PrismaClient,
-    private readonly storage: ObjectStorage,
+    @inject(TOKENS.PrismaClient) prisma: PrismaClient,
+    @inject(TOKENS.Storage) private readonly storage: ObjectStorage,
   ) {
     this.repository = new RegistryModelRepository(prisma);
   }

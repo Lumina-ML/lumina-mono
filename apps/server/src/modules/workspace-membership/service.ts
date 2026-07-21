@@ -1,14 +1,17 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type {
   CreateWorkspaceMembershipInput,
   UpdateWorkspaceMembershipInput,
 } from "./schema.js";
 import { WorkspaceMembershipRepository } from "./repository.js";
 
+@injectable()
 export class WorkspaceMembershipService {
   private readonly repository: WorkspaceMembershipRepository;
 
-  constructor(prisma: PrismaClient) {
+  constructor(@inject(TOKENS.PrismaClient) prisma: PrismaClient) {
     this.repository = new WorkspaceMembershipRepository(prisma);
   }
 

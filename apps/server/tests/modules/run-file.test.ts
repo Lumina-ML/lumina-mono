@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { buildTestApp } from "../helpers/build-app.js";
+import { buildTestApp, swapDIToken, TOKENS } from "../helpers/build-app.js";
 import { createFakePrisma } from "../helpers/fake-prisma.js";
 import { runFileRoutes } from "../../src/modules/run-file/routes.js";
 import { LocalObjectStorage } from "../../src/infra/storage/local.js";
@@ -19,10 +19,15 @@ describe("run-file module (SDK save/restore backend)", () => {
       prisma: createFakePrisma({ runs: [{ runId: RUN_ID, projectId: "p1" }] }),
     });
     // Swap in a fresh LocalObjectStorage pointed at tmpDir for isolation.
-    (app as unknown as { storage: LocalObjectStorage }).storage = new LocalObjectStorage({
+    const swapped = new LocalObjectStorage({
       baseUrl: "http://localhost:0",
       basePath: tmpDir,
     });
+    (app as unknown as { storage: LocalObjectStorage }).storage = swapped;
+    // Re-bind the DI token so RunFileService (resolved via container)
+    // picks up the swapped storage instead of the one registered by
+    // diPlugin before this beforeEach ran.
+    swapDIToken(TOKENS.Storage, swapped);
     await app.register(runFileRoutes, { prefix: "/api/v1" });
     await app.ready();
   });

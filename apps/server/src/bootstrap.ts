@@ -8,6 +8,7 @@ import cors from "@fastify/cors";
 import fastify from "fastify";
 import { ZodError } from "zod";
 import { Prisma } from "./generated/prisma/index.js";
+import { isAppError } from "./core/errors/app-error.js";
 import { buildLoggerOptions, requestIdHeader } from "./core/logging/index.js";
 import { configPlugin } from "./plugins/config.js";
 import { prismaPlugin } from "./plugins/prisma.js";
@@ -18,6 +19,7 @@ import { telemetryPlugin } from "./plugins/telemetry.js";
 import { busPlugin } from "./plugins/bus.js";
 import { cachePlugin } from "./plugins/cache.js";
 import { queuePlugin } from "./plugins/queue.js";
+import { diPlugin } from "./plugins/di.js";
 import { observabilityPlugin } from "./plugins/observability.js";
 import { websocketPlugin } from "./plugins/websocket.js";
 import { healthPlugin } from "./plugins/health.js";
@@ -108,6 +110,17 @@ export async function buildApp() {
       });
       return;
     }
+    // Typed application errors (NotFound, Conflict, etc.) take the
+    // fast path — services can signal a 4xx that's distinguishable
+    // from a real bug instead of leaking as a generic 500.
+    if (isAppError(err)) {
+      reply.status(err.status).send({
+        error: err.code,
+        message: err.message,
+        ...(err.details !== undefined ? { details: err.details } : {}),
+      });
+      return;
+    }
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       const target = (err.meta?.target as string[] | undefined) ?? [];
       const field = target[0] ?? "field";
@@ -132,6 +145,11 @@ export async function buildApp() {
   await app.register(busPlugin);
   await app.register(cachePlugin);
   await app.register(queuePlugin);
+  // Composition root: register Fastify-decorated infra into the DI
+  // container so business services can be resolved via tsyringe with
+  // uniform dependencies (fixes the silent eventBus-loss bug where some
+  // routes constructed RunService without an eventBus).
+  await app.register(diPlugin);
 
   // 3. Cross-cutting concerns
   // Observability must come before OTel so the request id is set on

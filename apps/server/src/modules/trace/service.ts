@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
+import { inject, injectable } from "tsyringe";
 import type { SpanRow, TraceRow, TraceStorage } from "../../core/storage/trace-storage.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type {
   CreateTraceInput,
   PatchTraceInput,
@@ -9,10 +11,11 @@ import type {
 } from "./schema.js";
 import { TraceRepository } from "./repository.js";
 
+@injectable()
 export class TraceService {
   private readonly repository: TraceRepository;
 
-  constructor(storage: TraceStorage) {
+  constructor(@inject(TOKENS.TraceStorage) storage: TraceStorage) {
     this.repository = new TraceRepository(storage);
   }
 

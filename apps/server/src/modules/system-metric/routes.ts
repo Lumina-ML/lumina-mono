@@ -2,10 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { SystemMetricService } from "./service.js";
 import { SystemMetricHandler } from "./handler.js";
 import { RunService } from "../run/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function systemMetricRoutes(app: FastifyInstance) {
-  const systemMetricService = new SystemMetricService(app.timeSeriesStorage);
-  const runService = new RunService(app.prisma);
+  const systemMetricService = container.resolve(SystemMetricService);
+  const runService = container.resolve(RunService);
   const handler = new SystemMetricHandler(systemMetricService, runService);
 
   app.post("/runs/:runId/system-metrics", {

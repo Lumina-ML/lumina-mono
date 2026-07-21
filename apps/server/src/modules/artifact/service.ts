@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
+import { inject, injectable } from "tsyringe";
 import type { ObjectStorage } from "../../core/storage/object-storage.js";
 import type { EventBus } from "../../core/bus/event-bus.js";
 import type { Queue } from "../../core/queue/queue.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type {
   CreateArtifactInput,
   CreateArtifactVersionInput,
@@ -14,6 +16,13 @@ import type {
 } from "./schema.js";
 import { ArtifactRepository } from "./repository.js";
 
+/**
+ * Legacy deps-object constructor kept for callers that still pass an
+ * explicit `{ prisma, storage, eventBus, queue }` (older route tests,
+ * direct service wiring). The tsyringe-managed `@injectable()` path is
+ * the four-argument constructor below; both share the same body via the
+ * `init` helper.
+ */
 export interface ArtifactServiceDeps {
   prisma: PrismaClient;
   storage: ObjectStorage;
@@ -21,11 +30,35 @@ export interface ArtifactServiceDeps {
   queue?: Queue;
 }
 
+@injectable()
 export class ArtifactService {
   private readonly repository: ArtifactRepository;
+  private readonly storage: ObjectStorage;
+  private readonly eventBus: EventBus | undefined;
+  private readonly queue: Queue | undefined;
 
-  constructor(private readonly deps: ArtifactServiceDeps) {
-    this.repository = new ArtifactRepository(deps.prisma);
+  constructor(
+    @inject(TOKENS.PrismaClient) prisma: PrismaClient,
+    @inject(TOKENS.Storage) storage: ObjectStorage,
+    @inject(TOKENS.EventBus) eventBus: EventBus,
+    @inject(TOKENS.Queue) queue: Queue,
+  ) {
+    this.repository = new ArtifactRepository(prisma);
+    this.storage = storage;
+    this.eventBus = eventBus;
+    this.queue = queue;
+  }
+
+  /** Legacy constructor that accepts a deps object. Routes/tests that
+   * still pass `{ prisma, storage, eventBus, queue }` keep working. */
+  static fromDeps(deps: ArtifactServiceDeps): ArtifactService {
+    const svc = Object.create(ArtifactService.prototype) as ArtifactService;
+    // Reach into the same private fields the DI constructor populates.
+    (svc as unknown as { repository: ArtifactRepository }).repository = new ArtifactRepository(deps.prisma);
+    (svc as unknown as { storage: ObjectStorage }).storage = deps.storage;
+    (svc as unknown as { eventBus: EventBus | undefined }).eventBus = deps.eventBus;
+    (svc as unknown as { queue: Queue | undefined }).queue = deps.queue;
+    return svc;
   }
 
   async createArtifact(projectId: string, data: CreateArtifactInput) {
@@ -117,7 +150,7 @@ export class ArtifactService {
       ...data,
       storageKey,
     });
-    const uploadUrl = await this.deps.storage.getUploadUrl(storageKey);
+    const uploadUrl = await this.storage.getUploadUrl(storageKey);
     return {
       file: { ...created, size: created.size.toString() },
       uploadUrl,
@@ -149,12 +182,12 @@ export class ArtifactService {
       fileCount: version.files.length,
       digest,
     };
-    await this.deps.eventBus?.publish({
+    await this.eventBus?.publish({
       type: "ArtifactUploaded",
       payload: eventPayload,
       occurredAt: new Date(),
     });
-    await this.deps.queue?.enqueue({ name: "artifact.uploaded", payload: eventPayload });
+    await this.queue?.enqueue({ name: "artifact.uploaded", payload: eventPayload });
 
     return updated;
   }
@@ -213,7 +246,7 @@ export class ArtifactService {
           size: file.size.toString(),
         };
         if (file.storageKey) {
-          enriched.downloadUrl = await this.deps.storage.getDownloadUrl(file.storageKey);
+          enriched.downloadUrl = await this.storage.getDownloadUrl(file.storageKey);
         }
         return enriched;
       }),

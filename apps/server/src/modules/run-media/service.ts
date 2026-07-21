@@ -1,11 +1,14 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type { CreateRunMediaInput, ListRunMediaQuery } from "./schema.js";
 import { RunMediaRepository } from "./repository.js";
 
+@injectable()
 export class RunMediaService {
   private readonly repository: RunMediaRepository;
 
-  constructor(prisma: PrismaClient) {
+  constructor(@inject(TOKENS.PrismaClient) prisma: PrismaClient) {
     this.repository = new RunMediaRepository(prisma);
   }
 

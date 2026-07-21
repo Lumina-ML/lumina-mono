@@ -1,8 +1,11 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type { RecordUseArtifactInput } from "./schema.js";
 
+@injectable()
 export class RunUseArtifactService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(@inject(TOKENS.PrismaClient) private readonly prisma: PrismaClient) {}
 
   async create(runId: string, data: RecordUseArtifactInput) {
     // Upsert by (runId, artifactVersionId, type) — the same combination

@@ -1,10 +1,13 @@
+import { inject, injectable } from "tsyringe";
 import type { ObjectStorage } from "../../core/storage/object-storage.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 
+@injectable()
 export class RunFileService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly storage: ObjectStorage,
+    @inject(TOKENS.PrismaClient) private readonly prisma: PrismaClient,
+    @inject(TOKENS.Storage) private readonly storage: ObjectStorage,
   ) {}
 
   /**
