@@ -119,8 +119,13 @@ const codeSource = computed(() => (props.block.type === "code" ? props.block.dat
     class="overflow-x-auto rounded-md border border-border bg-canvas p-3 font-mono text-xs"
   ><code :class="`language-${codeLang}`">{{ codeSource }}</code></pre>
 
-  <!-- Image -->
+  <!-- Image — user-uploaded block content, not an avatar/photo of a
+       named user. LAvatar's src+alt contract doesn't fit because the
+       alt is free-form and there's no initials fallback. Allowed
+       exception to the dashboard atom-only rule. -->
+  <!-- eslint-disable-next-line dashboard/no-native-button-or-input -->
   <figure v-else-if="block.type === 'image'" class="space-y-1">
+    <!-- eslint-disable-next-line dashboard/no-native-button-or-input -->
     <img
       v-if="block.data.src"
       :src="block.data.src"

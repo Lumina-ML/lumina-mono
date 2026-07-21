@@ -382,21 +382,22 @@ function removeMetricKey(key: string) {
               {{ runNames[runId] ?? runId }}
             </span>
             <div class="flex flex-wrap gap-1">
-              <button
+              <LButton
                 v-for="c in colorList"
                 :key="c"
-                type="button"
+                quaternary
+                size="xs"
                 :class="[
-                  'h-5 w-5 rounded-sm border transition-transform',
+                  '!h-5 !w-5 !rounded-sm !border !p-0',
                   (colorOverrides[runId] ?? '') === c
-                    ? 'border-fg-primary scale-110'
-                    : 'border-border hover:scale-105',
+                    ? '!border-fg-primary !scale-110'
+                    : '!border-border hover:!scale-105',
                 ]"
                 :style="{ backgroundColor: c }"
                 :aria-label="`Set color ${c}`"
                 @click="setColor(runId, c)"
               />
-            </div>
+          </div>
           </li>
         </ul>
       </LTabPane>

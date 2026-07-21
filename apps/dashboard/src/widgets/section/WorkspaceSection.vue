@@ -82,9 +82,10 @@ function patchPanel(panelId: string, config: ChartPanelConfig) {
     <header
       class="group flex items-center justify-between gap-2 rounded-md border border-transparent px-1 py-1 hover:border-border"
     >
-      <button
-        type="button"
-        class="flex min-w-0 flex-1 items-center gap-2 text-left"
+      <LButton
+        quaternary
+        size="sm"
+        class="!flex !min-w-0 !flex-1 !items-center !gap-2 !text-left !p-0"
         @click="toggleCollapsed"
       >
         <component
@@ -96,7 +97,7 @@ function patchPanel(panelId: string, config: ChartPanelConfig) {
         <span class="rounded-full bg-canvas px-1.5 py-0.5 font-mono text-[10px] text-fg-tertiary">
           {{ section.panels.length }}
         </span>
-      </button>
+      </LButton>
 
       <div class="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <LButton size="sm" @click="emit('add-panel')">

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter, RouterView } from "vue-router";
+import { LButton } from "@lumina/ui";
 import {
   LayoutDashboard,
   Play,
@@ -140,15 +141,16 @@ function goToTab(tab: TabDef) {
     <div
       class="sticky top-0 z-10 -mx-4 mb-4 flex items-center gap-1 overflow-x-auto border-b border-border bg-background px-4 md:-mx-6 md:px-6"
     >
-      <button
+      <LButton
         v-for="tab in tabs"
         :key="tab.key"
-        type="button"
+        quaternary
+        size="sm"
         :class="[
-          'flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm transition-colors',
+          '!flex !shrink-0 !items-center !gap-2 !rounded-none border-b-2 !px-3 !py-2 !text-sm',
           isActive(tab)
-            ? 'border-accent-primary font-medium text-fg-primary'
-            : 'border-transparent text-fg-tertiary hover:text-fg-secondary',
+            ? '!border-accent-primary !font-medium !text-fg-primary'
+            : '!border-transparent !text-fg-tertiary hover:!text-fg-secondary',
         ]"
         @click="goToTab(tab)"
       >
@@ -160,7 +162,7 @@ function goToTab(tab: TabDef) {
         >
           {{ tab.count() }}
         </span>
-      </button>
+      </LButton>
     </div>
 
     <!-- Tab content -->

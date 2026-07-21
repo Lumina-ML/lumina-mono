@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronRight } from "lucide-vue-next";
+import { LButton } from "@lumina/ui";
 import type { SpanNode } from "./types";
 
 defineProps<{
@@ -36,13 +37,14 @@ function durationMs(span: SpanNode): number {
     <ul class="space-y-0.5 p-2">
       <li v-for="span in spans" :key="span.id">
         <div class="flex flex-col">
-          <button
-            type="button"
+          <LButton
+            quaternary
+            size="xs"
             :class="[
-              'group flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors',
+              '!group !flex w-full !items-center !gap-1.5 !rounded-md !px-2 !py-1 !text-left',
               selectedSpanId === span.id
-                ? 'bg-accent-primary/15 font-medium text-fg-primary'
-                : 'hover:bg-canvas text-fg-secondary',
+                ? '!bg-accent-primary/15 !font-medium !text-fg-primary'
+                : 'hover:!bg-canvas !text-fg-secondary',
             ]"
             @click="emit('select', span.id)"
           >
@@ -55,20 +57,21 @@ function durationMs(span: SpanNode): number {
             <span class="shrink-0 font-mono text-[10px] text-fg-tertiary">
               {{ durationMs(span) }}ms
             </span>
-          </button>
+          </LButton>
           <ul
             v-if="span.children.length > 0"
             class="ml-3 space-y-0.5 border-l border-border pl-1"
           >
             <li v-for="child in span.children" :key="child.id">
               <div class="flex flex-col">
-                <button
-                  type="button"
+                <LButton
+                  quaternary
+                  size="xs"
                   :class="[
-                    'group flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors',
+                    '!group !flex w-full !items-center !gap-1.5 !rounded-md !px-2 !py-1 !text-left',
                     selectedSpanId === child.id
-                      ? 'bg-accent-primary/15 font-medium text-fg-primary'
-                      : 'hover:bg-canvas text-fg-secondary',
+                      ? '!bg-accent-primary/15 !font-medium !text-fg-primary'
+                      : 'hover:!bg-canvas !text-fg-secondary',
                   ]"
                   @click="emit('select', child.id)"
                 >
@@ -81,19 +84,20 @@ function durationMs(span: SpanNode): number {
                   <span class="shrink-0 font-mono text-[10px] text-fg-tertiary">
                     {{ durationMs(child) }}ms
                   </span>
-                </button>
+                </LButton>
                 <ul
                   v-if="child.children.length > 0"
                   class="ml-3 space-y-0.5 border-l border-border pl-1"
                 >
                   <li v-for="grand in child.children" :key="grand.id">
-                    <button
-                      type="button"
+                    <LButton
+                      quaternary
+                      size="xs"
                       :class="[
-                        'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors',
+                        '!flex w-full !items-center !gap-1.5 !rounded-md !px-2 !py-1 !text-left',
                         selectedSpanId === grand.id
-                          ? 'bg-accent-primary/15 font-medium text-fg-primary'
-                          : 'hover:bg-canvas text-fg-secondary',
+                          ? '!bg-accent-primary/15 !font-medium !text-fg-primary'
+                          : 'hover:!bg-canvas !text-fg-secondary',
                       ]"
                       @click="emit('select', grand.id)"
                     >
@@ -106,7 +110,7 @@ function durationMs(span: SpanNode): number {
                       <span class="shrink-0 font-mono text-[10px] text-fg-tertiary">
                         {{ durationMs(grand) }}ms
                       </span>
-                    </button>
+                    </LButton>
                   </li>
                 </ul>
               </div>

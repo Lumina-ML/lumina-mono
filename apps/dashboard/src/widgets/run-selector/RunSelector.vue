@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { Eye, EyeOff, Search, Pin, PinOff, X } from "lucide-vue-next";
-import { LInput, LIconButton, LTooltip, LTag } from "@lumina/ui";
+import { LInput, LIconButton, LTooltip, LTag, LButton } from "@lumina/ui";
 import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
 import { colorForRunId } from "@/composables/useRunColor";
 import { useDateFormat } from "@/composables/useDateFormat";
@@ -145,14 +145,15 @@ const totalLabel = computed(() => {
         class="mt-2 flex items-center justify-between text-xs text-fg-tertiary"
       >
         <span>{{ selectedRunIds.length }} selected</span>
-        <button
-          type="button"
-          class="flex items-center gap-0.5 hover:text-fg-primary"
+        <LButton
+          quaternary
+          size="xs"
+          class="!flex !items-center !gap-0.5 hover:!text-fg-primary"
           @click="clearSelection"
         >
           <X class="h-3 w-3" />
           Clear
-        </button>
+        </LButton>
       </div>
     </div>
 
@@ -178,19 +179,20 @@ const totalLabel = computed(() => {
                 :style="{ backgroundColor: colorForRunId(run.runId) }"
                 aria-hidden="true"
               />
-              <button
-                type="button"
+              <LButton
+                quaternary
+                size="xs"
                 :class="[
-                  'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border transition-colors',
+                  '!flex !h-5 !w-5 !flex-shrink-0 !items-center !justify-center !rounded !border !p-0',
                   selectedSet.has(run.runId)
-                    ? 'border-accent-primary bg-accent-primary/15 text-accent-primary'
-                    : 'border-border bg-card hover:border-fg-tertiary',
+                    ? '!border-accent-primary !bg-accent-primary/15 !text-accent-primary'
+                    : '!border-border !bg-card hover:!border-fg-tertiary',
                 ]"
                 :aria-label="selectedSet.has(run.runId) ? 'Hide from charts' : 'Show in charts'"
                 @click="toggleSelected(run.runId)"
               >
                 <span v-if="selectedSet.has(run.runId)" aria-hidden="true" class="text-[10px]">✓</span>
-              </button>
+              </LButton>
               <div class="flex min-w-0 flex-1 flex-col">
                 <span
                   :class="[
@@ -246,19 +248,20 @@ const totalLabel = computed(() => {
                 :style="{ backgroundColor: colorForRunId(run.runId) }"
                 aria-hidden="true"
               />
-              <button
-                type="button"
+              <LButton
+                quaternary
+                size="xs"
                 :class="[
-                  'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border transition-colors',
+                  '!flex !h-5 !w-5 !flex-shrink-0 !items-center !justify-center !rounded !border !p-0',
                   selectedSet.has(run.runId)
-                    ? 'border-accent-primary bg-accent-primary/15 text-accent-primary'
-                    : 'border-border bg-card hover:border-fg-tertiary',
+                    ? '!border-accent-primary !bg-accent-primary/15 !text-accent-primary'
+                    : '!border-border !bg-card hover:!border-fg-tertiary',
                 ]"
                 :aria-label="selectedSet.has(run.runId) ? 'Hide from charts' : 'Show in charts'"
                 @click="toggleSelected(run.runId)"
               >
                 <span v-if="selectedSet.has(run.runId)" aria-hidden="true" class="text-[10px]">✓</span>
-              </button>
+              </LButton>
               <div class="flex min-w-0 flex-1 flex-col">
                 <span
                   :class="[

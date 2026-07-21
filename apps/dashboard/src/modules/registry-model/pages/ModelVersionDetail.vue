@@ -433,7 +433,7 @@ const patchStageMutation = useMutation({
               <span class="font-mono text-fg-tertiary">
                 {{ r.runId.slice(0, 8) }}…
               </span>
-            </button>
+            </LButton>
           </div>
         </div>
       </div>
