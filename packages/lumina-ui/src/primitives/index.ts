@@ -15,6 +15,7 @@ export { default as LFormItem } from "./LFormItem.vue";
 export { default as LIcon } from "./LIcon.vue";
 export { default as LIconButton } from "./LIconButton.vue";
 export { default as LInput } from "./LInput.vue";
+export { default as LKbd } from "./LKbd.vue";
 export { default as LMenu } from "./LMenu.vue";
 export { default as LPagination } from "./LPagination.vue";
 export { default as LPopover } from "./LPopover.vue";

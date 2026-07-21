@@ -67,8 +67,8 @@ const {
   removeSection,
   patchSection,
   addPanel,
-  resetLayout,
-} = useWorkspaceLayout();
+  resetToTemplate,
+} = useWorkspaceLayout(projectId);
 
 const visibleSections = computed(() => sections.value.filter((s) => !s.hidden));
 
@@ -191,7 +191,7 @@ const totals = computed(() => ({
             Add Section
           </LButton>
           <LTooltip content="Reset to default layout">
-            <LIconButton aria-label="Reset layout" @click="resetLayout">
+            <LIconButton aria-label="Reset to template layout" @click="resetToTemplate">
               <RotateCcw class="h-4 w-4" />
             </LIconButton>
           </LTooltip>
