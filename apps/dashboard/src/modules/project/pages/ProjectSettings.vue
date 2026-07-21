@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
-import { LCard, LEmpty, LButton, LInput, LTextarea, LAlert, LDialog } from "@lumina/ui";
+import { LCard, LEmpty, LButton, LInput, LTextarea, LAlert, LDialog, LSkeleton } from "@lumina/ui";
 import { Settings as SettingsIcon, Trash2, ShieldAlert, Save } from "lucide-vue-next";
 import { useProject } from "@/modules/project/composables/useProjects";
 import { ProjectService } from "@/services/project.service";
@@ -27,7 +27,7 @@ const queryClient = useQueryClient();
 const toast = useToast();
 
 const projectId = computed(() => route.params.projectId as string);
-const { data: project } = useProject(projectId);
+const { data: project, isLoading: isProjectLoading, isError: isProjectError, error: projectError, refetch: refetchProject } = useProject(projectId);
 
 // ── Metadata edit form ──────────────────────────────────────────────
 // Local editable copies so the user can type freely without the query
@@ -117,10 +117,23 @@ function openDelete() {
 
 <template>
   <LCard class="p-8">
+    <LSkeleton
+      v-if="isProjectLoading"
+      :repeat="5"
+      text
+    />
     <LEmpty
-      v-if="!project"
-      title="Project settings"
-      description="Configure project-level metadata, default run configs, retention, and integrations."
+      v-else-if="isProjectError"
+      title="Couldn't load this project"
+      :description="(projectError as Error)?.message ?? 'The server may be unreachable.'"
+      :icon="SettingsIcon"
+    >
+      <LButton class="mt-3" @click="refetchProject()">Retry</LButton>
+    </LEmpty>
+    <LEmpty
+      v-else-if="!project"
+      title="Project not found"
+      description="Check that the project ID in the URL is correct."
       :icon="SettingsIcon"
     />
     <div v-else class="space-y-6 text-left">

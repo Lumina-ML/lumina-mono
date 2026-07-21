@@ -2,7 +2,6 @@
 import { computed, ref } from "vue";
 import { useRoute, RouterLink } from "vue-router";
 import { useQueryClient } from "@tanstack/vue-query";
-import { useProject } from "@/modules/project/composables/useProjects";
 import { useRuns } from "@/modules/run/composables/useRuns";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
@@ -17,12 +16,15 @@ import type { RunStatus } from "@/types/run";
 const route = useRoute();
 const queryClient = useQueryClient();
 const projectId = computed(() => route.params.projectId as string);
-const { data: project } = useProject(projectId);
 const { formatDate } = useDateFormat();
 
 const { data: runsResponse } = useRuns(
   computed(() => ({
-    project: project.value?.name,
+    // Filter by canonical UUID; the backend resolves `projectId` directly
+    // and skips the name lookup. The earlier `project: project.value?.name`
+    // would resolve to undefined whenever the slug differs from the UUID
+    // and leave RunSelector empty.
+    projectId: projectId.value,
     limit: 200,
     offset: 0,
   })),

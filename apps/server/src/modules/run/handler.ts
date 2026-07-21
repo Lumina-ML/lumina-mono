@@ -32,8 +32,8 @@ export class RunHandler {
   ) {
     const query = ListRunsQuerySchema.parse(req.query);
 
-    let projectId: string | undefined;
-    if (query.project) {
+    let projectId: string | undefined = query.projectId;
+    if (!projectId && query.project) {
       const project = await this.projectService.findByName(
         req.workspaceId,
         query.project,
