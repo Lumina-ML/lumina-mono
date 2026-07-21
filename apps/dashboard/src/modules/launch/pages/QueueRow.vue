@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { RouterLink } from "vue-router";
 import {
   LStatusBadge,
   LSkeleton,
+  LButton,
+  LIconButton,
 } from "@lumina/ui";
-import { Rocket } from "lucide-vue-next";
+import { Rocket, XCircle, RotateCcw, Download } from "lucide-vue-next";
 import { useLaunchRunsByQueue } from "@/modules/launch/composables/useLaunch";
+import { LaunchService } from "@/services/launch.service";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useToast } from "@/composables/useToast";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import type { LaunchQueue, LaunchRun, LaunchRunStatus } from "@/services/launch.service";
 
 const props = defineProps<{
@@ -16,6 +22,43 @@ const props = defineProps<{
 const queueId = computed(() => props.queue.id);
 const { data: runs, isLoading } = useLaunchRunsByQueue(queueId);
 const { formatDate } = useDateFormat();
+const toast = useToast();
+const queryClient = useQueryClient();
+
+const patchRunMutation = useMutation({
+  mutationFn: ({
+    runId,
+    status,
+  }: {
+    runId: string;
+    status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  }) => LaunchService.patchRun(runId, { status }),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["launch-runs"] });
+  },
+  onError: (e) => toast.error(`Update failed: ${(e as Error).message}`),
+});
+
+const dequeueMutation = useMutation({
+  mutationFn: () => LaunchService.dequeueRun(queueId.value),
+  onSuccess: (run) => {
+    if (run) {
+      toast.success(`Claimed launch run ${run.id.slice(0, 8)}`);
+    } else {
+      toast.info("Queue is empty");
+    }
+    queryClient.invalidateQueries({ queryKey: ["launch-runs"] });
+  },
+  onError: (e) => toast.error(`Dequeue failed: ${(e as Error).message}`),
+});
+
+function cancelRun(runId: string) {
+  patchRunMutation.mutate({ runId, status: "cancelled" });
+}
+
+function retryRun(runId: string) {
+  patchRunMutation.mutate({ runId, status: "pending" });
+}
 
 const statusCounts = computed(() => {
   const items = (runs.value?.items ?? []) as LaunchRun[];
@@ -55,9 +98,20 @@ const ORDER: LaunchRunStatus[] = [
           {{ queue.id.slice(0, 8) }}
         </span>
       </div>
-      <span class="font-mono text-xs text-fg-tertiary">
-        created {{ formatDate(queue.createdAt) }}
-      </span>
+      <div class="flex items-center gap-2">
+        <LButton
+          size="xs"
+          quaternary
+          :loading="dequeueMutation.isPending.value"
+          @click="dequeueMutation.mutate()"
+        >
+          <Download class="mr-1 h-3 w-3" />
+          Dequeue
+        </LButton>
+        <span class="font-mono text-xs text-fg-tertiary">
+          created {{ formatDate(queue.createdAt) }}
+        </span>
+      </div>
     </div>
 
     <div class="flex flex-wrap items-center gap-2 text-[11px]">
@@ -90,10 +144,35 @@ const ORDER: LaunchRunStatus[] = [
             <span class="font-mono text-[10px] text-fg-tertiary">
               {{ r.id.slice(0, 8) }}
             </span>
+            <RouterLink
+              v-if="r.runId"
+              :to="`/projects/${queue.projectId}/runs/${r.runId}`"
+              class="font-mono text-[10px] text-accent-primary hover:underline"
+            >
+              {{ r.runId.slice(0, 8) }}
+            </RouterLink>
           </div>
-          <span class="font-mono text-[10px] text-fg-tertiary">
-            {{ formatDate(r.createdAt) }}
-          </span>
+          <div class="flex items-center gap-1">
+            <LIconButton
+              v-if="r.status === 'running' || r.status === 'pending'"
+              aria-label="Cancel run"
+              size="small"
+              @click="cancelRun(r.id)"
+            >
+              <XCircle class="h-3 w-3" />
+            </LIconButton>
+            <LIconButton
+              v-if="r.status === 'failed' || r.status === 'cancelled'"
+              aria-label="Retry run"
+              size="small"
+              @click="retryRun(r.id)"
+            >
+              <RotateCcw class="h-3 w-3" />
+            </LIconButton>
+            <span class="font-mono text-[10px] text-fg-tertiary">
+              {{ formatDate(r.createdAt) }}
+            </span>
+          </div>
         </li>
       </ul>
     </div>

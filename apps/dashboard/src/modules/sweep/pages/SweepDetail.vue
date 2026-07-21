@@ -16,6 +16,7 @@ import {
   LDialog,
   LSelect,
   LInput,
+  LParallelChart,
 } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
 import {
@@ -101,6 +102,50 @@ const sweepMetric = computed<{ name: string; goal?: string } | null>(() => {
   if (!cfg?.metric?.name) return null;
   return { name: cfg.metric.name, goal: cfg.metric.goal };
 });
+
+// ── Parameter importance / parallel coordinates ─────────────────────────
+const paramKeys = computed(() => {
+  const keys = new Set<string>();
+  for (const obs of observations.value ?? []) {
+    for (const k of Object.keys(obs.params ?? {})) keys.add(k);
+  }
+  return [...keys];
+});
+
+const numericParamKeys = computed(() =>
+  paramKeys.value.filter((k) =>
+    (observations.value ?? []).some(
+      (obs) => typeof (obs.params as Record<string, unknown>)?.[k] === "number",
+    ),
+  ),
+);
+
+const hasParallelData = computed(
+  () =>
+    numericParamKeys.value.length > 0 &&
+    (observations.value ?? []).some((o) => o.metric != null),
+);
+
+const parallelAxes = computed(() => {
+  const metricName = sweepMetric.value?.name ?? "metric";
+  const dims = [...numericParamKeys.value, metricName];
+  return dims.map((name, idx) => ({
+    dim: idx,
+    name,
+    type: "value" as const,
+  }));
+});
+
+const parallelRows = computed(() =>
+  (observations.value ?? [])
+    .filter((obs) => obs.metric != null)
+    .map((obs) => [
+      ...numericParamKeys.value.map(
+        (k) => ((obs.params as Record<string, unknown>)?.[k] as number) ?? 0,
+      ),
+      obs.metric as number,
+    ]),
+);
 
 // ── State transitions (Pause / Resume / Stop) ────────────────────────
 const stateMutation = useMutation({
@@ -364,6 +409,21 @@ const columns: ColumnDef<Run>[] = [
             </div>
           </div>
         </div>
+      </LCard>
+
+      <LCard title="Parameter importance" class="p-4">
+        <div v-if="hasParallelData">
+          <LParallelChart
+            :axes="parallelAxes"
+            :rows="parallelRows"
+            height="360px"
+          />
+        </div>
+        <LEmpty
+          v-else
+          title="No parameter data"
+          description="Finish a few sweep runs to see how parameters relate to the metric."
+        />
       </LCard>
 
       <LCard title="Runs" class="p-0">

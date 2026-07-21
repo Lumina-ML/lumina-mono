@@ -13,14 +13,12 @@ import {
   LStatistic,
   LDialog,
   LInput,
-  LSelect,
   LButton,
 } from "@lumina/ui";
 import { ArrowLeft, PackageOpen } from "lucide-vue-next";
 import { useEvaluation } from "@/modules/evaluation/composables/useEvaluations";
 import { EvaluationService } from "@/services/evaluation.service";
 import { RegistryService } from "@/services/registry.service";
-import { ArtifactService } from "@/services/artifact.service";
 import { useModels } from "@/modules/registry-model/composables/useModels";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useToast } from "@/composables/useToast";
@@ -248,7 +246,24 @@ function openPromote() {
             >
               {{ evaluation.runId.slice(0, 12) }}
             </RouterLink>
+            <RouterLink
+              v-if="evaluation.modelArtifactVersionId"
+              :to="`/projects/${projectId}/artifacts`"
+              class="font-mono text-xs hover:underline"
+            >
+              model artifact
+            </RouterLink>
           </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <LButton
+            size="sm"
+            :disabled="!evaluation.modelArtifactVersionId"
+            @click="openPromote"
+          >
+            <PackageOpen class="mr-1 h-3 w-3" />
+            Promote to registry
+          </LButton>
         </div>
       </div>
 
@@ -412,5 +427,81 @@ function openPromote() {
     <LCard v-else class="p-8 text-center text-fg-tertiary">
       Evaluation not found.
     </LCard>
+
+    <!-- Promote to registry dialog -->
+    <LDialog
+      v-model:show="promoteOpen"
+      title="Promote evaluation to model registry"
+      width="500px"
+      @close="promoteError = null"
+    >
+      <div class="space-y-3">
+        <p class="text-xs text-fg-tertiary">
+          Creates a registry model under this project (or fetches an existing
+          one by name) and points a new version at the evaluation's linked
+          model artifact.
+        </p>
+        <div>
+          <label
+            for="promote-model-name"
+            class="mb-1 block text-xs font-medium text-fg-secondary"
+          >
+            Registry model name <span class="text-accent-danger">*</span>
+          </label>
+          <LInput
+            id="promote-model-name"
+            v-model:value="promoteModelName"
+            placeholder="e.g. resnet50"
+          />
+          <div
+            v-if="modelOptions.length > 0"
+            class="mt-2 max-h-32 overflow-auto rounded-md border border-border"
+          >
+            <button
+              v-for="opt in modelOptions"
+              :key="opt.value"
+              type="button"
+              class="flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-canvas"
+              :class="promoteModelName === opt.value ? 'bg-accent-primary/10' : ''"
+              @click="promoteModelName = opt.value"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+        <div>
+          <label
+            for="promote-aliases"
+            class="mb-1 block text-xs font-medium text-fg-secondary"
+          >
+            Aliases (comma-separated)
+          </label>
+          <LInput
+            id="promote-aliases"
+            v-model:value="promoteAliasText"
+            placeholder="latest, production"
+          />
+        </div>
+        <div
+          v-if="promoteError"
+          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+        >
+          {{ promoteError }}
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <LButton quaternary @click="promoteOpen = false">Cancel</LButton>
+          <LButton
+            :loading="promoteMutation.isPending.value"
+            :disabled="!promoteModelName.trim()"
+            @click="promoteMutation.mutate()"
+          >
+            <PackageOpen class="mr-1 h-3 w-3" />
+            Promote
+          </LButton>
+        </div>
+      </template>
+    </LDialog>
   </div>
 </template>
