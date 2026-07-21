@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useRoute, RouterLink } from "vue-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
@@ -39,15 +39,13 @@ import {
   Download,
 } from "lucide-vue-next";
 import { useRun } from "@/modules/run/composables/useRuns";
-import { useMetrics } from "@/modules/metric/composables/useMetrics";
-import { useSystemMetrics } from "@/modules/metric/composables/useSystemMetrics";
 import { useLogLines } from "@/modules/log-line/composables/useLogLines";
 import { useRunTags } from "@/modules/run/composables/useTags";
-import MetricChart from "@/widgets/metric-chart/MetricChart.vue";
 import LogViewer from "@/widgets/log-viewer/LogViewer.vue";
 import TagList from "@/widgets/tag-list/TagList.vue";
 import QueryBoundary from "@/components/QueryBoundary.vue";
 import RunDetailDialogs from "@/modules/run/components/RunDetailDialogs.vue";
+import RunMetricPanel from "@/modules/run/components/RunMetricPanel.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useAutoRefresh } from "@/composables/useAutoRefresh";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
@@ -68,8 +66,8 @@ const queryClient = useQueryClient();
 const runId = computed(() => route.params.runId as string);
 
 const { data: run, isLoading: isRunLoading, isError: isRunError, error: runError, refetch: refetchRun } = useRun(runId);
-const { data: metrics, isLoading: isMetricsLoading, refetch: refetchMetrics } = useMetrics(runId);
-const { data: systemMetrics, isLoading: isSystemMetricsLoading, refetch: refetchSystemMetrics } = useSystemMetrics(runId);
+// Metrics charts moved to RunMetricPanel; refetches below use the same
+// queryKeys so Vue Query dedupes between the panel and our invalides.
 const { data: logLines, isLoading: isLogsLoading, refetch: refetchLogs } = useLogLines(runId);
 const { data: runTags, isLoading: isTagsLoading, refetch: refetchTags } = useRunTags(runId);
 
@@ -107,8 +105,8 @@ useAutoRefresh(
   5000,
   () => {
     refetchRun();
-    refetchMetrics();
-    refetchSystemMetrics();
+    queryClient.invalidateQueries({ queryKey: ["metrics", runId.value] });
+    queryClient.invalidateQueries({ queryKey: ["systemMetrics", runId.value] });
     refetchLogs();
     refetchTags();
   },
@@ -119,93 +117,6 @@ const durationMs = computed(() => {
   const end = run.value.finishedAt ? new Date(run.value.finishedAt).getTime() : Date.now();
   return end - new Date(run.value.createdAt).getTime();
 });
-
-const metricKeys = computed(() =>
-  metrics.value ? Object.keys(metrics.value.metrics) : [],
-);
-const selectedKeys = ref<string[]>([]);
-
-// Persist the user's metric selection per project/run so reopening a run
-// restores the chart they were looking at.
-const METRIC_KEYS_STORAGE_PREFIX = "lumina:run-metric-keys:";
-const metricStorageKey = computed(() =>
-  run.value
-    ? `${METRIC_KEYS_STORAGE_PREFIX}${run.value.projectId}:${run.value.runId}`
-    : null,
-);
-
-function readPersistedKeys(): string[] | null {
-  if (!metricStorageKey.value) return null;
-  try {
-    const raw = localStorage.getItem(metricStorageKey.value);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((k): k is string => typeof k === "string")
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-// Default selection: keys that appear in the run's summary (the metrics the
-// SDK flagged as "the ones that matter") come first, then the remaining keys
-// alphabetically, capped at 5. Falls back to plain alphabetical when there's
-// no summary.
-function defaultKeys(keys: string[]): string[] {
-  const summary = (run.value?.summary ?? {}) as Record<string, unknown>;
-  const summaryKeys = Object.keys(summary).filter((k) => keys.includes(k));
-  const rest = keys
-    .filter((k) => !summaryKeys.includes(k))
-    .sort((a, b) => a.localeCompare(b));
-  return [...summaryKeys, ...rest].slice(0, 5);
-}
-
-// Initialize the selection once per run, once its metrics have loaded — a
-// persisted choice (filtered to keys that still exist) wins, otherwise the
-// summary-first default. `initializedFor` stops later metric updates for the
-// same run from clobbering the user's toggles.
-const initializedFor = ref<string | null>(null);
-watch(
-  [metricKeys, () => run.value?.runId, isMetricsLoading],
-  ([keys, currentRunId, loading]) => {
-    if (!currentRunId || loading || keys.length === 0) return;
-    if (initializedFor.value === currentRunId) return;
-
-    const persisted =
-      readPersistedKeys()?.filter((k) => keys.includes(k)) ?? [];
-    selectedKeys.value = persisted.length > 0 ? persisted : defaultKeys(keys);
-    initializedFor.value = currentRunId;
-  },
-  { immediate: true },
-);
-
-// Persist toggles (after the initial hydrate) so they survive a refresh.
-watch(selectedKeys, (keys) => {
-  if (!metricStorageKey.value || initializedFor.value === null) return;
-  try {
-    localStorage.setItem(metricStorageKey.value, JSON.stringify(keys));
-  } catch {
-    // storage unavailable / over quota — non-fatal, selection stays in-memory
-  }
-});
-
-const filteredMetrics = computed(() => {
-  if (!metrics.value) return {};
-  const out: Record<string, (typeof metrics.value.metrics)[string]> = {};
-  for (const key of selectedKeys.value) {
-    if (metrics.value.metrics[key]) out[key] = metrics.value.metrics[key]!;
-  }
-  return out;
-});
-
-function toggleKey(key: string) {
-  if (selectedKeys.value.includes(key)) {
-    selectedKeys.value = selectedKeys.value.filter((k) => k !== key);
-  } else {
-    selectedKeys.value = [...selectedKeys.value, key];
-  }
-}
 
 // ── Traces (linked to this run via metadata.runId) ──────────────────────
 const { data: tracesForRun } = useQuery({
@@ -813,54 +724,12 @@ function toggleStopSignal() {
 
       <!-- ── Metrics ─────────────────────────────────────────────────── -->
       <LTabPane name="metrics" tab="Metrics">
-        <LCard>
-          <div
-            v-if="isMetricsLoading"
-            class="py-12 text-center text-muted-foreground"
-          >
-            Loading metrics…
-          </div>
-          <div
-            v-else-if="metricKeys.length === 0"
-            class="py-12 text-center text-muted-foreground"
-          >
-            No metrics logged yet.
-          </div>
-          <div v-else class="space-y-4">
-            <div class="flex flex-wrap gap-2">
-              <LTag
-                v-for="key in metricKeys"
-                :key="key"
-                :type="selectedKeys.includes(key) ? 'primary' : 'default'"
-                size="small"
-                class="cursor-pointer"
-                @click="toggleKey(key)"
-              >
-                {{ key }}
-              </LTag>
-            </div>
-            <MetricChart :metrics="filteredMetrics" />
-          </div>
-        </LCard>
+        <RunMetricPanel :run-id="run.runId" :run="run" source="run" />
       </LTabPane>
 
       <!-- ── System ──────────────────────────────────────────────────── -->
       <LTabPane name="system" tab="System">
-        <LCard>
-          <div
-            v-if="isSystemMetricsLoading"
-            class="py-12 text-center text-muted-foreground"
-          >
-            Loading system metrics…
-          </div>
-          <div
-            v-else-if="!systemMetrics || Object.keys(systemMetrics.metrics).length === 0"
-            class="py-12 text-center text-muted-foreground"
-          >
-            No system metrics logged yet.
-          </div>
-          <MetricChart v-else :metrics="systemMetrics.metrics" />
-        </LCard>
+        <RunMetricPanel :run-id="run.runId" :run="run" source="system" />
       </LTabPane>
 
       <!-- ── Logs ────────────────────────────────────────────────────── -->
@@ -1100,6 +969,5 @@ function toggleStopSignal() {
       @submit-alert="submitAlert"
       @submit-use-artifact="useArtifactMutation.mutate(useArtifactVersionId.trim())"
     />
-
   </div>
 </template>
