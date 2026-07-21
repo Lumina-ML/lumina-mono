@@ -196,15 +196,16 @@ function dismiss() {
         <div class="min-w-0 flex-1">
           <div class="font-medium text-fg-primary">{{ step.title }}</div>
           <div class="mt-0.5 text-fg-tertiary">{{ step.description }}</div>
-          <button
+          <LButton
             v-if="!step.done()"
-            type="button"
-            class="mt-1 inline-flex items-center gap-1 text-accent-primary hover:underline"
+            quaternary
+            size="xs"
+            class="!mt-1 !text-accent-primary hover:!underline"
             @click="completeAndGo(step)"
           >
             Do it now
-            <ChevronRight class="h-3 w-3" />
-          </button>
+            <ChevronRight class="ml-1 h-3 w-3" />
+          </LButton>
           <span
             v-else
             class="mt-1 inline-flex items-center gap-1 text-accent-success"

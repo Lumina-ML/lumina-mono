@@ -138,10 +138,11 @@ function downloadMd() {
     <template v-else-if="report">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
-          <input
+          <LInput
             v-if="editing"
             v-model="draftTitle"
-            class="w-full bg-transparent text-2xl font-semibold tracking-tight focus:outline-none focus:ring-1 focus:ring-accent-primary"
+            size="large"
+            class="!bg-transparent !text-2xl !font-semibold !tracking-tight"
             @keydown.enter="saveMutation.mutate()"
           />
           <h1 v-else class="truncate text-2xl font-semibold tracking-tight">
@@ -213,12 +214,12 @@ function downloadMd() {
           Preview of the report serialized to Markdown. Chart and image
           blocks render as placeholders in the .md output.
         </p>
-        <textarea
+        <LTextarea
           :value="exportContent"
           readonly
-          rows="16"
-          class="w-full rounded-md border border-border bg-canvas p-3 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary"
-        />
+          :rows="16"
+          class="!w-full !rounded-md !border !border-border !bg-canvas !p-3 !font-mono !text-xs"
+        ></LTextarea>
         <template #footer>
           <div class="flex justify-end gap-2">
             <LButton quaternary @click="exportOpen = false">Close</LButton>

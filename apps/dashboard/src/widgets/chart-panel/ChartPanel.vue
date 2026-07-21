@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useQuery } from "@tanstack/vue-query";
 import { Pencil, X } from "lucide-vue-next";
 import {
   LCard,
@@ -16,11 +15,8 @@ import {
   deriveMetric,
 } from "@lumina/ui";
 import type { ChartConfig, MetricPoint } from "@lumina/ui";
-import { MetricService } from "@/services/metric.service";
-import { RunService } from "@/services/run.service";
-import { colorForRunId } from "@/composables/useRunColor";
 import { useDateFormat } from "@/composables/useDateFormat";
-import type { Run } from "@/types/run";
+import { useChartPanelData } from "@/widgets/chart-panel/useChartPanelData";
 import ChartConfigModal from "@/widgets/chart-panel/ChartConfigModal.vue";
 
 export interface ChartPanelConfig {
@@ -67,54 +63,13 @@ const { formatDate } = useDateFormat();
 
 const configOpen = ref(false);
 
-interface PanelSeries {
-  run: Run;
-  metrics: Record<string, MetricPoint[]>;
-  color: string;
-}
-
-const enabled = computed(() => props.runIds.length > 0);
-
-// Fetch runs + metrics in one go so the panel can show overlay even when
-// multiple panels reference the same runs (TanStack dedupes by queryKey).
-const panelQuery = useQuery({
-  queryKey: computed(() => [
-    "chart-panel-data",
-    props.runIds.slice().sort().join(","),
-    props.config.metricKeys.slice().sort().join(","),
-  ]),
-  enabled,
-  queryFn: async (): Promise<PanelSeries[]> => {
-    const runs = await Promise.all(
-      props.runIds.map((id) =>
-        RunService.get(id)
-          .then((r) => r as Run | null)
-          .catch(() => null),
-      ),
-    );
-    const validRuns = runs.filter((r): r is Run => !!r);
-    if (validRuns.length === 0) return [];
-    const metricsEntries = await Promise.all(
-      validRuns.map(async (run) => {
-        try {
-          const resp = await MetricService.list(run.runId, { limit: 5000 });
-          return [run.runId, resp.metrics] as const;
-        } catch {
-          return [run.runId, {}] as const;
-        }
-      }),
-    );
-    const metricsByRun = Object.fromEntries(metricsEntries);
-    return validRuns.map((run) => ({
-      run,
-      metrics: (metricsByRun[run.runId] ?? {}) as Record<string, MetricPoint[]>,
-      color: props.config.colorOverrides?.[run.runId] ?? colorForRunId(run.runId),
-    }));
-  },
-});
-
-const series = computed<PanelSeries[]>(() => panelQuery.data.value ?? []);
-const loading = computed(() => panelQuery.isLoading.value);
+const { series, loading } = useChartPanelData(
+  computed(() => ({
+    runIds: props.runIds,
+    metricKeys: props.config.metricKeys,
+    colorOverrides: props.config.colorOverrides,
+  })),
+);
 
 const dataCfg = computed(() => props.config.data ?? {});
 const chartCfg = computed(() => props.config.chart ?? {});

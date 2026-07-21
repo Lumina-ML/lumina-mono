@@ -129,14 +129,13 @@ const opSymbol = (op: FilterOperator) => {
       <span class="font-mono">{{ fieldLabel(chip.field) }}</span>
       <span class="mx-1 text-fg-tertiary">{{ opSymbol(chip.operator) }}</span>
       <span class="font-mono">{{ chip.value }}</span>
-      <button
-        type="button"
-        class="ml-1 text-fg-tertiary hover:text-fg-primary"
+      <LIconButton
+        class="!ml-1 !text-fg-tertiary hover:!text-fg-primary"
         aria-label="Remove filter"
         @click="removeChip(chip.id)"
       >
         <X class="h-3 w-3" />
-      </button>
+      </LIconButton>
     </LTag>
 
     <!-- Add chip form -->
@@ -144,9 +143,10 @@ const opSymbol = (op: FilterOperator) => {
       v-if="addingNew"
       class="flex items-center gap-1 rounded-md border border-border bg-card p-1"
     >
-      <select
+      <LSelect
         v-model="draftField"
-        class="rounded-sm border-0 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary"
+        size="small"
+        class="!text-xs"
       >
         <option
           v-for="f in fields"
@@ -155,10 +155,11 @@ const opSymbol = (op: FilterOperator) => {
         >
           {{ f.label }}
         </option>
-      </select>
-      <select
+      </LSelect>
+      <LSelect
         v-model="draftOp"
-        class="rounded-sm border-0 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary"
+        size="small"
+        class="!text-xs"
       >
         <option
           v-for="op in operatorsFor(fieldType(draftField))"
@@ -167,12 +168,13 @@ const opSymbol = (op: FilterOperator) => {
         >
           {{ opSymbol(op) }}
         </option>
-      </select>
-      <input
+      </LSelect>
+      <LInput
         v-model="draftValue"
         type="text"
         placeholder="value"
-        class="w-24 rounded-sm border-0 bg-transparent px-2 py-1 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary"
+        size="small"
+        class="!w-24 !font-mono !text-xs"
         @keydown.enter="confirmAdd"
         @keydown.esc="addingNew = false"
       />

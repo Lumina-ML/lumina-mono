@@ -27,7 +27,6 @@ export interface NavGroup {
   key: string;
   label?: string;
   items: NavItem[];
-  pinFirst?: boolean;
 }
 
 /**
@@ -36,9 +35,8 @@ export interface NavGroup {
  * Launch / Sweeps / Artifacts / Evaluations) have been removed — those
  * concepts are project-scoped and reachable from the project tab bar.
  * The Settings entry is a single link; sub-pages (members, api-keys,
- * billing) are navigated via the SettingsLayout's left rail. Billing was
- * removed in Phase 2 of the code-review fix plan; the sub-pages list now
- * is just (members, api-keys, alerts).
+ * alerts) are navigated via the SettingsLayout's left rail. Billing was
+ * removed in Phase 2 of the code-review fix plan.
  */
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -94,20 +92,6 @@ function projectNavGroup(projectId: string, _projectName: string): NavGroup {
   };
 }
 
-const PINNED_KEY = "lumina:sidebar:pinned";
-
-function loadPinned(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(PINNED_KEY);
-    if (!raw) return ["/", "/projects"];
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
 export interface DynamicProject {
   id: string;
   name: string;
@@ -117,7 +101,6 @@ export interface DynamicProject {
 export const useSidebarStore = defineStore("sidebar", () => {
   const collapsed = ref(false);
   const mobileOpen = ref(false);
-  const pinned = ref<string[]>(loadPinned());
 
   // Recently visited projects — fed by the router watcher in AppLayout.
   // Capped to keep the sidebar compact.
@@ -162,17 +145,6 @@ export const useSidebarStore = defineStore("sidebar", () => {
     return projectNavGroup(activeProjectId.value, name);
   });
 
-  const pinnedItems = computed<NavItem[]>(() => {
-    const allItems = NAV_GROUPS.flatMap((g) => g.items);
-    return pinned.value
-      .map((to) => allItems.find((i) => i.to === to))
-      .filter((x): x is NavItem => Boolean(x));
-  });
-
-  const isPinned = (to: string): boolean => pinned.value.includes(to);
-
-  // 折叠态没有 PINNED 区,显示全部(纯图标);展开态把已 pin 的项从分组里去掉,
-  // 避免与顶部 PINNED 区重复渲染。空分组自动隐藏。
   const displayGroups = computed<NavGroup[]>(() => {
     const groups = [...NAV_GROUPS];
     if (projectGroup.value) {
@@ -186,33 +158,8 @@ export const useSidebarStore = defineStore("sidebar", () => {
       const idx = groups.findIndex((g) => g.key === "experiments");
       groups.splice(idx + 1, 0, currentProjectGroup.value);
     }
-    if (collapsed.value) return groups;
-    return groups
-      .map((g) => ({
-        ...g,
-        items: g.items.filter((i) => !pinned.value.includes(i.to)),
-      }))
-      .filter((g) => g.items.length > 0);
+    return groups.filter((g) => g.items.length > 0);
   });
-
-  function togglePin(to: string) {
-    const idx = pinned.value.indexOf(to);
-    if (idx >= 0) {
-      pinned.value = pinned.value.filter((p) => p !== to);
-    } else {
-      pinned.value = [...pinned.value, to];
-    }
-    persist();
-  }
-
-  function persist() {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(PINNED_KEY, JSON.stringify(pinned.value));
-    } catch {
-      // ignore quota errors
-    }
-  }
 
   function toggle() {
     collapsed.value = !collapsed.value;
@@ -251,17 +198,13 @@ export const useSidebarStore = defineStore("sidebar", () => {
   return {
     collapsed,
     mobileOpen,
-    pinned,
     navGroups,
     displayGroups,
-    pinnedItems,
-    isPinned,
     recentProjects,
     projectGroup,
     currentProjectGroup,
     activeProjectId,
     activeProjectName,
-    togglePin,
     toggle,
     setCollapsed,
     toggleMobile,

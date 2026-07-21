@@ -80,11 +80,12 @@ const blockEntries = computed(() => {
     <template v-else-if="report">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
-          <input
+          <LInput
             v-if="editing"
             v-model="draftTitle"
             type="text"
-            class="w-full bg-transparent text-2xl font-semibold tracking-tight focus:outline-none focus:ring-1 focus:ring-accent-primary"
+            size="large"
+            class="!bg-transparent !text-2xl !font-semibold !tracking-tight"
             @keydown.enter="save"
             @keydown.esc="cancelEdit"
           />
