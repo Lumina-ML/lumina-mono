@@ -123,9 +123,9 @@ const codeSource = computed(() => (props.block.type === "code" ? props.block.dat
        named user. LAvatar's src+alt contract doesn't fit because the
        alt is free-form and there's no initials fallback. Allowed
        exception to the dashboard atom-only rule. -->
-  <!-- eslint-disable-next-line dashboard/no-native-button-or-input -->
+  <!-- eslint-disable-next-line vue/no-restricted-html-elements -->
   <figure v-else-if="block.type === 'image'" class="space-y-1">
-    <!-- eslint-disable-next-line dashboard/no-native-button-or-input -->
+    <!-- eslint-disable-next-line vue/no-restricted-html-elements -->
     <img
       v-if="block.data.src"
       :src="block.data.src"
