@@ -11,11 +11,21 @@ import {
   LTabPane,
   LSlider,
   LStatistic,
+  LDialog,
+  LInput,
+  LSelect,
+  LButton,
 } from "@lumina/ui";
-import { ArrowLeft } from "lucide-vue-next";
+import { ArrowLeft, PackageOpen } from "lucide-vue-next";
 import { useEvaluation } from "@/modules/evaluation/composables/useEvaluations";
 import { EvaluationService } from "@/services/evaluation.service";
+import { RegistryService } from "@/services/registry.service";
+import { ArtifactService } from "@/services/artifact.service";
+import { useModels } from "@/modules/registry-model/composables/useModels";
 import { useDateFormat } from "@/composables/useDateFormat";
+import { useToast } from "@/composables/useToast";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { ApiError } from "@/services/api";
 import {
   confusionMatrixStats,
   perClassMetrics,
@@ -136,6 +146,78 @@ const statusVariant = computed(() => {
   if (s === "failed") return "error" as const;
   return "default" as const;
 });
+
+// ── Promote evaluation to model registry ────────────────────────────────
+const toast = useToast();
+const queryClient = useQueryClient();
+const promoteOpen = ref(false);
+const promoteModelName = ref("");
+const promoteAliasText = ref("latest");
+const promoteError = ref<string | null>(null);
+
+const { data: models } = useModels(
+  computed(() => ({ projectId: evaluation.value?.projectId, limit: 200 })),
+);
+
+const modelOptions = computed(() =>
+  (models.value?.items ?? []).map((m) => ({ label: m.name, value: m.name })),
+);
+
+const promoteMutation = useMutation({
+  mutationFn: async () => {
+    if (!evaluation.value) throw new Error("No evaluation");
+    const projectId = evaluation.value.projectId;
+    const artifactVersionId = evaluation.value.modelArtifactVersionId;
+    if (!artifactVersionId) {
+      throw new Error("Evaluation has no linked model artifact version");
+    }
+    if (!promoteModelName.value.trim()) {
+      throw new Error("Model name is required");
+    }
+
+    let modelId: string;
+    try {
+      const created = await RegistryService.create(projectId, {
+        name: promoteModelName.value.trim(),
+      });
+      modelId = created.id;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        const list = await RegistryService.list({ projectId, limit: 200 });
+        const found = list.items.find(
+          (m) => m.name === promoteModelName.value.trim(),
+        );
+        if (!found) throw new Error("Model exists but couldn't be loaded");
+        modelId = found.id;
+      } else {
+        throw e;
+      }
+    }
+
+    const aliases = promoteAliasText.value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return RegistryService.createVersion(modelId, artifactVersionId, aliases);
+  },
+  onSuccess: (version) => {
+    toast.success(
+      `Promoted to ${promoteModelName.value}@${version.version}`,
+    );
+    promoteOpen.value = false;
+    queryClient.invalidateQueries({ queryKey: ["registry-models"] });
+  },
+  onError: (e) => {
+    promoteError.value = (e as Error).message ?? "Unknown error";
+  },
+});
+
+function openPromote() {
+  promoteModelName.value = "";
+  promoteAliasText.value = "latest";
+  promoteError.value = null;
+  promoteOpen.value = true;
+}
 </script>
 
 <template>

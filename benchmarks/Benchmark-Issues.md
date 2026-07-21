@@ -204,3 +204,39 @@
 
 - `EV-2`: LuminaClientError: Connection failed: [Errno 60] Operation timed out
 
+
+## 自动跑测补充：real M 级（2026-07-21 04:35:58）
+
+- 命令：`uv run python scenario_runner.py --mode real --level M`
+- 日志：`logs/scenario_real_M_20260721-043251.log`
+- 退出码：`0`
+- 汇总：PASSED=17 FAILED=0 SKIPPED=6
+
+### 各场景结果
+
+| Scenario | Status | 关键指标 / 错误 |
+|---|---|---|
+| AR-1 | skipped | Artifact storage endpoint is not reachable from the benchmark host (presigned URL: http://minio:9000/lumina-artifacts/blobs/sha256/ba/ba8e9f2429bce52224845cc8241906163e9ecad4993f421fe78f76329f38b53b/tmpra3e40tp?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20260720%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260720T203251Z&X-Amz-Expires=300&X-Amz-Signature=565863081dd1c3214a88090f8dce3558e0387ead3922afec068a784f8b572067&X-Amz-SignedHeaders=host&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject). Run benchmarks inside the Docker network or configure a public S3 endpoint. |
+| AR-2 | skipped | Artifact storage endpoint is not reachable from the benchmark host (presigned URL: http://minio:9000/lumina-artifacts/blobs/sha256/91/913bea5c2f5b94d7eede7a4ddec9110d312682917cbc114eb4f729a26428d02c/file_0000.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20260720%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260720T203252Z&X-Amz-Expires=300&X-Amz-Signature=26b75ef56460938fdd1886962b7421e8b650800a8003e0ad9b46bafb5a265e01&X-Amz-SignedHeaders=host&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject). Run benchmarks inside the Docker network or configure a public S3 endpoint. |
+| AR-3 | passed | parent_version_id=db637fa9-dd65-4fb0-a8ae-cb0a8cb059ef child_version_id=cab14f99-18a0-4a33-8046-8d4aeafde79e |
+| AW-1 | passed | default_workspace_id=default run_id=019f813b-46ec-72e8-8074-919a579e5594 create_elapsed_ms=9.03 isolated_status_code=403 |
+| AW-2 | skipped | HTTP 404: {"error":"Not found"} |
+| ET-1 | passed | init_ms=9.77 log_ms=386.31 finish_ms=42.68 |
+| ET-2 | passed | steps=1000 keys_per_step=4 total_points=4000 elapsed_sec=77.529 points/sec=51.6 p95_ms=None |
+| ET-3 | passed | steps=20 log_lines=100 system_metric_points=60 returned_logs=100 elapsed_ms=8864.88 |
+| ET-4 | passed | run_id=019f813c-9b37-79ad-8f7c-ba87ad60712d elapsed_ms=35.36 |
+| ET-5 | passed | run_id=019f813c-9ccf-7055-ae8a-bce623a95589 tag_count=2 elapsed_ms=33.05 |
+| EV-1 | passed | eval_id=6add6b29-8239-454d-9ff6-8fbd7b6ec926 elapsed_ms=137.78 result_count=2 |
+| EV-2 | passed | results=10000 received=10000 elapsed_sec=91.425 results/sec=109.4 |
+| LN-1 | passed | queue_id=8614172e-5c42-4a90-9dac-9a81bd63bdf8 job_id=7eeb2b9f-8f0c-4c3f-9a57-a3b6b82fd820 launch_run_id=298dc6c3-7e69-4dbb-8fc0-eb9c1fdacfba executed_count=1 elapsed_sec=0.109 |
+| LN-2 | passed | agents=4 runs_per_agent=2 expected_total=8 executed_total=8 completed_total=8 elapsed_sec=0.153 runs/sec=52.16 |
+| MD-1 | skipped | Artifact storage endpoint is not reachable from the benchmark host (presigned URL: http://minio:9000/lumina-artifacts/blobs/sha256/ea/eaa6abc3959144aad7472efa4de398579949ef494209a191a41c910cada55c3b/image.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20260720%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260720T203553Z&X-Amz-Expires=300&X-Amz-Signature=922ba6fd130021002262a786c4dd3ec8e65ba3a298e6b2e33b751d8a9ee85f58&X-Amz-SignedHeaders=host&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject). Run benchmarks inside the Docker network or configure a public S3 endpoint. |
+| MD-2 | skipped | Artifact storage endpoint is not reachable from the benchmark host (presigned URL: http://minio:9000/lumina-artifacts/blobs/sha256/2c/2c589ab623deecbb17a74785e4fb2405e5b21c5565071f649ece33d59d010354/table.csv?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20260720%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260720T203554Z&X-Amz-Expires=300&X-Amz-Signature=a3991d1c8ca29081e3de987592600d78691aaffae75b23ac025fbcedd353ddda&X-Amz-SignedHeaders=host&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject). Run benchmarks inside the Docker network or configure a public S3 endpoint. |
+| MR-1 | skipped | Artifact storage endpoint is not reachable from the benchmark host (presigned URL: http://minio:9000/lumina-artifacts/blobs/sha256/7f/7f568111800abf94ad0817bde423f232d8518c61a23cf12c274394d762fb87c5/tmpq6xt17mm?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20260720%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260720T203554Z&X-Amz-Expires=300&X-Amz-Signature=e34081155f4f57fbde710bc0131ca400fbe7696d9f9273ce7905998f7282b9f0&X-Amz-SignedHeaders=host&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject). Run benchmarks inside the Docker network or configure a public S3 endpoint. |
+| PA-1 | passed | seeded_runs=3 queried_runs=50 queried_projects=23 runs_query_ms=10.38 projects_query_ms=7.68 |
+| RP-1 | passed | report_id=be0372a4-c36f-4125-a428-10b5adda8d15 create_ms=12.46 patch_ms=9.57 listed_count=8 |
+| SW-1 | passed | trials=8 terminated=0 finished=8 elapsed_sec=1.569 trials/sec=5.1 observations=8 |
+| SW-2 | passed | agents=4 trials_per_agent=3 expected_total=12 unique_runs=12 observations=12 elapsed_sec=0.448 trials/sec=26.79 |
+| TR-1 | passed | trace_id=ec866190-6434-48fe-8b9d-4ab5b40a7aff elapsed_ms=90.45 |
+| TR-2 | passed | query_count=10 trace_ids=10 listed_count=45 elapsed_ms=787.76 |
+
