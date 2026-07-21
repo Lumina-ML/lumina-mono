@@ -5,6 +5,7 @@ import type { EventBus } from "../../core/bus/event-bus.js";
 import type { Queue } from "../../core/queue/queue.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import { TOKENS } from "../../core/di/tokens.js";
+import { ConflictError, NotFoundError } from "../../core/errors/app-error.js";
 import type {
   CreateArtifactInput,
   CreateArtifactVersionInput,
@@ -120,12 +121,12 @@ export class ArtifactService {
   async addFile(versionId: string, data: CreateArtifactFileInput) {
     const version = await this.repository.findVersionById(versionId);
     if (!version) {
-      throw new Error(`Version not found: ${versionId}`);
+      throw new NotFoundError("Version", versionId);
     }
 
     const existingPath = await this.repository.findFileByPath(versionId, data.path);
     if (existingPath) {
-      throw new Error(`File path already registered: ${data.path}`);
+      throw new ConflictError(`File path already registered: ${data.path}`);
     }
 
     // Reference artifact — no storage, just record the external pointer.
@@ -166,7 +167,7 @@ export class ArtifactService {
   async finalizeVersion(versionId: string) {
     const version = await this.repository.findVersionById(versionId);
     if (!version) {
-      throw new Error(`Version not found: ${versionId}`);
+      throw new NotFoundError("Version", versionId);
     }
 
     const manifest = buildManifest(version.files);
@@ -196,12 +197,12 @@ export class ArtifactService {
 
   async attachLineage(childVersionId: string, parentVersionId: string, type: string) {
     if (childVersionId === parentVersionId) {
-      throw new Error("A version cannot be its own parent");
+      throw new ConflictError("A version cannot be its own parent");
     }
     const child = await this.repository.findVersionById(childVersionId);
-    if (!child) throw new Error(`Child version not found: ${childVersionId}`);
+    if (!child) throw new NotFoundError("Child version", childVersionId);
     const parent = await this.repository.findVersionById(parentVersionId);
-    if (!parent) throw new Error(`Parent version not found: ${parentVersionId}`);
+    if (!parent) throw new NotFoundError("Parent version", parentVersionId);
     return this.repository.attachLineage(childVersionId, parentVersionId, type);
   }
 

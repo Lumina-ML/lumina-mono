@@ -4,9 +4,12 @@ import {
   domainEventSchema,
 } from "../../core/events/domain-event.js";
 import type { EventBus, EventHandler } from "../../core/bus/event-bus.js";
+import type { FastifyBaseLogger } from "fastify";
 
 export class MemoryEventBus implements EventBus {
   private readonly handlers = new Map<string, Array<EventHandler<DomainEvent>>>();
+
+  constructor(private readonly logger?: FastifyBaseLogger) {}
 
   async publish(event: DomainEvent): Promise<void> {
     // Validate at the in-process boundary so a typo at a publish site
@@ -14,9 +17,9 @@ export class MemoryEventBus implements EventBus {
     // silently dispatching to zero subscribers.
     const parseResult = domainEventSchema.safeParse(event);
     if (!parseResult.success) {
-      console.error(
-        `Refusing to publish malformed event ${event.type}`,
-        parseResult.error.issues,
+      this.logger?.error(
+        { eventType: event.type, issues: parseResult.error.issues },
+        "Refusing to publish malformed event",
       );
       return;
     }
@@ -27,7 +30,10 @@ export class MemoryEventBus implements EventBus {
         await handler(validated);
       } catch (err) {
         // Event bus must not break the caller; log and continue.
-        console.error(`Event handler failed for ${validated.type}`, err);
+        this.logger?.error(
+          { eventType: validated.type, err },
+          "Event handler failed",
+        );
       }
     }
   }
