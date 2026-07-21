@@ -702,15 +702,17 @@ function toggleStopSignal() {
           </span>
         </LTooltip>
         <LButton size="sm" @click="refetchRun()">Refresh</LButton>
-        <LButton
-          size="sm"
-          quaternary
-          :loading="isResumeStateLoading"
-          @click="resumeOpen = true"
-        >
-          <Play class="mr-1 h-3 w-3" />
-          Resume
-        </LButton>
+        <LTooltip content="View the run's resume state (history / events / log counts) — read-only; does not trigger a resume mutation.">
+          <LButton
+            size="sm"
+            quaternary
+            :loading="isResumeStateLoading"
+            @click="resumeOpen = true"
+          >
+            <Play class="mr-1 h-3 w-3" />
+            Resume state
+          </LButton>
+        </LTooltip>
         <LButton size="sm" quaternary @click="openRewindDialog">
           <RotateCcw class="mr-1 h-3 w-3" />
           Rewind

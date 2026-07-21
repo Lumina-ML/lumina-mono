@@ -3,11 +3,12 @@ import { TagService } from "./service.js";
 import { TagHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
 import { RunService } from "../run/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function tagRoutes(app: FastifyInstance) {
-  const tagService = new TagService(app.prisma);
-  const projectService = new ProjectService(app.prisma);
-  const runService = new RunService(app.prisma);
+  const tagService = container.resolve(TagService);
+  const projectService = container.resolve(ProjectService);
+  const runService = container.resolve(RunService);
   const handler = new TagHandler(tagService, projectService, runService);
 
   app.post("/projects/:projectId/tags", {

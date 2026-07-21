@@ -1,13 +1,16 @@
+import { inject, injectable } from "tsyringe";
 import type { MetricStorage } from "../../core/storage/metric-storage.js";
 import type { EventBus } from "../../core/bus/event-bus.js";
 import type { Queue } from "../../core/queue/queue.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type { LogMetricsInput, CompareMetricsInput } from "./schema.js";
 
+@injectable()
 export class MetricService {
   constructor(
-    private readonly storage: MetricStorage,
-    private readonly eventBus: EventBus,
-    private readonly queue: Queue,
+    @inject(TOKENS.MetricStorage) private readonly storage: MetricStorage,
+    @inject(TOKENS.EventBus) private readonly eventBus: EventBus,
+    @inject(TOKENS.Queue) private readonly queue: Queue,
   ) {}
 
   async log(

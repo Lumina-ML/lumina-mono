@@ -1,10 +1,14 @@
+import { inject, injectable } from "tsyringe";
 import type { ObjectStorage } from "../../core/storage/object-storage.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
+import { NotFoundError } from "../../core/errors/app-error.js";
 
+@injectable()
 export class RunFileService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly storage: ObjectStorage,
+    @inject(TOKENS.PrismaClient) private readonly prisma: PrismaClient,
+    @inject(TOKENS.Storage) private readonly storage: ObjectStorage,
   ) {}
 
   /**
@@ -23,7 +27,7 @@ export class RunFileService {
 
     const run = await this.prisma.run.findUnique({ where: { runId } });
     if (!run) {
-      throw new Error(`Run not found: ${runId}`);
+      throw new NotFoundError("Run", runId);
     }
     const metadata = (run.metadata as Record<string, unknown>) ?? {};
     const files = (metadata.files as Record<string, { size: number; storedAt: string }>) ?? {};

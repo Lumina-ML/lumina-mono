@@ -1,4 +1,7 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
+import { NotFoundError } from "../../core/errors/app-error.js";
 import type {
   CreateSweepInput,
   UpdateSweepInput,
@@ -13,10 +16,11 @@ import type { Prisma } from "../../generated/prisma/index.js";
 type JsonObject = Prisma.JsonObject;
 type JsonValue = Prisma.JsonValue;
 
+@injectable()
 export class SweepService {
   private readonly repository: SweepRepository;
 
-  constructor(prisma: PrismaClient) {
+  constructor(@inject(TOKENS.PrismaClient) prisma: PrismaClient) {
     this.repository = new SweepRepository(prisma);
   }
 
@@ -50,7 +54,7 @@ export class SweepService {
    */
   async listObservations(sweepId: string): Promise<Observation[]> {
     const sweep = await this.repository.findById(sweepId);
-    if (!sweep) throw new Error(`Sweep not found: ${sweepId}`);
+    if (!sweep) throw new NotFoundError("Sweep", sweepId);
 
     const cfg = (sweep.config ?? {}) as SweepConfig;
     const goal = cfg.metric?.goal ?? "minimize";
@@ -87,7 +91,7 @@ export class SweepService {
    */
   async suggestNext(sweepId: string, count: number): Promise<Array<Record<string, unknown>>> {
     const sweep = await this.repository.findById(sweepId);
-    if (!sweep) throw new Error(`Sweep not found: ${sweepId}`);
+    if (!sweep) throw new NotFoundError("Sweep", sweepId);
 
     const observations = await this.listObservations(sweepId);
     const config = sweep.config as SweepConfig;
@@ -111,7 +115,7 @@ export class SweepService {
     currentMetric: number,
   ): Promise<{ shouldTerminate: boolean; reason?: string }> {
     const sweep = await this.repository.findById(sweepId);
-    if (!sweep) throw new Error(`Sweep not found: ${sweepId}`);
+    if (!sweep) throw new NotFoundError("Sweep", sweepId);
     const config = sweep.config as SweepConfig;
     if (!config?.early_terminate) return { shouldTerminate: false };
 
@@ -130,7 +134,7 @@ export class SweepService {
 
   async recordBestRun(sweepId: string): Promise<string | null> {
     const sweep = await this.repository.findById(sweepId);
-    if (!sweep) throw new Error(`Sweep not found: ${sweepId}`);
+    if (!sweep) throw new NotFoundError("Sweep", sweepId);
     const config = sweep.config as SweepConfig;
     if (!config?.metric) return null;
     const observations = await this.listObservations(sweepId);

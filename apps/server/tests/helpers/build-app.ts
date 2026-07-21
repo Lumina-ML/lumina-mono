@@ -11,6 +11,9 @@ import { LocalObjectStorage } from "../../src/infra/storage/local.js";
 import type { ServerConfig } from "../../src/config/index.js";
 import type { PrismaClient } from "../../src/generated/prisma/index.js";
 import { workspaceGuardPlugin } from "../../src/plugins/workspace-guard.js";
+import { diPlugin } from "../../src/plugins/di.js";
+import { container, resetContainer } from "../../src/core/di/container.js";
+import { TOKENS, type Token } from "../../src/core/di/tokens.js";
 
 export interface BuildTestAppOptions {
   /** Override the in-memory event bus (e.g. with a real Redis bus). */
@@ -136,5 +139,25 @@ export async function buildTestApp(
   // their own `onRequest` hook (see tests/modules/workspace-isolation).
   await app.register(workspaceGuardPlugin);
 
+  // Reset + re-register the DI container so each test app gets a clean
+  // binding for its in-memory infra. Without this, the second
+  // `buildTestApp()` call would re-use the first app's mock prisma and
+  // tests would observe stale data.
+  resetContainer();
+  await app.register(diPlugin);
+
   return app;
 }
+
+/**
+ * Re-bind a single DI token. Tests that swap `app.storage` (or any
+ * other decorated infra) after `buildTestApp` returns must call this
+ * helper so subsequent `container.resolve(...)` lookups pick up the
+ * new instance. Without it, services resolved after the swap still
+ * see the pre-swap binding.
+ */
+export function swapDIToken<T>(token: Token, value: T): void {
+  container.registerInstance(token, value);
+}
+
+export { TOKENS };

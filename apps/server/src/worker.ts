@@ -48,6 +48,7 @@ async function buildWorker() {
       metricStorage: app.metricStorage,
       timeSeriesStorage: app.timeSeriesStorage,
       cache: app.cache,
+      logger: app.log.child({ component: "job-worker" }),
     };
     jobWorker = createJobWorker({ redisUrl: app.config.redisUrl, ctx });
     app.log.info({ redisUrl: app.config.redisUrl }, "started BullMQ job worker");

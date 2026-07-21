@@ -5,6 +5,7 @@ import { Archive, Download, Trash2, Filter as FilterIcon } from "lucide-vue-next
 import {
   LButton,
   LDataTable,
+  LRadioGroup,
   LTag,
 } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
@@ -303,23 +304,16 @@ void statusFilter;
           <FilterIcon class="mr-1 h-3 w-3" />
           Reset
         </LButton>
-        <div class="flex items-center rounded-md border border-border">
-          <button
-            v-for="d in ['compact', 'standard', 'comfortable'] as const"
-            :key="d"
-            type="button"
-            :class="[
-              'px-2 py-1 text-xs transition-colors',
-              density === d
-                ? 'bg-accent-primary/10 font-medium text-accent-primary'
-                : 'text-fg-tertiary hover:bg-canvas',
-            ]"
-            :aria-pressed="density === d"
-            @click="setDensity(d)"
-          >
-            {{ d === 'compact' ? 'Compact' : d === 'standard' ? 'Standard' : 'Comfy' }}
-          </button>
-        </div>
+        <LRadioGroup
+          :model-value="density"
+          @update:model-value="(v: 'compact' | 'standard' | 'comfortable') => setDensity(v)"
+          :options="[
+            { label: 'Compact', value: 'compact' },
+            { label: 'Standard', value: 'standard' },
+            { label: 'Comfy', value: 'comfortable' },
+          ]"
+          size="small"
+        />
       </div>
     </div>
 
@@ -327,13 +321,9 @@ void statusFilter;
     <div v-if="selectedCount > 1" class="flex items-center gap-2 text-xs text-fg-tertiary">
       <LTag size="small" type="primary">{{ selectedCount }} runs selected</LTag>
       <span>·</span>
-      <button
-        type="button"
-        class="text-accent-primary hover:underline"
-        @click="onCompare"
-      >
-        Compare →
-      </button>
+      <LButton size="xs" quaternary @click="onCompare">
+          Compare →
+        </LButton>
     </div>
 
     <LDataTable

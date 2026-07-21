@@ -1,4 +1,7 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import type { Queue } from "../../core/queue/queue.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type {
   CreateLaunchQueueInput,
   CreateLaunchJobInput,
@@ -7,10 +10,14 @@ import type {
 } from "./schema.js";
 import { LaunchRepository } from "./repository.js";
 
+@injectable()
 export class LaunchService {
   private readonly repository: LaunchRepository;
 
-  constructor(prisma: PrismaClient) {
+  constructor(
+    @inject(TOKENS.PrismaClient) prisma: PrismaClient,
+    @inject(TOKENS.Queue) private readonly queue: Queue,
+  ) {
     this.repository = new LaunchRepository(prisma);
   }
 
@@ -72,8 +79,21 @@ export class LaunchService {
 
   /** Atomically claim one pending run for `queueId`. The row's status
    * transitions ``pending -> running`` inside the same call so concurrent
-   * agents can't double-claim. */
+   * agents can't double-claim. After a successful claim, enqueue a
+   * `launch.run.claimed` job so the worker can run post-claim side
+   * effects (heartbeat bookkeeping, websocket broadcast, dead-agent
+   * detection). */
   async claimNextPendingRun(queueId: string) {
-    return this.repository.claimNextPendingRun(queueId);
+    const claimed = await this.repository.claimNextPendingRun(queueId);
+    // Repository return type is `unknown`; the actual shape (from
+    // `prisma.launchRun.findUnique`) carries an `id` field.
+    const claimedId = (claimed as { id: string } | null)?.id;
+    if (claimedId) {
+      await this.queue.enqueue({
+        name: "launch.run.claimed",
+        payload: { launchRunId: claimedId, queueId },
+      });
+    }
+    return claimed;
   }
 }

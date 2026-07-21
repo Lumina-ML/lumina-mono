@@ -420,11 +420,12 @@ const patchStageMutation = useMutation({
             v-if="projectRuns.length > 0"
             class="mt-2 max-h-40 overflow-auto rounded-md border border-border"
           >
-            <button
+            <LButton
               v-for="r in projectRuns"
               :key="r.runId"
-              type="button"
-              class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-canvas"
+              quaternary
+              size="xs"
+              class="!justify-between w-full !text-xs !px-3 !py-1.5"
               :class="linkRunInput === r.runId ? 'bg-accent-primary/10' : ''"
               @click="linkRunInput = r.runId"
             >

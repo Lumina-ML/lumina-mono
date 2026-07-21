@@ -2,15 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { ArtifactService } from "./service.js";
 import { ArtifactHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function artifactRoutes(app: FastifyInstance) {
-  const artifactService = new ArtifactService({
-    prisma: app.prisma,
-    storage: app.storage,
-    eventBus: app.eventBus,
-    queue: app.queue,
-  });
-  const projectService = new ProjectService(app.prisma);
+  const artifactService = container.resolve(ArtifactService);
+  const projectService = container.resolve(ProjectService);
   const handler = new ArtifactHandler(artifactService, projectService);
 
   app.post("/projects/:projectId/artifacts", {

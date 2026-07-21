@@ -2,10 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { LogLineService } from "./service.js";
 import { LogLineHandler } from "./handler.js";
 import { RunService } from "../run/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function logLineRoutes(app: FastifyInstance) {
-  const logLineService = new LogLineService(app.timeSeriesStorage);
-  const runService = new RunService(app.prisma);
+  const logLineService = container.resolve(LogLineService);
+  const runService = container.resolve(RunService);
   const handler = new LogLineHandler(logLineService, runService);
 
   app.post("/runs/:runId/logs", {

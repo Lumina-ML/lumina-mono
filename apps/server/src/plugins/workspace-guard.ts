@@ -35,7 +35,6 @@
  */
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { PrismaClient } from "../generated/prisma/index.js";
 import {
   lookupArtifact,
   lookupArtifactVersion,
@@ -49,10 +48,8 @@ import {
   lookupReport,
   lookupRun,
   lookupRunMedia,
-  lookupSpan,
   lookupSweep,
   lookupTag,
-  lookupTrace,
 } from "../core/authz/assert-workspace.js";
 
 export type AuthzRule =
@@ -104,10 +101,11 @@ const NOT_FOUND: Record<AuthzRule["kind"], string> = {
 };
 
 async function lookup(
-  prisma: PrismaClient,
+  server: FastifyInstance,
   rule: AuthzRule,
   id: string,
 ): Promise<string | null> {
+  const prisma = server.prisma;
   switch (rule.kind) {
     case "project":
       return lookupProject(prisma, id);
@@ -123,10 +121,18 @@ async function lookup(
       return lookupRegistryModelVersion(prisma, id);
     case "evaluation":
       return lookupEvaluation(prisma, id);
-    case "trace":
-      return lookupTrace(prisma, id);
-    case "span":
-      return lookupSpan(prisma, id);
+    case "trace": {
+      const trace = await server.traceStorage.findTrace(id);
+      if (!trace) return null;
+      return lookupProject(prisma, trace.projectId);
+    }
+    case "span": {
+      const span = await server.traceStorage.findSpan(id);
+      if (!span) return null;
+      const trace = await server.traceStorage.findTrace(span.traceId);
+      if (!trace) return null;
+      return lookupProject(prisma, trace.projectId);
+    }
     case "report":
       return lookupReport(prisma, id);
     case "runMedia":
@@ -162,7 +168,7 @@ export const workspaceGuardPlugin = fp(async (app: FastifyInstance) => {
         // optional (rare today; safer than inventing a 400 shape).
         if (!id) return;
 
-        const rowWorkspaceId = await lookup(req.server.prisma, rule, id);
+        const rowWorkspaceId = await lookup(req.server, rule, id);
         if (rowWorkspaceId !== req.workspaceId) {
           reply.status(404).send({ error: NOT_FOUND[rule.kind] });
           return reply;

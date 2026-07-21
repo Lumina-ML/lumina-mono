@@ -2,10 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { TraceService } from "./service.js";
 import { TraceHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function traceRoutes(app: FastifyInstance) {
-  const traceService = new TraceService(app.traceStorage);
-  const projectService = new ProjectService(app.prisma);
+  const traceService = container.resolve(TraceService);
+  const projectService = container.resolve(ProjectService);
   const handler = new TraceHandler(traceService, projectService);
 
   app.post("/projects/:projectId/traces", {

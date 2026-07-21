@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import {
   LDialog,
   LButton,
@@ -11,31 +9,14 @@ import {
   LIconButton,
 } from "@lumina/ui";
 import { Copy, Check, AlertTriangle, Mail } from "lucide-vue-next";
-import {
-  WorkspaceService,
-  DEFAULT_WORKSPACE_ID,
-  type WorkspaceRole,
-  type CreateUserResult,
-} from "@/services/workspace.service";
 import { useToast } from "@/composables/useToast";
 import { useApiUrl } from "@/composables/useApiUrl";
+import { useInviteByEmail } from "@/modules/workspace/composables/useInviteByEmail";
 
 /**
- * Create-and-invite dialog. Closes the §7 gap in
- * `docs/User-Lifecycle-Flow-Audit.md` — previously the only invite path
- * required the teammate to already exist on the server, so admins were
- * forced to share keys out-of-band.
- *
- * Flow:
- *   1. Admin enters email + (optional) name + role.
- *   2. We POST /api/v1/users (server issues a fresh apiKey).
- *   3. We POST /api/v1/workspace-memberships to attach them.
- *   4. We display the apiKey in a copyable box. Admin sends it to the
- *      teammate via Slack / email / carrier pigeon.
- *
- * Self-hosted Lumina can't deliver email out of the box (no SMTP
- * configured), so the magic-link / short-URL variant is left as a
- * follow-up — see audit §7 for the longer-term shape.
+ * Create-and-invite dialog. See `useInviteByEmail` for the data-flow
+ * comment. This component stays presentational — all state + the
+ * mutation live in the composable.
  */
 const props = defineProps<{
   open: boolean;
@@ -47,12 +28,18 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
-const queryClient = useQueryClient();
 const { baseUrl } = useApiUrl();
-
-const email = ref("");
-const name = ref("");
-const role = ref<WorkspaceRole>("member");
+const {
+  email,
+  name,
+  role,
+  canSubmit,
+  issued,
+  copied,
+  inviteStep,
+  inviteMutation,
+  reset,
+} = useInviteByEmail();
 
 const roleOptions = [
   { label: "Owner", value: "owner" },
@@ -61,22 +48,12 @@ const roleOptions = [
   { label: "Viewer", value: "viewer" },
 ];
 
-const issued = ref<CreateUserResult | null>(null);
-const copied = ref(false);
-const inviteStep = ref<"form" | "done">("form");
-
-const canSubmit = computed(() => {
-  const trimmed = email.value.trim();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
-});
-
-function reset() {
-  email.value = "";
-  name.value = "";
-  role.value = "member";
-  issued.value = null;
-  copied.value = false;
-  inviteStep.value = "form";
+// After successful invite, fire the parent event. Wrapping the composable's
+// mutation here keeps the composable unaware of `emit` (which would tie it
+// to a specific Vue component contract).
+async function submitAndNotify() {
+  await inviteMutation.mutateAsync();
+  emit("invited");
 }
 
 function close() {
@@ -84,43 +61,6 @@ function close() {
   // Defer reset so the dialog's leave animation doesn't show empty fields.
   setTimeout(reset, 200);
 }
-
-const inviteMutation = useMutation({
-  mutationFn: async () => {
-    const trimmedEmail = email.value.trim();
-    const trimmedName = name.value.trim();
-    const created = await WorkspaceService.createUser({
-      email: trimmedEmail,
-      ...(trimmedName ? { name: trimmedName } : {}),
-    });
-    try {
-      await WorkspaceService.createMembership({
-        workspaceId: DEFAULT_WORKSPACE_ID,
-        userId: created.id,
-        role: role.value,
-      });
-    } catch (membershipErr) {
-      // User is already on the server but not in this workspace — surface
-      // it but keep the apiKey visible so the admin can still hand it
-      // over. The membership call can be retried from the existing-user
-      // branch.
-      toast.warning(
-        `User created but couldn't auto-attach to workspace: ${(membershipErr as Error).message}. Add them via the existing-user tab.`,
-      );
-    }
-    return created;
-  },
-  onSuccess: (created) => {
-    issued.value = created;
-    inviteStep.value = "done";
-    queryClient.invalidateQueries({ queryKey: ["workspace-memberships"] });
-    queryClient.invalidateQueries({ queryKey: ["workspace-users"] });
-    emit("invited");
-  },
-  onError: (e) => {
-    toast.error(`Invite failed: ${(e as Error).message}`);
-  },
-});
 
 async function copyKey() {
   if (!issued.value) return;
@@ -175,7 +115,7 @@ async function copyEnvSnippet() {
           autocomplete="off"
           spellcheck="false"
           :disabled="inviteMutation.isPending.value"
-          @keydown.enter="canSubmit && inviteMutation.mutate()"
+          @keydown.enter="canSubmit && submitAndNotify()"
         />
       </div>
 
@@ -278,7 +218,7 @@ async function copyEnvSnippet() {
           type="primary"
           :disabled="!canSubmit"
           :loading="inviteMutation.isPending.value"
-          @click="inviteMutation.mutate()"
+          @click="submitAndNotify()"
         >
           Create account
         </LButton>

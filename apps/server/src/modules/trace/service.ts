@@ -1,5 +1,8 @@
 import crypto from "node:crypto";
+import { inject, injectable } from "tsyringe";
 import type { SpanRow, TraceRow, TraceStorage } from "../../core/storage/trace-storage.js";
+import { TOKENS } from "../../core/di/tokens.js";
+import { NotFoundError } from "../../core/errors/app-error.js";
 import type {
   CreateTraceInput,
   PatchTraceInput,
@@ -9,10 +12,11 @@ import type {
 } from "./schema.js";
 import { TraceRepository } from "./repository.js";
 
+@injectable()
 export class TraceService {
   private readonly repository: TraceRepository;
 
-  constructor(storage: TraceStorage) {
+  constructor(@inject(TOKENS.TraceStorage) storage: TraceStorage) {
     this.repository = new TraceRepository(storage);
   }
 
@@ -48,13 +52,13 @@ export class TraceService {
   async createSpan(traceId: string, data: CreateSpanInput): Promise<SpanRow> {
     const trace = await this.repository.findByTraceId(traceId);
     if (!trace) {
-      throw new Error(`Trace not found: ${traceId}`);
+      throw new NotFoundError("Trace", traceId);
     }
     const spanId = data.spanId ?? crypto.randomUUID();
     if (data.parentSpanId) {
       const parent = await this.repository.findSpanById(data.parentSpanId);
       if (!parent) {
-        throw new Error(`Parent span not found: ${data.parentSpanId}`);
+        throw new NotFoundError("Parent span", data.parentSpanId);
       }
     }
     return this.repository.createSpan(traceId, { ...data, spanId, parentSpanId: data.parentSpanId });
@@ -63,7 +67,7 @@ export class TraceService {
   async listSpansByTrace(traceId: string): Promise<SpanRow[]> {
     const trace = await this.repository.findByTraceId(traceId);
     if (!trace) {
-      throw new Error(`Trace not found: ${traceId}`);
+      throw new NotFoundError("Trace", traceId);
     }
     return trace.spans;
   }

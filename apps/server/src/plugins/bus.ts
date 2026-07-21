@@ -11,9 +11,14 @@ declare module "fastify" {
 }
 
 export const busPlugin = fp(async (app: FastifyInstance) => {
+  const busLogger = app.log.child({ component: "event-bus" });
   const bus: EventBus = app.config.redisUrl
-    ? new RedisEventBus({ redisUrl: app.config.redisUrl, channelPrefix: "lumina:events" })
-    : new MemoryEventBus();
+    ? new RedisEventBus({
+      redisUrl: app.config.redisUrl,
+      channelPrefix: "lumina:events",
+      logger: busLogger,
+    })
+    : new MemoryEventBus(busLogger);
   app.decorate("eventBus", bus);
 
   app.addHook("onClose", async () => {

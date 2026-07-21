@@ -76,14 +76,15 @@ async function onAction(action: BulkAction) {
           />
           {{ action.label }}
         </LButton>
-        <button
-          type="button"
-          class="ml-1 flex items-center gap-0.5 rounded px-2 py-1 text-xs text-fg-tertiary hover:bg-canvas hover:text-fg-primary"
+        <LButton
+          quaternary
+          size="xs"
+          class="!ml-1 !text-fg-tertiary hover:!text-fg-primary"
           @click="emit('clear')"
         >
-          <X class="h-3 w-3" />
+          <X class="mr-1 h-3 w-3" />
           Clear
-        </button>
+        </LButton>
       </div>
     </div>
   </Transition>

@@ -1,11 +1,14 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type { CreateTagInput } from "./schema.js";
 import { TagRepository } from "./repository.js";
 
+@injectable()
 export class TagService {
   private readonly repository: TagRepository;
 
-  constructor(prisma: PrismaClient) {
+  constructor(@inject(TOKENS.PrismaClient) prisma: PrismaClient) {
     this.repository = new TagRepository(prisma);
   }
 

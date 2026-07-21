@@ -1,4 +1,6 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type {
   CreateReportInput,
   PatchReportInput,
@@ -6,10 +8,11 @@ import type {
 } from "./schema.js";
 import { ReportRepository } from "./repository.js";
 
+@injectable()
 export class ReportService {
   private readonly repository: ReportRepository;
 
-  constructor(prisma: PrismaClient) {
+  constructor(@inject(TOKENS.PrismaClient) prisma: PrismaClient) {
     this.repository = new ReportRepository(prisma);
   }
 

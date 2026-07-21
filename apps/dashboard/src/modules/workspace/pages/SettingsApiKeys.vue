@@ -1,29 +1,23 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import {
   LCard,
   LButton,
   LTag,
   LSkeleton,
-  LDialog,
-  LTooltip,
-  LIconButton,
+  LSelect,
 } from "@lumina/ui";
-import { Copy, Check, Key, RotateCw, AlertTriangle } from "lucide-vue-next";
+import { Key, RotateCw } from "lucide-vue-next";
 import { WorkspaceService } from "@/services/workspace.service";
 import { useWorkspaceUsers } from "@/modules/workspace/composables/useWorkspaceSettings";
 import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
-import { useDateFormat } from "@/composables/useDateFormat";
-import { useApiUrl } from "@/composables/useApiUrl";
+import ApiKeyDialog from "@/modules/workspace/components/ApiKeyDialog.vue";
 
 const queryClient = useQueryClient();
 const toast = useToast();
 const { confirm } = useConfirm();
-const { formatDate } = useDateFormat();
-void formatDate;
-const { baseUrl } = useApiUrl();
 
 const { data: users, isLoading } = useWorkspaceUsers();
 const currentUserId = ref<string | null>(null);
@@ -32,16 +26,6 @@ const currentUserId = ref<string | null>(null);
 // After they dismiss the dialog the value is cleared from memory.
 const generatedKey = ref<string | null>(null);
 const generatedDialogOpen = ref(false);
-const copied = ref(false);
-const envCopied = ref(false);
-
-const envSnippet = computed(() => {
-  if (!generatedKey.value) return "";
-  const url = baseUrl || "http://localhost:8000";
-  return `# Generated from your Lumina dashboard.\n` +
-    `LUMINA_API_URL=${url}\n` +
-    `LUMINA_API_KEY=${generatedKey.value}\n`;
-});
 
 const generateMutation = useMutation({
   mutationFn: (userId: string) => WorkspaceService.generateApiKey(userId),
@@ -60,22 +44,6 @@ function generate() {
     return;
   }
   generateMutation.mutate(currentUserId.value);
-}
-
-async function copy() {
-  if (!generatedKey.value) return;
-  await navigator.clipboard.writeText(generatedKey.value);
-  copied.value = true;
-  toast.success("API key copied");
-  setTimeout(() => (copied.value = false), 1500);
-}
-
-async function copyEnvSnippet() {
-  if (!envSnippet.value) return;
-  await navigator.clipboard.writeText(envSnippet.value);
-  envCopied.value = true;
-  toast.success(".env snippet copied");
-  setTimeout(() => (envCopied.value = false), 1500);
 }
 
 async function revoke() {
@@ -97,7 +65,6 @@ async function revoke() {
 function dismiss() {
   generatedKey.value = null;
   generatedDialogOpen.value = false;
-  envCopied.value = false;
 }
 
 const apiKeyEnv = import.meta.env.VITE_LUMINA_API_KEY as string | undefined;
@@ -147,9 +114,10 @@ const currentKeyPreview = apiKeyEnv
         <span>
           Keys are scoped per user. Pick a user to generate or revoke theirs.
         </span>
-        <select
+        <LSelect
           v-model="currentUserId"
-          class="rounded-md border border-border bg-card px-2 py-1 text-xs"
+          size="small"
+          placeholder="Pick a user…"
         >
           <option :value="null" disabled>Pick a user…</option>
           <option
@@ -159,57 +127,18 @@ const currentKeyPreview = apiKeyEnv
           >
             {{ u.name ?? u.email }}
           </option>
-        </select>
+        </LSelect>
       </div>
     </div>
 
-    <LDialog
-      v-model:show="generatedDialogOpen"
-      title="Your new API key"
-      width="520px"
-      @close="dismiss"
-    >
-      <div class="space-y-3">
-        <div
-          class="flex items-start gap-2 rounded-md border border-accent-warning/30 bg-accent-warning/10 p-3 text-xs"
-        >
-          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-warning" />
-          <div>
-            <div class="font-medium">Copy this key now — you won't see it again.</div>
-            <div class="text-fg-tertiary">
-              Store it in your password manager or environment variables (e.g.
-              <code class="font-mono">LUMINA_API_KEY</code>).
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2 rounded-md border border-border bg-canvas p-2 font-mono text-xs">
-          <span class="min-w-0 flex-1 truncate">{{ generatedKey }}</span>
-          <LTooltip content="Copy">
-            <LIconButton aria-label="Copy" @click="copy">
-              <Check v-if="copied" class="h-3.5 w-3.5 text-accent-success" />
-              <Copy v-else class="h-3.5 w-3.5" />
-            </LIconButton>
-          </LTooltip>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <LButton size="sm" @click="copyEnvSnippet">
-            <Copy class="mr-1 h-3 w-3" />
-            {{ envCopied ? 'Copied .env snippet' : 'Copy .env snippet' }}
-          </LButton>
-          <span class="text-[11px] text-fg-tertiary">
-            Save it as <code class="font-mono">.env</code> next to your script.
-          </span>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="flex justify-end">
-          <LButton @click="dismiss">I've stored it</LButton>
-        </div>
-      </template>
-    </LDialog>
+    <ApiKeyDialog
+      v-model:open="generatedDialogOpen"
+      :api-key="generatedKey"
+      warning-title="Copy this key now — you won't see it again."
+      warning-detail="Store it in your password manager or environment variables (e.g. LUMINA_API_KEY)."
+      :show-env-snippet="true"
+      @update:open="dismiss"
+    />
   </LCard>
 </template>
 

@@ -1,4 +1,7 @@
-import type { JobProcessor, JobContext } from "../types.js";
+import type { Prisma } from "../../generated/prisma/index.js";
+import type { JobContext, JobProcessor, JobPayloadByName } from "../types.js";
+
+type Payload = JobPayloadByName["launch.run.claimed"];
 
 /**
  * Background worker hook for LaunchRuns. Fired after the atomic dequeue
@@ -11,16 +14,29 @@ import type { JobProcessor, JobContext } from "../types.js";
  *   update.
  * - Logging + telemetry for the registry.
  */
-export class LaunchRunProcessor implements JobProcessor {
+export class LaunchRunProcessor implements JobProcessor<"launch.run.claimed"> {
   readonly name = "launch.run.claimed";
 
-  async process(
-    job: { name: string; payload: unknown },
-    _ctx: JobContext,
-  ): Promise<void> {
-    const payload = job.payload as { launchRunId: string; queueId: string };
-    console.log(
-      `Launch run claimed: ${payload.launchRunId} (queue=${payload.queueId})`,
+  async process(payload: Payload, ctx: JobContext): Promise<void> {
+    // Heartbeat: keep `lastSeenAt` fresh so the monitor UI can detect
+    // dead agents that stopped reporting back. Tolerates missing rows
+    // (the agent may have already reported a terminal status and the
+    // LaunchRun was archived) — a missing row isn't an error here.
+    try {
+      await ctx.prisma.launchRun.update({
+        where: { id: payload.launchRunId },
+        data: { lastSeenAt: new Date() } as unknown as Prisma.LaunchRunUncheckedUpdateInput,
+      });
+    } catch (err) {
+      ctx.logger.warn(
+        { launchRunId: payload.launchRunId, err },
+        "launch.run.claimed: LaunchRun row missing or not updatable",
+      );
+    }
+
+    ctx.logger.info(
+      { launchRunId: payload.launchRunId, queueId: payload.queueId },
+      "Launch run claimed",
     );
   }
 }

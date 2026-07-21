@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { ProjectService } from "./service.js";
 import { ProjectHandler } from "./handler.js";
+import { container } from "../../core/di/container.js";
 
 export async function projectRoutes(app: FastifyInstance) {
-  const service = new ProjectService(app.prisma);
+  const service = container.resolve(ProjectService);
   const handler = new ProjectHandler(service);
 
   app.post("/projects", handler.create.bind(handler));

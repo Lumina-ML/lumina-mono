@@ -192,14 +192,13 @@ const userOptions = computed(() =>
             @update:value="(v) => onChangeRole(m.id, String(v) as WorkspaceRole)"
           />
           <LTag :type="roleColor[m.role]" size="small">{{ m.role }}</LTag>
-          <button
-            type="button"
-            class="rounded p-1 text-fg-tertiary hover:bg-canvas hover:text-accent-danger"
+          <LIconButton
             aria-label="Remove member"
+            class="!text-fg-tertiary hover:!text-accent-danger"
             @click="onRemove(m.id, m.user?.name ?? m.userId)"
           >
             <Trash2 class="h-3.5 w-3.5" />
-          </button>
+          </LIconButton>
         </div>
       </li>
     </ul>

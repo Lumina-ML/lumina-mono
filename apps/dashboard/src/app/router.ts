@@ -80,11 +80,6 @@ const router = createRouter({
               name: "SettingsAlerts",
               component: () => import("@/modules/workspace/pages/SettingsAlerts.vue"),
             },
-            {
-              path: "billing",
-              name: "SettingsBilling",
-              component: () => import("@/modules/workspace/pages/SettingsBilling.vue"),
-            },
           ],
         },
 

@@ -2,10 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { EvaluationService } from "./service.js";
 import { EvaluationHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function evaluationRoutes(app: FastifyInstance) {
-  const evaluationService = new EvaluationService(app.prisma);
-  const projectService = new ProjectService(app.prisma);
+  const evaluationService = container.resolve(EvaluationService);
+  const projectService = container.resolve(ProjectService);
   const handler = new EvaluationHandler(evaluationService, projectService);
 
   app.post("/projects/:projectId/evaluations", {

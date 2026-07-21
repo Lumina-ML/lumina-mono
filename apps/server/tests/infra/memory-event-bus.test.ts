@@ -14,8 +14,8 @@ describe("MemoryEventBus", () => {
       received.push((event.payload as { count: number }).count);
     });
 
-    await bus.publish({ type: "MetricLogged", payload: { runId: "r1", projectId: "p1", keys: ["loss"], count: 3 }, occurredAt: new Date() });
-    await bus.publish({ type: "MetricLogged", payload: { runId: "r1", projectId: "p1", keys: ["acc"], count: 5 }, occurredAt: new Date() });
+    await bus.publish({ type: "MetricLogged", payload: { runId: "r1", projectId: "p1", workspaceId: "w1", keys: ["loss"], count: 3 }, occurredAt: new Date() });
+    await bus.publish({ type: "MetricLogged", payload: { runId: "r1", projectId: "p1", workspaceId: "w1", keys: ["acc"], count: 5 }, occurredAt: new Date() });
 
     expect(received).toEqual([3, 5]);
   });
@@ -31,8 +31,8 @@ describe("MemoryEventBus", () => {
       runCount++;
     });
 
-    await bus.publish({ type: "MetricLogged", payload: { runId: "r1", projectId: "p1", keys: [], count: 1 }, occurredAt: new Date() });
-    await bus.publish({ type: "RunFinished", payload: { runId: "r1", projectId: "p1", status: "finished" }, occurredAt: new Date() });
+    await bus.publish({ type: "MetricLogged", payload: { runId: "r1", projectId: "p1", workspaceId: "w1", keys: [], count: 1 }, occurredAt: new Date() });
+    await bus.publish({ type: "RunFinished", payload: { runId: "r1", projectId: "p1", workspaceId: "w1", status: "finished" }, occurredAt: new Date() });
 
     expect(metricCount).toBe(1);
     expect(runCount).toBe(1);
@@ -50,7 +50,7 @@ describe("MemoryEventBus", () => {
     const originalError = console.error;
     console.error = () => {};
     try {
-      await bus.publish({ type: "MetricLogged", payload: { runId: "r1", projectId: "p1", keys: [], count: 1 }, occurredAt: new Date() });
+      await bus.publish({ type: "MetricLogged", payload: { runId: "r1", projectId: "p1", workspaceId: "w1", keys: [], count: 1 }, occurredAt: new Date() });
     } finally {
       console.error = originalError;
     }
@@ -66,7 +66,7 @@ describe("MemoryEventBus", () => {
       b.push((event.payload as { count: number }).count);
     });
 
-    await bus.publish({ type: "MetricLogged", payload: { runId: "r1", projectId: "p1", keys: [], count: 7 }, occurredAt: new Date() });
+    await bus.publish({ type: "MetricLogged", payload: { runId: "r1", projectId: "p1", workspaceId: "w1", keys: [], count: 7 }, occurredAt: new Date() });
     expect(a).toEqual([7]);
     expect(b).toEqual([7]);
   });

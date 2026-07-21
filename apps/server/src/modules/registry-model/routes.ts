@@ -2,10 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { RegistryModelService } from "./service.js";
 import { RegistryModelHandler } from "./handler.js";
 import { ProjectService } from "../project/service.js";
+import { container } from "../../core/di/container.js";
 
 export async function registryModelRoutes(app: FastifyInstance) {
-  const registryModelService = new RegistryModelService(app.prisma, app.storage);
-  const projectService = new ProjectService(app.prisma);
+  const registryModelService = container.resolve(RegistryModelService);
+  const projectService = container.resolve(ProjectService);
   const handler = new RegistryModelHandler(registryModelService, projectService);
 
   app.post("/projects/:projectId/registry-models", {

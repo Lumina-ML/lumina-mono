@@ -1,4 +1,6 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import type { CreateUserInput, UpdateUserInput, GenerateApiKeyInput } from "./schema.js";
 import { UserRepository } from "./repository.js";
 
@@ -7,6 +9,7 @@ export interface CreateUserResult {
   apiKey: string;
 }
 
+@injectable()
 export class UserService {
   private readonly repository: UserRepository;
 
@@ -14,7 +17,7 @@ export class UserService {
   // onboarding flow. Kept on the constructor so callers (the Fastify
   // route registration) don't have to change.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(@inject(TOKENS.PrismaClient) private readonly prisma: PrismaClient) {
     this.repository = new UserRepository(prisma);
   }
 

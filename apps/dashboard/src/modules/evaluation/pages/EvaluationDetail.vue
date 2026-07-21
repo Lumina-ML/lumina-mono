@@ -457,16 +457,17 @@ function openPromote() {
             v-if="modelOptions.length > 0"
             class="mt-2 max-h-32 overflow-auto rounded-md border border-border"
           >
-            <button
+            <LButton
               v-for="opt in modelOptions"
               :key="opt.value"
-              type="button"
-              class="flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-canvas"
+              quaternary
+              size="xs"
+              class="!justify-start w-full !text-xs !px-3 !py-1.5"
               :class="promoteModelName === opt.value ? 'bg-accent-primary/10' : ''"
               @click="promoteModelName = opt.value"
             >
               {{ opt.label }}
-            </button>
+            </LButton>
           </div>
         </div>
         <div>

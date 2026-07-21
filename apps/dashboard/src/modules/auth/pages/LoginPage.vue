@@ -483,15 +483,13 @@ const apiBase = import.meta.env.VITE_LUMINA_API_URL || "(default — same origin
                     <KeyRound class="h-4 w-4 text-fg-tertiary" />
                   </template>
                   <template #suffix>
-                    <button
-                      type="button"
-                      class="flex h-7 w-7 items-center justify-center rounded text-fg-tertiary hover:bg-canvas"
+                    <LIconButton
                       :aria-label="showKey ? 'Hide API key' : 'Show API key'"
                       @click="showKey = !showKey"
                     >
                       <EyeOff v-if="showKey" class="h-4 w-4" />
                       <Eye v-else class="h-4 w-4" />
-                    </button>
+                    </LIconButton>
                   </template>
                 </LInput>
                 <p class="mt-1 text-[11px] text-fg-tertiary">

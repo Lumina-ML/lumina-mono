@@ -6,15 +6,12 @@ import {
   Moon,
   Sun,
   Search,
-  Pin,
-  PinOff,
   ChevronLeft,
   KeyRound,
   LogOut,
   RefreshCw,
   Copy,
   Check,
-  AlertTriangle,
 } from "lucide-vue-next";
 import {
   LSidebar,
@@ -22,12 +19,10 @@ import {
   LBreadcrumb,
   LBreadcrumbItem,
   LIconButton,
-  LTooltip,
   LButton,
   LTag,
   LPopover,
   LAvatar,
-  LDialog,
 } from "@lumina/ui";
 import { useThemeStore } from "@/stores/theme";
 import { useSidebarStore } from "@/stores/sidebar";
@@ -42,6 +37,7 @@ import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { WorkspaceService } from "@/services/workspace.service";
 import NotificationBell from "@/components/Notifications/NotificationBell.vue";
 import BrandMark from "@/components/BrandMark.vue";
+import ApiKeyDialog from "@/modules/workspace/components/ApiKeyDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -62,7 +58,6 @@ const copiedKey = ref(false);
 // in `docs/User-Lifecycle-Flow-Audit.md`.
 const rotatedKey = ref<string | null>(null);
 const rotatedDialogOpen = ref(false);
-const rotatedCopied = ref(false);
 const rotating = ref(false);
 
 // ── Workspace memberships (drives the workspace switcher in the sidebar)
@@ -158,21 +153,9 @@ async function onRotateKey() {
   }
 }
 
-async function copyRotatedKey() {
-  if (!rotatedKey.value) return;
-  try {
-    await navigator.clipboard.writeText(rotatedKey.value);
-    rotatedCopied.value = true;
-    setTimeout(() => (rotatedCopied.value = false), 1500);
-  } catch {
-    toast.error("Could not copy key to clipboard.");
-  }
-}
-
-function dismissRotatedDialog() {
+async function dismissRotatedDialog() {
   rotatedKey.value = null;
   rotatedDialogOpen.value = false;
-  rotatedCopied.value = false;
 }
 
 async function onCopyKey() {
@@ -309,8 +292,12 @@ watch(
 </script>
 
 <template>
-  <div class="flex min-h-screen bg-background">
-    <!-- Desktop sidebar -->
+  <div class="flex h-screen overflow-hidden bg-background">
+    <!-- Desktop sidebar. LSidebar is internally a `h-screen flex-col`
+         with an `overflow-auto` nav, so it scrolls independently of
+         the main content (which lives in a separate `overflow-y-auto`
+         column below). This keeps the sidebar header pinned while the
+         page scrolls. -->
     <LSidebar :collapsed="sidebarStore.collapsed">
       <div class="flex h-12 items-center justify-between border-b border-border px-4">
         <RouterLink to="/" class="flex min-w-0 items-center gap-2">
@@ -330,40 +317,6 @@ watch(
       </div>
 
       <nav class="flex-1 space-y-2 overflow-auto p-2">
-        <!-- Pinned -->
-        <div v-if="sidebarStore.pinnedItems.length > 0 && !sidebarStore.collapsed">
-          <div class="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
-            Pinned
-          </div>
-          <div class="space-y-1">
-            <div
-              v-for="item in sidebarStore.pinnedItems"
-              :key="`pin-${item.to}`"
-              class="group relative"
-            >
-              <LSidebarItem
-                :to="item.to"
-                :active="isItemActive(item.to)"
-                @click="onItemClick"
-              >
-                <template #icon>
-                  <component :is="item.icon" class="h-4 w-4" />
-                </template>
-                {{ item.label }}
-              </LSidebarItem>
-              <LTooltip :content="'Unpin'" placement="right">
-                <LIconButton
-                  aria-label="Unpin"
-                  class="absolute right-2 top-1/2 hidden -translate-y-1/2 group-hover:inline-flex"
-                  @click="sidebarStore.togglePin(item.to)"
-                >
-                  <PinOff class="h-3 w-3" />
-                </LIconButton>
-              </LTooltip>
-            </div>
-          </div>
-        </div>
-
         <!-- Groups -->
         <div v-for="group in sidebarStore.displayGroups" :key="group.key" class="space-y-1">
           <div
@@ -390,22 +343,6 @@ watch(
               </template>
               <span v-if="!sidebarStore.collapsed">{{ item.label }}</span>
             </LSidebarItem>
-            <LTooltip
-              v-if="!sidebarStore.collapsed"
-              :content="sidebarStore.isPinned(item.to) ? 'Unpin' : 'Pin to top'"
-              placement="right"
-            >
-              <LIconButton
-                aria-label="Toggle pin"
-                :class="[
-                  'absolute right-2 top-1/2 hidden -translate-y-1/2 group-hover:inline-flex',
-                  sidebarStore.isPinned(item.to) ? 'inline-flex text-accent-primary' : '',
-                ]"
-                @click="sidebarStore.togglePin(item.to)"
-              >
-                <Pin class="h-3 w-3" />
-              </LIconButton>
-            </LTooltip>
           </div>
         </div>
       </nav>
@@ -421,9 +358,10 @@ watch(
           trigger="click"
         >
           <template #trigger>
-            <button
-              type="button"
-              class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-canvas"
+            <LButton
+              quaternary
+              size="sm"
+              class="!justify-start w-full !px-2 !py-1.5 !text-xs"
               :aria-label="`Workspace: ${workspaceStore.currentId}`"
             >
               <LAvatar
@@ -442,7 +380,7 @@ watch(
                   </span>
                 </div>
               </div>
-            </button>
+            </LButton>
           </template>
           <div class="w-60 space-y-1 p-1">
             <div class="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
@@ -454,11 +392,12 @@ watch(
             >
               You're only a member of the default workspace.
             </div>
-            <button
+            <LButton
               v-for="opt in workspaceOptions"
               :key="opt.id"
-              type="button"
-              class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-canvas"
+              quaternary
+              size="sm"
+              class="!justify-start w-full !px-2 !py-1.5 !text-sm"
               :class="opt.isCurrent ? 'bg-canvas' : ''"
               @click="selectWorkspace(opt.id)"
             >
@@ -475,7 +414,7 @@ watch(
               >
                 current
               </span>
-            </button>
+            </LButton>
             <div
               v-if="(workspaceOptions ?? []).length > 1"
               class="border-t border-border pt-1"
@@ -486,14 +425,12 @@ watch(
             </div>
           </div>
         </LPopover>
-        <button
+        <LIconButton
           v-else
-          type="button"
-          class="flex h-7 w-7 items-center justify-center rounded text-fg-tertiary hover:bg-canvas"
           :aria-label="`Workspace: ${workspaceStore.currentId}`"
         >
           <LAvatar :name="workspaceStore.currentId" size="xs" shape="square" />
-        </button>
+        </LIconButton>
       </div>
     </LSidebar>
 
@@ -511,23 +448,6 @@ watch(
         </div>
         <nav class="flex-1 space-y-3 overflow-auto p-3">
           <!-- Pinned -->
-          <div v-if="sidebarStore.pinnedItems.length > 0" class="space-y-1">
-            <div class="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
-              Pinned
-            </div>
-            <LSidebarItem
-              v-for="item in sidebarStore.pinnedItems"
-              :key="`pin-${item.to}`"
-              :to="item.to"
-              :active="isItemActive(item.to)"
-              @click="onItemClick"
-            >
-              <template #icon>
-                <component :is="item.icon" class="h-4 w-4" />
-              </template>
-              {{ item.label }}
-            </LSidebarItem>
-          </div>
           <div v-for="group in sidebarStore.displayGroups" :key="`m-${group.key}`" class="space-y-1">
             <div
               v-if="group.label"
@@ -629,23 +549,24 @@ watch(
             trigger="click"
           >
             <template #trigger>
-              <button
-                type="button"
-                class="hidden h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-accent-primary/15 text-xs font-semibold text-accent-primary transition-colors hover:bg-accent-primary/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary md:flex"
+              <LIconButton
+                class="!hidden md:!flex !h-8 !w-8 !rounded-full !bg-accent-primary/15 hover:!bg-accent-primary/25 !text-accent-primary !text-xs !font-semibold"
                 :aria-label="
                   authStore.user?.name
                     ? `Account menu for ${authStore.user.name}`
                     : 'Account menu'
                 "
               >
-                <img
+                <LAvatar
                   v-if="authStore.user?.avatar"
                   :src="authStore.user.avatar"
-                  alt=""
-                  class="h-full w-full object-cover"
+                  :alt="authStore.user?.name ?? ''"
+                  size="xs"
+                  shape="circle"
+                  class="!h-full !w-full"
                 />
                 <span v-else>{{ userInitial }}</span>
-              </button>
+              </LIconButton>
             </template>
 
             <div class="w-64 space-y-1">
@@ -665,15 +586,16 @@ watch(
                   <span class="text-[10px] font-medium uppercase tracking-wider text-fg-tertiary">
                     API key
                   </span>
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1 rounded px-1 text-[10px] text-fg-tertiary hover:text-fg-primary"
+                  <LButton
+                    quaternary
+                    size="xs"
+                    class="!text-[10px]"
                     @click="onCopyKey"
                   >
-                    <Check v-if="copiedKey" class="h-3 w-3 text-accent-success" />
-                    <Copy v-else class="h-3 w-3" />
+                    <Check v-if="copiedKey" class="mr-1 h-3 w-3 text-accent-success" />
+                    <Copy v-else class="mr-1 h-3 w-3" />
                     {{ copiedKey ? "Copied" : "Copy" }}
-                  </button>
+                  </LButton>
                 </div>
                 <code
                   class="block truncate rounded bg-canvas px-2 py-1 font-mono text-[11px] text-fg-secondary"
@@ -685,14 +607,15 @@ watch(
 
               <div class="border-t border-border" />
 
-              <button
-                type="button"
-                class="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-canvas"
+              <LButton
+                quaternary
+                size="sm"
+                class="!justify-start w-full !text-sm !px-3 !py-2"
                 @click="onRotateKey"
               >
-                <RefreshCw class="h-3.5 w-3.5 text-fg-tertiary" />
+                <RefreshCw class="mr-2 h-3.5 w-3.5 text-fg-tertiary" />
                 Rotate key
-              </button>
+              </LButton>
               <RouterLink
                 to="/settings/api-keys"
                 class="flex items-center gap-2 rounded px-3 py-2 text-sm hover:bg-canvas"
@@ -704,14 +627,15 @@ watch(
 
               <div class="border-t border-border" />
 
-              <button
-                type="button"
-                class="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-accent-danger hover:bg-canvas"
+              <LButton
+                quaternary
+                size="sm"
+                class="!justify-start w-full !text-sm !px-3 !py-2 !text-accent-danger"
                 @click="onLogout"
               >
-                <LogOut class="h-3.5 w-3.5" />
+                <LogOut class="mr-2 h-3.5 w-3.5" />
                 Sign out
-              </button>
+              </LButton>
             </div>
           </LPopover>
         </div>
@@ -724,7 +648,7 @@ watch(
         Skip to main content
       </a>
 
-      <main id="main-content" class="flex-1 p-4 md:p-6" tabindex="-1">
+      <main id="main-content" class="flex-1 overflow-y-auto p-4 md:p-6" tabindex="-1">
         <RouterView />
       </main>
     </div>
@@ -732,43 +656,13 @@ watch(
     <!-- Rotate key confirmation dialog. Reuses the warning callout /
     copy button shape from SettingsApiKeys.vue so the UX is identical
     across both rotate entry points. -->
-    <LDialog
-      v-model:show="rotatedDialogOpen"
-      title="Your new API key"
-      width="520px"
-      @close="dismissRotatedDialog"
-    >
-      <div class="space-y-3">
-        <div
-          class="flex items-start gap-2 rounded-md border border-accent-warning/30 bg-accent-warning/10 p-3 text-xs"
-        >
-          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-warning" />
-          <div>
-            <div class="font-medium">Copy this key now — the old one is already invalid.</div>
-            <div class="text-fg-tertiary">
-              Any running SDK processes still using the old key will start
-              receiving 401s on the next <code class="font-mono">log()</code> call.
-            </div>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 rounded-md border border-border bg-canvas p-2 font-mono text-xs">
-          <span class="min-w-0 flex-1 truncate">{{ rotatedKey }}</span>
-          <LTooltip content="Copy">
-            <LIconButton aria-label="Copy new API key" @click="copyRotatedKey">
-              <Check v-if="rotatedCopied" class="h-3.5 w-3.5 text-accent-success" />
-              <Copy v-else class="h-3.5 w-3.5" />
-            </LIconButton>
-          </LTooltip>
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end">
-          <LButton :loading="rotating" @click="dismissRotatedDialog">
-            I've stored it
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
+    <ApiKeyDialog
+      v-model:open="rotatedDialogOpen"
+      :api-key="rotatedKey"
+      warning-title="Copy this key now — the old one is already invalid."
+      warning-detail="Any running SDK processes still using the old key will start receiving 401s on the next log() call."
+      @update:open="dismissRotatedDialog"
+    />
   </div>
 </template>
 

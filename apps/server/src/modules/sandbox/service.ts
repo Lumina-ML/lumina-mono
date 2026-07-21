@@ -1,5 +1,7 @@
+import { inject, injectable } from "tsyringe";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { TraceStorage } from "../../core/storage/trace-storage.js";
+import { TOKENS } from "../../core/di/tokens.js";
 import {
   type DemoScenario,
   type DemoRunResult,
@@ -18,10 +20,11 @@ import {
  * playground project). If it doesn't exist (someone deleted it), we
  * re-seed it on demand so the button keeps working.
  */
+@injectable()
 export class SandboxService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly traceStorage: TraceStorage,
+    @inject(TOKENS.PrismaClient) private readonly prisma: PrismaClient,
+    @inject(TOKENS.TraceStorage) private readonly traceStorage: TraceStorage,
   ) {}
 
   async runExample(
