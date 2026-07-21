@@ -10,7 +10,7 @@ import { useWorkspaceLayout } from "@/composables/useWorkspaceLayout";
 import RunSelector from "@/widgets/run-selector/RunSelector.vue";
 import WorkspaceSection from "@/widgets/section/WorkspaceSection.vue";
 import { Plus, RotateCcw } from "lucide-vue-next";
-import { LCard, LEmpty, LButton, LIconButton, LTooltip } from "@lumina/ui";
+import { LCard, LEmpty, LButton, LIconButton, LTooltip, LDialog, LInput } from "@lumina/ui";
 import RunStatusBadge from "@/widgets/run-status-badge/RunStatusBadge.vue";
 import type { RunStatus } from "@/types/run";
 
@@ -72,21 +72,59 @@ const {
 
 const visibleSections = computed(() => sections.value.filter((s) => !s.hidden));
 
-function onAddSection() {
-  const name = window.prompt("Section name", "New section");
-  if (name && name.trim()) addSection(name.trim());
+// ── Add section dialog ─────────────────────────────────────────────────
+// `window.prompt` is the browser default and is jarring next to the rest of
+// the dashboard. Drive the same flow through LDialog + LInput instead.
+const addSectionOpen = ref(false);
+const newSectionName = ref("");
+const sectionError = ref<string | null>(null);
+
+function openAddSection() {
+  newSectionName.value = "";
+  sectionError.value = null;
+  addSectionOpen.value = true;
 }
 
-function onAddPanel(sectionId: string) {
-  const title = window.prompt("Panel title", "New chart");
-  const keys = window.prompt(
-    "Metric keys (comma-separated)",
-    "train/loss,val/loss",
-  );
-  const metricKeys = keys
-    ? keys.split(",").map((k) => k.trim()).filter(Boolean)
-    : [];
-  addPanel(sectionId, { title: title ?? "New chart", metricKeys });
+function submitAddSection() {
+  const name = newSectionName.value.trim();
+  if (!name) {
+    sectionError.value = "Section name is required";
+    return;
+  }
+  addSection(name);
+  addSectionOpen.value = false;
+}
+
+// ── Add panel dialog ───────────────────────────────────────────────────
+// Same reason as above — replace the two consecutive window.prompt calls with
+// a single LDialog that captures both title and metric keys.
+const addPanelOpen = ref(false);
+const panelTargetSectionId = ref<string | null>(null);
+const newPanelTitle = ref("");
+const newPanelKeysText = ref("train/loss,val/loss");
+const panelError = ref<string | null>(null);
+
+function openAddPanel(sectionId: string) {
+  panelTargetSectionId.value = sectionId;
+  newPanelTitle.value = "";
+  newPanelKeysText.value = "train/loss,val/loss";
+  panelError.value = null;
+  addPanelOpen.value = true;
+}
+
+function submitAddPanel() {
+  if (!panelTargetSectionId.value) return;
+  const title = newPanelTitle.value.trim() || "New chart";
+  const metricKeys = newPanelKeysText.value
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (metricKeys.length === 0) {
+    panelError.value = "At least one metric key is required";
+    return;
+  }
+  addPanel(panelTargetSectionId.value, { title, metricKeys });
+  addPanelOpen.value = false;
 }
 
 // Header metrics
@@ -186,7 +224,7 @@ const totals = computed(() => ({
           Workspace
         </h2>
         <div class="flex items-center gap-2">
-          <LButton size="sm" @click="onAddSection">
+          <LButton size="sm" @click="openAddSection">
             <Plus class="mr-1 h-3 w-3" />
             Add Section
           </LButton>
@@ -207,7 +245,7 @@ const totals = computed(() => ({
           :run-ids="chartRunIds"
           @update:section="(next) => patchSection(section.id, next)"
           @remove="removeSection(section.id)"
-          @add-panel="onAddPanel(section.id)"
+          @add-panel="openAddPanel(section.id)"
         />
       </div>
 
@@ -216,7 +254,7 @@ const totals = computed(() => ({
           title="No sections yet"
           description="Add a section to start building your workspace. Each section groups related charts."
         >
-          <LButton class="mt-3" @click="onAddSection">
+          <LButton class="mt-3" @click="openAddSection">
             <Plus class="mr-1 h-3 w-3" />
             Add Section
           </LButton>
@@ -224,4 +262,86 @@ const totals = computed(() => ({
       </LCard>
     </div>
   </div>
+
+  <LDialog
+    v-model:show="addSectionOpen"
+    title="Add section"
+    width="480px"
+    @close="sectionError = null"
+  >
+    <form class="space-y-3" @submit.prevent="submitAddSection">
+      <div>
+        <label for="section-name" class="mb-1 block text-xs font-medium text-fg-secondary">
+          Section name <span class="text-accent-danger">*</span>
+        </label>
+        <LInput
+          id="section-name"
+          v-model:value="newSectionName"
+          placeholder="e.g. Training"
+          autofocus
+        />
+      </div>
+      <div
+        v-if="sectionError"
+        class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+      >
+        {{ sectionError }}
+      </div>
+    </form>
+    <template #footer>
+      <div class="flex justify-end gap-2">
+        <LButton quaternary @click="addSectionOpen = false">Cancel</LButton>
+        <LButton
+          :disabled="!newSectionName.trim()"
+          @click="submitAddSection"
+        >
+          Add section
+        </LButton>
+      </div>
+    </template>
+  </LDialog>
+
+  <LDialog
+    v-model:show="addPanelOpen"
+    title="Add panel"
+    width="520px"
+    @close="panelError = null"
+  >
+    <form class="space-y-3" @submit.prevent="submitAddPanel">
+      <div>
+        <label for="panel-title" class="mb-1 block text-xs font-medium text-fg-secondary">
+          Title
+        </label>
+        <LInput
+          id="panel-title"
+          v-model:value="newPanelTitle"
+          placeholder="e.g. Train loss vs. step"
+        />
+      </div>
+      <div>
+        <label for="panel-keys" class="mb-1 block text-xs font-medium text-fg-secondary">
+          Metric keys <span class="font-normal text-fg-tertiary">(comma-separated)</span>
+        </label>
+        <LInput
+          id="panel-keys"
+          v-model:value="newPanelKeysText"
+          placeholder="train/loss,val/loss"
+        />
+      </div>
+      <div
+        v-if="panelError"
+        class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+      >
+        {{ panelError }}
+      </div>
+    </form>
+    <template #footer>
+      <div class="flex justify-end gap-2">
+        <LButton quaternary @click="addPanelOpen = false">Cancel</LButton>
+        <LButton @click="submitAddPanel">
+          Add panel
+        </LButton>
+      </div>
+    </template>
+  </LDialog>
 </template>

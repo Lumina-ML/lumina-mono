@@ -4,7 +4,10 @@ import {
   LIconButton,
   LTooltip,
   LButton,
+  LDialog,
+  LInput,
 } from "@lumina/ui";
+import { ref } from "vue";
 import ChartPanel, { type ChartPanelConfig } from "@/widgets/chart-panel/ChartPanel.vue";
 import { useConfirm } from "@/composables/useConfirm";
 
@@ -43,9 +46,25 @@ function toggleCollapsed() {
   patch({ collapsed: !props.section.collapsed });
 }
 
-function rename() {
-  const next = window.prompt("Rename section", props.section.name);
-  if (next && next.trim()) patch({ name: next.trim() });
+// Rename section dialog (replaces window.prompt).
+const renameOpen = ref(false);
+const renameDraft = ref("");
+const renameError = ref<string | null>(null);
+
+function openRename() {
+  renameDraft.value = props.section.name;
+  renameError.value = null;
+  renameOpen.value = true;
+}
+
+function submitRename() {
+  const name = renameDraft.value.trim();
+  if (!name) {
+    renameError.value = "Section name is required";
+    return;
+  }
+  patch({ name });
+  renameOpen.value = false;
 }
 
 function hide() {
@@ -106,7 +125,7 @@ function patchPanel(panelId: string, config: ChartPanelConfig) {
         </LButton>
         <template v-if="editable !== false">
           <LTooltip content="Rename section">
-            <LIconButton aria-label="Rename" @click="rename">
+            <LIconButton aria-label="Rename" @click="openRename">
               <Edit3 class="h-3.5 w-3.5" />
             </LIconButton>
           </LTooltip>
@@ -155,4 +174,38 @@ function patchPanel(panelId: string, config: ChartPanelConfig) {
       </div>
     </div>
   </section>
+
+  <LDialog
+    v-model:show="renameOpen"
+    title="Rename section"
+    width="480px"
+    @close="renameError = null"
+  >
+    <form class="space-y-3" @submit.prevent="submitRename">
+      <div>
+        <label for="section-rename" class="mb-1 block text-xs font-medium text-fg-secondary">
+          Section name <span class="text-accent-danger">*</span>
+        </label>
+        <LInput
+          id="section-rename"
+          v-model:value="renameDraft"
+          autofocus
+        />
+      </div>
+      <div
+        v-if="renameError"
+        class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+      >
+        {{ renameError }}
+      </div>
+    </form>
+    <template #footer>
+      <div class="flex justify-end gap-2">
+        <LButton quaternary @click="renameOpen = false">Cancel</LButton>
+        <LButton :disabled="!renameDraft.trim()" @click="submitRename">
+          Save
+        </LButton>
+      </div>
+    </template>
+  </LDialog>
 </template>
