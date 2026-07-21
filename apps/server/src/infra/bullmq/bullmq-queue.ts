@@ -2,6 +2,7 @@ import { Queue } from "bullmq";
 import { Redis } from "ioredis";
 import type { QueueJob } from "../../core/queue/queue.js";
 import { Queue as CoreQueue } from "../../core/queue/queue.js";
+import type { JobName } from "../../jobs/types.js";
 
 export interface BullMQQueueConfig {
   redisUrl: string;
@@ -27,7 +28,7 @@ export class BullMQQueue implements CoreQueue {
     });
   }
 
-  async enqueue(job: QueueJob): Promise<void> {
+  async enqueue<N extends JobName>(job: QueueJob<N>): Promise<void> {
     await this.queue.add(job.name, job.payload, {
       jobId: `${job.name}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
     });

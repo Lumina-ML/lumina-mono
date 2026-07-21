@@ -1,17 +1,33 @@
-import type { DomainEvent, KnownDomainEvent } from "../../core/events/domain-event.js";
+import {
+  type DomainEvent,
+  type KnownDomainEvent,
+  domainEventSchema,
+} from "../../core/events/domain-event.js";
 import type { EventBus, EventHandler } from "../../core/bus/event-bus.js";
 
 export class MemoryEventBus implements EventBus {
   private readonly handlers = new Map<string, Array<EventHandler<DomainEvent>>>();
 
   async publish(event: DomainEvent): Promise<void> {
-    const handlers = this.handlers.get(event.type) ?? [];
+    // Validate at the in-process boundary so a typo at a publish site
+    // ("ArtifactUpload" vs "ArtifactUploaded") fails fast instead of
+    // silently dispatching to zero subscribers.
+    const parseResult = domainEventSchema.safeParse(event);
+    if (!parseResult.success) {
+      console.error(
+        `Refusing to publish malformed event ${event.type}`,
+        parseResult.error.issues,
+      );
+      return;
+    }
+    const validated = parseResult.data;
+    const handlers = this.handlers.get(validated.type) ?? [];
     for (const handler of handlers) {
       try {
-        await handler(event);
+        await handler(validated);
       } catch (err) {
         // Event bus must not break the caller; log and continue.
-        console.error(`Event handler failed for ${event.type}`, err);
+        console.error(`Event handler failed for ${validated.type}`, err);
       }
     }
   }

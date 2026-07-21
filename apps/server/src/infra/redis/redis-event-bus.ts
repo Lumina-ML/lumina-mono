@@ -1,5 +1,9 @@
 import { Redis } from "ioredis";
-import type { DomainEvent, KnownDomainEvent } from "../../core/events/domain-event.js";
+import {
+  type DomainEvent,
+  type KnownDomainEvent,
+  domainEventSchema,
+} from "../../core/events/domain-event.js";
 import type { EventBus, EventHandler } from "../../core/bus/event-bus.js";
 
 export interface RedisEventBusConfig {
@@ -27,8 +31,20 @@ export class RedisEventBus implements EventBus {
     this.subscriber.on("message", async (channel, message) => {
       const eventType = channel.slice(this.channelPrefix.length);
       try {
-        const event = JSON.parse(message) as DomainEvent;
-        await this.dispatch(eventType, event);
+        // Zod parse (a) coerces `occurredAt` from the JSON string back to
+        // a Date so subscribers' date math doesn't silently NaN, and
+        // (b) rejects malformed payloads (missing fields, wrong types,
+        // unknown event type) instead of dispatching `DomainEvent`-typed
+        // garbage to subscribers.
+        const parseResult = domainEventSchema.safeParse(JSON.parse(message));
+        if (!parseResult.success) {
+          console.error(
+            `Failed to validate Redis event on ${channel}`,
+            parseResult.error.issues,
+          );
+          return;
+        }
+        await this.dispatch(eventType, parseResult.data);
       } catch (err) {
         console.error(`Failed to handle Redis event on ${channel}`, err);
       }

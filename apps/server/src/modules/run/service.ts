@@ -1,5 +1,6 @@
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { EventBus } from "../../core/bus/event-bus.js";
+import type { Queue } from "../../core/queue/queue.js";
 import type { CreateRunInput, UpdateRunInput } from "./schema.js";
 import { RunRepository } from "./repository.js";
 
@@ -17,6 +18,14 @@ export class RunService {
      * sites (system-metric / log-line routes) still type-check.
      */
     private readonly defaultWorkspaceId?: string,
+    /**
+     * Durable job queue. Optional during the legacy construction sites;
+     * the composition root (`apps/server/src/plugins/di.ts`) wires the
+     * real implementation in. Without this, the durable side of
+     * `run.finished` (cache invalidation hooks, analytics aggregators)
+     * silently no-ops — events still publish on the in-process bus.
+     */
+    private readonly queue?: Queue,
   ) {
     this.repository = new RunRepository(prisma);
   }
@@ -65,18 +74,28 @@ export class RunService {
   async update(runId: string, data: UpdateRunInput) {
     const run = await this.repository.updateByRunId(runId, data);
 
-    if (this.eventBus && data.status && ["finished", "failed", "crashed", "killed"].includes(data.status)) {
+    if (data.status && (TERMINAL_STATUSES as readonly string[]).includes(data.status)) {
       const workspaceId = run.project?.workspaceId ?? this.defaultWorkspaceId ?? "";
-      await this.eventBus.publish({
-        type: "RunFinished",
-        payload: {
-          runId: run.runId,
-          projectId: run.projectId,
-          workspaceId,
-          status: data.status,
-        },
-        occurredAt: new Date(),
-      });
+      const payload = {
+        runId: run.runId,
+        projectId: run.projectId,
+        workspaceId,
+        status: data.status,
+      };
+      // Publish for in-process subscribers (websocket fanout etc.).
+      if (this.eventBus) {
+        await this.eventBus.publish({
+          type: "RunFinished",
+          payload,
+          occurredAt: new Date(),
+        });
+      }
+      // Enqueue durable job for side effects (cache invalidation, analytics).
+      // Decoupled from the event so a failed subscriber doesn't block the
+      // queue path and vice versa.
+      if (this.queue) {
+        await this.queue.enqueue({ name: "run.finished", payload });
+      }
     }
 
     return run;
@@ -85,20 +104,26 @@ export class RunService {
   async finish(runId: string) {
     const run = await this.repository.updateByRunId(runId, { status: "finished" });
 
+    const workspaceId = run.project?.workspaceId ?? this.defaultWorkspaceId ?? "";
+    const payload = {
+      runId: run.runId,
+      projectId: run.projectId,
+      workspaceId,
+      status: "finished",
+    };
     if (this.eventBus) {
-      const workspaceId = run.project?.workspaceId ?? this.defaultWorkspaceId ?? "";
       await this.eventBus.publish({
         type: "RunFinished",
-        payload: {
-          runId: run.runId,
-          projectId: run.projectId,
-          workspaceId,
-          status: "finished",
-        },
+        payload,
         occurredAt: new Date(),
       });
+    }
+    if (this.queue) {
+      await this.queue.enqueue({ name: "run.finished", payload });
     }
 
     return run;
   }
 }
+
+const TERMINAL_STATUSES = ["finished", "failed", "crashed", "killed"] as const;

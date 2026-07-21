@@ -1,3 +1,8 @@
+// MUST be the first import — `reflect-metadata` polyfills
+// `Reflect.metadata` for tsyringe's `@injectable()` / `@inject()` decorators
+// to function at runtime. Without this, every `@inject("X")` resolves to
+// `Object` instead of the registered instance.
+import "reflect-metadata";
 import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import fastify from "fastify";

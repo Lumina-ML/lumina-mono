@@ -1,19 +1,11 @@
-import type { JobProcessor, JobContext } from "../types.js";
+import type { JobContext, JobProcessor, JobPayloadByName } from "../types.js";
 
-export class MetricLoggedProcessor implements JobProcessor {
+type Payload = JobPayloadByName["metric.logged"];
+
+export class MetricLoggedProcessor implements JobProcessor<"metric.logged"> {
   readonly name = "metric.logged";
 
-  async process(
-    job: { name: string; payload: unknown },
-    ctx: JobContext,
-  ): Promise<void> {
-    const payload = job.payload as {
-      runId: string;
-      projectId: string;
-      keys: string[];
-      count: number;
-    };
-
+  async process(payload: Payload, ctx: JobContext): Promise<void> {
     // Example async side effect: aggregate latest metric summary for the run.
     // In production, this could compute avg/max/min per key and update Run.summary.
     const result = await ctx.metricStorage.listMetrics(payload.runId, { limit: 10000 });

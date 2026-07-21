@@ -1,27 +1,25 @@
-import type { JobProcessor, JobContext } from "../types.js";
+import type { JobContext, JobProcessor, JobPayloadByName } from "../types.js";
 
-export class ArtifactUploadedProcessor implements JobProcessor {
+type Payload = JobPayloadByName["artifact.uploaded"];
+
+export class ArtifactUploadedProcessor implements JobProcessor<"artifact.uploaded"> {
   readonly name = "artifact.uploaded";
 
-  async process(
-    job: { name: string; payload: unknown },
-    _ctx: JobContext,
-  ): Promise<void> {
-    const payload = job.payload as {
-      artifactVersionId: string;
-      projectId: string;
-      fileCount: number;
-      digest?: string;
-    };
-
+  async process(payload: Payload, ctx: JobContext): Promise<void> {
     // The manifest (carrying `digest` + file list) is now persisted on the
     // ArtifactVersion row at finalize-time. Async side effects such as
     // thumbnail generation, embedding indexing, and content-search
     // ingestion can be hooked in here. For now, just log so the worker
     // surfaces activity in the registry.
-    console.log(
-      `Processing artifact upload: ${payload.artifactVersionId} ` +
-        `(${payload.fileCount} files, digest=${payload.digest ?? "n/a"})`,
+    ctx.logger.info(
+      {
+        artifactVersionId: payload.artifactVersionId,
+        projectId: payload.projectId,
+        workspaceId: payload.workspaceId,
+        fileCount: payload.fileCount,
+        digest: payload.digest,
+      },
+      "Processing artifact upload",
     );
   }
 }

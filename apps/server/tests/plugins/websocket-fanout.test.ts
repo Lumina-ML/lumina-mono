@@ -110,26 +110,10 @@ describe("websocket fanout (per-workspace channels)", () => {
     });
   });
 
-  it("falls back to defaultWorkspaceId when the event omits workspaceId", async () => {
-    const captured: Array<{ channel: string; event: string }> = [];
-    app.realtime.broadcast = (channel, event) => {
-      captured.push({ channel, event });
-    };
-
-    // Cast through `any` because the test's intent is exactly the
-    // defensive fallback path the new code added — a payload that's
-    // missing workspaceId should still produce a valid workspace channel
-    // (the server default) rather than silently dropping the broadcast.
-    const evt = {
-      type: "RunCreated",
-      payload: { runId: "r4", projectId: "p4" },
-      occurredAt: new Date(),
-    } as unknown as KnownDomainEvent;
-    await bus.publish(evt);
-
-    expect(captured).toContainEqual({
-      channel: `workspace:${TEST_CONFIG.defaultWorkspaceId}`,
-      event: "RunCreated",
-    });
-  });
+  // Note: the previous "falls back to defaultWorkspaceId" case was
+  // removed when the event payload schema became Zod-validated.
+  // Discriminated-union schemas now require `workspaceId` on every
+  // event, so the bus refuses to dispatch anything missing it — there
+  // is no longer a fallback path to test. The defense-in-depth now
+  // lives at the schema boundary, not in the websocket plugin.
 });
