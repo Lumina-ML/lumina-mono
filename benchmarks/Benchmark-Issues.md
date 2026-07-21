@@ -240,3 +240,54 @@
 | TR-1 | passed | trace_id=ec866190-6434-48fe-8b9d-4ab5b40a7aff elapsed_ms=90.45 |
 | TR-2 | passed | query_count=10 trace_ids=10 listed_count=45 elapsed_ms=787.76 |
 
+
+## 自动跑测补充：real L 级（2026-07-21 09:58:23）
+
+- 命令：`uv run python scenario_runner.py --mode real --level L`
+- 日志：`logs/scenario_real_L_20260721-043558.log`
+- 退出码：`1`
+- 汇总：PASSED=6 FAILED=12 SKIPPED=5
+
+### 各场景结果
+
+| Scenario | Status | 关键指标 / 错误 |
+|---|---|---|
+| AR-1 | skipped | Artifact size capped at 500 MB for this benchmark |
+| AR-2 | skipped | Artifact storage endpoint is not reachable from the benchmark host (presigned URL: http://minio:9000/lumina-artifacts/blobs/sha256/91/913bea5c2f5b94d7eede7a4ddec9110d312682917cbc114eb4f729a26428d02c/file_0000.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20260720%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260720T203558Z&X-Amz-Expires=300&X-Amz-Signature=1c8b8198ca3c8289e1d184ea56cd16370e7692d22b9ccb1853e0e801fd3e4b7e&X-Amz-SignedHeaders=host&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject). Run benchmarks inside the Docker network or configure a public S3 endpoint. |
+| AR-3 | passed | parent_version_id=924fd355-e4a8-45ab-a525-c31e70609ff4 child_version_id=a57a5fab-2838-43e0-b86e-0daa08f26db2 |
+| AW-1 | passed | default_workspace_id=default run_id=019f813e-1d0d-7784-9256-664ff3c8f056 create_elapsed_ms=9.07 isolated_status_code=403 |
+| AW-2 | skipped | HTTP 404: {"error":"Not found"} |
+| ET-1 | passed | init_ms=9.85 log_ms=651.52 finish_ms=31.64 |
+| ET-2 | failed | LuminaClientError: HTTP 404: {"error":"Run not found"} |
+| ET-3 | failed | LuminaClientError: HTTP 404: {"error":"Run not found"} |
+| ET-4 | failed | LuminaClientError: HTTP 404: {"error":"Run not found"} |
+| ET-5 | failed | LuminaClientError: HTTP 404: {"error":"Run not found"} |
+| EV-1 | failed | LuminaClientError: HTTP 404: {"error":"Artifact not found"} |
+| EV-2 | failed | LuminaClientError: HTTP 500: {"statusCode":500,"code":"P2003","error":"Internal Server Error","message":"\nInvalid `prisma.evaluation.create()` invocation:\n\n\nForeign key constraint violated: `Evaluation_runId_fkey (index)`"} |
+| LN-1 | failed | LuminaClientError: HTTP 500: {"statusCode":500,"code":"P2003","error":"Internal Server Error","message":"\nInvalid `prisma.launchRun.create()` invocation:\n\n\nForeign key constraint violated: `LaunchRun_runId_fkey (index)`"} |
+| LN-2 | failed | ValueError: Launch Job not found: bench-concurrent-job-1784599093 |
+| MD-1 | skipped | Artifact storage endpoint is not reachable from the benchmark host (presigned URL: http://minio:9000/lumina-artifacts/blobs/sha256/ea/eaa6abc3959144aad7472efa4de398579949ef494209a191a41c910cada55c3b/image.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20260721%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260721T015813Z&X-Amz-Expires=300&X-Amz-Signature=585e28e95fc9544a89bab4a70ce88090ba2c8c60abe430c590c3e3e4c83206f1&X-Amz-SignedHeaders=host&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject). Run benchmarks inside the Docker network or configure a public S3 endpoint. |
+| MD-2 | failed | LuminaClientError: HTTP 500: {"statusCode":500,"code":"P2003","error":"Internal Server Error","message":"\nInvalid `prisma.artifactFile.create()` invocation:\n\n\nForeign key constraint violated: `ArtifactFile_artifactVersionId_fkey (index)`"} |
+| MR-1 | skipped | Artifact size capped at 500 MB for this benchmark |
+| PA-1 | failed | LuminaClientError: HTTP 404: {"error":"Run not found"} |
+| RP-1 | failed | LuminaClientError: HTTP 500: {"statusCode":500,"code":"P2003","error":"Internal Server Error","message":"\nInvalid `prisma.project.create()` invocation:\n\n\nForeign key constraint violated: `Project_workspaceId_fkey (index)`"} |
+| SW-1 | failed | LuminaClientError: HTTP 500: {"statusCode":500,"code":"P2003","error":"Internal Server Error","message":"\nInvalid `prisma.project.create()` invocation:\n\n\nForeign key constraint violated: `Project_workspaceId_fkey (index)`"} |
+| SW-2 | passed | agents=16 trials_per_agent=3 expected_total=48 unique_runs=48 observations=48 elapsed_sec=1.064 trials/sec=45.1 |
+| TR-1 | passed | trace_id=2d130db9-7805-4945-8796-b492b5ba6f3b elapsed_ms=88.53 |
+| TR-2 | passed | query_count=100 trace_ids=100 listed_count=100 elapsed_ms=7419.35 |
+
+### 新增 failed 场景
+
+- `ET-2`: LuminaClientError: HTTP 404: {"error":"Run not found"}
+- `ET-3`: LuminaClientError: HTTP 404: {"error":"Run not found"}
+- `ET-4`: LuminaClientError: HTTP 404: {"error":"Run not found"}
+- `ET-5`: LuminaClientError: HTTP 404: {"error":"Run not found"}
+- `EV-1`: LuminaClientError: HTTP 404: {"error":"Artifact not found"}
+- `EV-2`: LuminaClientError: HTTP 500: {"statusCode":500,"code":"P2003","error":"Internal Server Error","message":"\nInvalid `prisma.evaluation.create()` invocation:\n\n\nForeign key constraint violated: `Evaluation_runId_fkey (index)`"}
+- `LN-1`: LuminaClientError: HTTP 500: {"statusCode":500,"code":"P2003","error":"Internal Server Error","message":"\nInvalid `prisma.launchRun.create()` invocation:\n\n\nForeign key constraint violated: `LaunchRun_runId_fkey (index)`"}
+- `LN-2`: ValueError: Launch Job not found: bench-concurrent-job-1784599093
+- `MD-2`: LuminaClientError: HTTP 500: {"statusCode":500,"code":"P2003","error":"Internal Server Error","message":"\nInvalid `prisma.artifactFile.create()` invocation:\n\n\nForeign key constraint violated: `ArtifactFile_artifactVersionId_fkey (index)`"}
+- `PA-1`: LuminaClientError: HTTP 404: {"error":"Run not found"}
+- `RP-1`: LuminaClientError: HTTP 500: {"statusCode":500,"code":"P2003","error":"Internal Server Error","message":"\nInvalid `prisma.project.create()` invocation:\n\n\nForeign key constraint violated: `Project_workspaceId_fkey (index)`"}
+- `SW-1`: LuminaClientError: HTTP 500: {"statusCode":500,"code":"P2003","error":"Internal Server Error","message":"\nInvalid `prisma.project.create()` invocation:\n\n\nForeign key constraint violated: `Project_workspaceId_fkey (index)`"}
+
