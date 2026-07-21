@@ -36,7 +36,9 @@ export interface NavGroup {
  * Launch / Sweeps / Artifacts / Evaluations) have been removed — those
  * concepts are project-scoped and reachable from the project tab bar.
  * The Settings entry is a single link; sub-pages (members, api-keys,
- * billing) are navigated via the SettingsLayout's left rail.
+ * billing) are navigated via the SettingsLayout's left rail. Billing was
+ * removed in Phase 2 of the code-review fix plan; the sub-pages list now
+ * is just (members, api-keys, alerts).
  */
 const NAV_GROUPS: NavGroup[] = [
   {
