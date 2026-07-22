@@ -171,6 +171,17 @@ const router = createRouter({
               props: true,
             },
             {
+              // Project-scoped metrics browser. Distinct from
+              // /projects/:id/runs/:runId#metrics (RunDetail's per-run
+              // metrics tab) — this aggregates recent runs in the
+              // project so users can scan "is my loss still going
+              // down?" across the whole project at once.
+              path: "metrics",
+              name: "ProjectMetrics",
+              component: () =>
+                import("@/modules/project/pages/ProjectMetrics.vue"),
+            },
+            {
               path: "launch",
               name: "ProjectLaunch",
               component: () => import("@/modules/project/pages/ProjectLaunch.vue"),

@@ -86,6 +86,7 @@ function projectNavGroup(projectId: string, _projectName: string): NavGroup {
       { label: "Reports", to: `${base}/reports`, icon: FileText },
       { label: "Evaluations", to: `${base}/evaluations`, icon: Activity },
       { label: "Traces", to: `${base}/traces`, icon: Activity },
+      { label: "Metrics", to: `${base}/metrics`, icon: Activity },
       { label: "Launch", to: `${base}/launch`, icon: Rocket },
       { label: "Settings", to: `${base}/settings`, icon: Settings },
     ],
