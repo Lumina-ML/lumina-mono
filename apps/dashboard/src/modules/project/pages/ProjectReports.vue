@@ -2,7 +2,7 @@
 import { computed, ref, h } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
-import { LCard, LDataTable, LButton, LEmpty, LDialog, LInput } from "@lumina/ui";
+import { LCard, LDataTable, LButton, LEmpty, LDialog, LInput, LSkeleton } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { Plus } from "lucide-vue-next";
 import { useReports } from "@/modules/report/composables/useReports";
@@ -109,7 +109,11 @@ const columns: ColumnDef<Report>[] = [
     </div>
 
     <LCard class="p-0">
+      <div v-if="isLoading" class="space-y-3 p-4">
+        <LSkeleton :repeat="6" text />
+      </div>
       <LDataTable
+        v-else
         :data="reports?.items ?? []"
         :columns="columns"
         :loading="isLoading"

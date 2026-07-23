@@ -6,6 +6,7 @@ import {
   LInput,
   LTag,
   LSelect,
+  LTextarea,
 } from "@lumina/ui";
 import { Trash2, ArrowUp, ArrowDown, Plus, Code } from "lucide-vue-next";
 import type { Block, BlockType } from "./blocks";
@@ -214,12 +215,12 @@ function unknownType(b: Block): string {
               "
             />
           </div>
-          <textarea
+          <LTextarea
             :value="block.data.source"
             placeholder="paste code…"
-            rows="6"
-            class="w-full rounded-md border border-border bg-canvas p-3 font-mono text-xs focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
-            @input="(e) => setBlockCode(index, (e.target as HTMLTextAreaElement).value, block.data.language)"
+            :rows="6"
+            class="!w-full !rounded-md !border !border-border !bg-canvas !p-3 !font-mono !text-xs"
+            @update:value="(v: string | null) => setBlockCode(index, v ?? '', block.data.language)"
           />
         </div>
 

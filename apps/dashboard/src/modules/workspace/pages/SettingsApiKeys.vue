@@ -51,14 +51,15 @@ async function revoke() {
   const ok = await confirm({
     title: "Revoke this API key?",
     message:
-      "Any active clients using it will start receiving 401s immediately.",
-    confirmText: "Revoke key",
+      "Any active clients using the current key will start receiving 401s immediately. A new key will be issued — copy it before dismissing the dialog.",
+    confirmText: "Revoke + rotate",
     tone: "danger",
   });
   if (!ok) return;
-  // Backend has no list/revoke endpoints yet — surface intent + rotate by
-  // re-generating.
-  toast.warning("Revoke isn't wired yet — generating a new key as a stopgap.");
+  // The server doesn't yet have a dedicated "revoke" endpoint;
+  // generating a fresh key rotates it server-side and the old key is
+  // immediately invalidated (any auth lookup by old key fails). This is
+  // the same pattern `lumina.User.rotate()` uses internally.
   generateMutation.mutate(currentUserId.value);
 }
 

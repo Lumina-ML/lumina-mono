@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, h } from "vue";
+import { ref, computed, h, watch } from "vue";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
   LCard,
   LDataTable,
@@ -80,6 +80,32 @@ function openCreate() {
   createError.value = null;
   createOpen.value = true;
 }
+
+// `/models?new=1` deep-links straight into the create dialog so an
+// external "Register a model" CTA doesn't leave users stranded on an
+// empty list page. We can't fire `openCreate()` the moment the watcher
+// runs — `effectiveProjectId` is computed from `useProjects()` and is
+// undefined until the request resolves, so the Create button throws
+// "Pick a project first". Defer the dialog until the project picker
+// actually has a value, then consume the query so navigating projects
+// doesn't reopen it.
+const route = useRoute();
+const router = useRouter();
+const deepLinkNew = computed(
+  () => route.query.new === "1" || route.query.new === "true",
+);
+watch(
+  [effectiveProjectId, deepLinkNew],
+  ([projId, newFlag]) => {
+    if (newFlag && projId) {
+      openCreate();
+      // Drop the query param so subsequent project changes don't reopen
+      // the dialog for the same deep-link.
+      router.replace({ query: { ...route.query, new: undefined } });
+    }
+  },
+  { immediate: true },
+);
 
 const createMutation = useMutation({
   mutationFn: () => {

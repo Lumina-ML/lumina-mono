@@ -8,7 +8,7 @@ import {
   Lock,
   Search,
 } from "lucide-vue-next";
-import { LSelect, LEmpty, LTag, LIconButton, LTooltip, LInput } from "@lumina/ui";
+import { LSelect, LEmpty, LTag, LIconButton, LTooltip, LInput, LButton } from "@lumina/ui";
 import { redactLogMessage } from "@/composables/useLogRedaction";
 import { useDateFormat } from "@/composables/useDateFormat";
 import type { LogLine, LogLevel } from "@/types/log-line";
@@ -225,9 +225,10 @@ const showJumpToBottom = computed(
           <span class="w-12 flex-shrink-0 select-none text-right text-fg-tertiary">
             {{ virtualRow.index + 1 }}
           </span>
-          <button
-            type="button"
-            class="w-44 flex-shrink-0 cursor-pointer truncate text-left text-fg-tertiary hover:text-fg-primary"
+          <LButton
+            quaternary
+            size="xs"
+            class="!w-44 !flex-shrink-0 !cursor-pointer !truncate !text-left !text-fg-tertiary hover:!text-fg-primary !justify-start !p-0"
             :title="`Permalink to line ${virtualRow.index + 1}`"
             @click="copyLine(virtualRow.index)"
           >
@@ -237,7 +238,7 @@ const showJumpToBottom = computed(
               :class="copiedLine === virtualRow.index ? 'text-accent-success' : 'opacity-0 group-hover:opacity-100'"
             />
             {{ formatDate(redactedLogs[virtualRow.index].timestamp) }}
-          </button>
+          </LButton>
           <span
             v-if="redactedLogs[virtualRow.index].level"
             :class="[

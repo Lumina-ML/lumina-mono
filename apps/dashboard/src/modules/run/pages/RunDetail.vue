@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useRoute, RouterLink } from "vue-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
@@ -13,10 +13,6 @@ import {
   LEmpty,
   LJsonView,
   LTraceTimeline,
-  LDialog,
-  LTextarea,
-  LInput,
-  LSelect,
   LIconButton,
 } from "@lumina/ui";
 import type { TraceSpan } from "@lumina/ui";
@@ -34,7 +30,6 @@ import {
   StopCircle,
   XCircle,
   Trash2,
-  AlertTriangle,
   RotateCcw,
   Play,
   Send,
@@ -44,14 +39,13 @@ import {
   Download,
 } from "lucide-vue-next";
 import { useRun } from "@/modules/run/composables/useRuns";
-import { useMetrics } from "@/modules/metric/composables/useMetrics";
-import { useSystemMetrics } from "@/modules/metric/composables/useSystemMetrics";
 import { useLogLines } from "@/modules/log-line/composables/useLogLines";
 import { useRunTags } from "@/modules/run/composables/useTags";
-import MetricChart from "@/widgets/metric-chart/MetricChart.vue";
 import LogViewer from "@/widgets/log-viewer/LogViewer.vue";
 import TagList from "@/widgets/tag-list/TagList.vue";
 import QueryBoundary from "@/components/QueryBoundary.vue";
+import RunDetailDialogs from "@/modules/run/components/RunDetailDialogs.vue";
+import RunMetricPanel from "@/modules/run/components/RunMetricPanel.vue";
 import { useDateFormat } from "@/composables/useDateFormat";
 import { useAutoRefresh } from "@/composables/useAutoRefresh";
 import { useRealtimeSubscription } from "@/composables/useRealtimeSubscription";
@@ -72,8 +66,8 @@ const queryClient = useQueryClient();
 const runId = computed(() => route.params.runId as string);
 
 const { data: run, isLoading: isRunLoading, isError: isRunError, error: runError, refetch: refetchRun } = useRun(runId);
-const { data: metrics, isLoading: isMetricsLoading, refetch: refetchMetrics } = useMetrics(runId);
-const { data: systemMetrics, isLoading: isSystemMetricsLoading, refetch: refetchSystemMetrics } = useSystemMetrics(runId);
+// Metrics charts moved to RunMetricPanel; refetches below use the same
+// queryKeys so Vue Query dedupes between the panel and our invalides.
 const { data: logLines, isLoading: isLogsLoading, refetch: refetchLogs } = useLogLines(runId);
 const { data: runTags, isLoading: isTagsLoading, refetch: refetchTags } = useRunTags(runId);
 
@@ -111,8 +105,8 @@ useAutoRefresh(
   5000,
   () => {
     refetchRun();
-    refetchMetrics();
-    refetchSystemMetrics();
+    queryClient.invalidateQueries({ queryKey: ["metrics", runId.value] });
+    queryClient.invalidateQueries({ queryKey: ["systemMetrics", runId.value] });
     refetchLogs();
     refetchTags();
   },
@@ -123,93 +117,6 @@ const durationMs = computed(() => {
   const end = run.value.finishedAt ? new Date(run.value.finishedAt).getTime() : Date.now();
   return end - new Date(run.value.createdAt).getTime();
 });
-
-const metricKeys = computed(() =>
-  metrics.value ? Object.keys(metrics.value.metrics) : [],
-);
-const selectedKeys = ref<string[]>([]);
-
-// Persist the user's metric selection per project/run so reopening a run
-// restores the chart they were looking at.
-const METRIC_KEYS_STORAGE_PREFIX = "lumina:run-metric-keys:";
-const metricStorageKey = computed(() =>
-  run.value
-    ? `${METRIC_KEYS_STORAGE_PREFIX}${run.value.projectId}:${run.value.runId}`
-    : null,
-);
-
-function readPersistedKeys(): string[] | null {
-  if (!metricStorageKey.value) return null;
-  try {
-    const raw = localStorage.getItem(metricStorageKey.value);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((k): k is string => typeof k === "string")
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-// Default selection: keys that appear in the run's summary (the metrics the
-// SDK flagged as "the ones that matter") come first, then the remaining keys
-// alphabetically, capped at 5. Falls back to plain alphabetical when there's
-// no summary.
-function defaultKeys(keys: string[]): string[] {
-  const summary = (run.value?.summary ?? {}) as Record<string, unknown>;
-  const summaryKeys = Object.keys(summary).filter((k) => keys.includes(k));
-  const rest = keys
-    .filter((k) => !summaryKeys.includes(k))
-    .sort((a, b) => a.localeCompare(b));
-  return [...summaryKeys, ...rest].slice(0, 5);
-}
-
-// Initialize the selection once per run, once its metrics have loaded — a
-// persisted choice (filtered to keys that still exist) wins, otherwise the
-// summary-first default. `initializedFor` stops later metric updates for the
-// same run from clobbering the user's toggles.
-const initializedFor = ref<string | null>(null);
-watch(
-  [metricKeys, () => run.value?.runId, isMetricsLoading],
-  ([keys, currentRunId, loading]) => {
-    if (!currentRunId || loading || keys.length === 0) return;
-    if (initializedFor.value === currentRunId) return;
-
-    const persisted =
-      readPersistedKeys()?.filter((k) => keys.includes(k)) ?? [];
-    selectedKeys.value = persisted.length > 0 ? persisted : defaultKeys(keys);
-    initializedFor.value = currentRunId;
-  },
-  { immediate: true },
-);
-
-// Persist toggles (after the initial hydrate) so they survive a refresh.
-watch(selectedKeys, (keys) => {
-  if (!metricStorageKey.value || initializedFor.value === null) return;
-  try {
-    localStorage.setItem(metricStorageKey.value, JSON.stringify(keys));
-  } catch {
-    // storage unavailable / over quota — non-fatal, selection stays in-memory
-  }
-});
-
-const filteredMetrics = computed(() => {
-  if (!metrics.value) return {};
-  const out: Record<string, (typeof metrics.value.metrics)[string]> = {};
-  for (const key of selectedKeys.value) {
-    if (metrics.value.metrics[key]) out[key] = metrics.value.metrics[key]!;
-  }
-  return out;
-});
-
-function toggleKey(key: string) {
-  if (selectedKeys.value.includes(key)) {
-    selectedKeys.value = selectedKeys.value.filter((k) => k !== key);
-  } else {
-    selectedKeys.value = [...selectedKeys.value, key];
-  }
-}
 
 // ── Traces (linked to this run via metadata.runId) ──────────────────────
 const { data: tracesForRun } = useQuery({
@@ -417,10 +324,6 @@ function confirmCancel() {
   cancelOpen.value = false;
 }
 
-const canConfirmCancel = computed(
-  () => !!run.value && cancelConfirm.value.trim() === run.value.name,
-);
-
 // ── Notes editor dialog ─────────────────────────────────────────────────
 const notesOpen = ref(false);
 const notesDraft = ref("");
@@ -459,10 +362,6 @@ const deleteMutation = useMutation({
   },
   onError: (e) => toast.error(`Delete failed: ${(e as Error).message}`),
 });
-
-const canDelete = computed(
-  () => !!run.value && deleteConfirm.value.trim() === run.value.name,
-);
 
 // ── Run lifecycle: resume / rewind / stop-signal / alert / use-artifact ─
 const {
@@ -564,7 +463,7 @@ const resumeOpen = ref(false);
 
 const rewindOpen = ref(false);
 const rewindMetricName = ref("");
-const rewindMetricValue = ref("");
+const rewindMetricValue = ref(0);
 const rewindError = ref<string | null>(null);
 
 const alertOpen = ref(false);
@@ -577,7 +476,7 @@ const useArtifactVersionId = ref("");
 
 function openRewindDialog() {
   rewindMetricName.value = "";
-  rewindMetricValue.value = "";
+  rewindMetricValue.value = 0;
   rewindError.value = null;
   rewindOpen.value = true;
 }
@@ -585,7 +484,7 @@ function openRewindDialog() {
 function submitRewind() {
   rewindError.value = null;
   const name = rewindMetricName.value.trim();
-  const value = Number(rewindMetricValue.value);
+  const value = rewindMetricValue.value;
   if (!name) {
     rewindError.value = "Metric name is required";
     return;
@@ -825,54 +724,12 @@ function toggleStopSignal() {
 
       <!-- ── Metrics ─────────────────────────────────────────────────── -->
       <LTabPane name="metrics" tab="Metrics">
-        <LCard>
-          <div
-            v-if="isMetricsLoading"
-            class="py-12 text-center text-muted-foreground"
-          >
-            Loading metrics…
-          </div>
-          <div
-            v-else-if="metricKeys.length === 0"
-            class="py-12 text-center text-muted-foreground"
-          >
-            No metrics logged yet.
-          </div>
-          <div v-else class="space-y-4">
-            <div class="flex flex-wrap gap-2">
-              <LTag
-                v-for="key in metricKeys"
-                :key="key"
-                :type="selectedKeys.includes(key) ? 'primary' : 'default'"
-                size="small"
-                class="cursor-pointer"
-                @click="toggleKey(key)"
-              >
-                {{ key }}
-              </LTag>
-            </div>
-            <MetricChart :metrics="filteredMetrics" />
-          </div>
-        </LCard>
+        <RunMetricPanel :run-id="run.runId" :run="run" source="run" />
       </LTabPane>
 
       <!-- ── System ──────────────────────────────────────────────────── -->
       <LTabPane name="system" tab="System">
-        <LCard>
-          <div
-            v-if="isSystemMetricsLoading"
-            class="py-12 text-center text-muted-foreground"
-          >
-            Loading system metrics…
-          </div>
-          <div
-            v-else-if="!systemMetrics || Object.keys(systemMetrics.metrics).length === 0"
-            class="py-12 text-center text-muted-foreground"
-          >
-            No system metrics logged yet.
-          </div>
-          <MetricChart v-else :metrics="systemMetrics.metrics" />
-        </LCard>
+        <RunMetricPanel :run-id="run.runId" :run="run" source="system" />
       </LTabPane>
 
       <!-- ── Logs ────────────────────────────────────────────────────── -->
@@ -1084,407 +941,33 @@ function toggleStopSignal() {
       </LTabPane>
     </LTabs>
 
-    <!-- Notes editor -->
-    <LDialog
-      v-model:show="notesOpen"
-      title="Run notes"
-      width="540px"
-      @close="notesError = null"
-    >
-      <div class="space-y-3">
-        <p class="text-xs text-fg-tertiary">
-          Free-form notes for this run. Visible to everyone with access to the
-          project. Markdown is rendered as plain text.
-        </p>
-        <LTextarea
-          v-model:value="notesDraft"
-          :rows="8"
-          placeholder="Why did this run produce these metrics? What was tried?"
-          @keydown.meta.enter="saveNotes"
-          @keydown.ctrl.enter="saveNotes"
-        />
-        <div
-          v-if="notesError"
-          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
-        >
-          {{ notesError }}
-        </div>
-        <div class="flex items-center justify-between text-[11px] text-fg-tertiary">
-          <span>{{ notesDraft.length }} characters</span>
-          <span>Press ⌘+Enter to save</span>
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton quaternary @click="notesOpen = false">Cancel</LButton>
-          <LButton
-            :loading="updateMutation.isPending.value"
-            @click="saveNotes"
-          >
-            Save notes
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Cancel run confirmation ─────────────────────────────────── -->
-    <LDialog
-      v-model:show="cancelOpen"
-      title="Cancel this run?"
-      width="480px"
-      @close="cancelConfirm = ''"
-    >
-      <div class="space-y-3">
-        <div
-          class="flex items-start gap-2 rounded-md border border-accent-warning/30 bg-accent-warning/10 p-3 text-xs"
-        >
-          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-warning" />
-          <div>
-            <div class="font-medium">
-              Cancellation flips the run's status to <code class="font-mono">killed</code>
-              and is recorded in the audit log.
-            </div>
-            <div class="text-fg-tertiary">
-              If you're still inside a training loop, the SDK will pick up the
-              status change on its next heartbeat. Use <em>preempt</em> instead
-              if you want a softer stop.
-            </div>
-          </div>
-        </div>
-
-        <div class="space-y-1">
-          <label
-            for="run-cancel-confirm"
-            class="text-xs font-medium text-fg-secondary"
-          >
-            Type the run name
-            <code class="font-mono text-fg-primary">{{ run.name }}</code>
-            to confirm.
-          </label>
-          <LInput
-            id="run-cancel-confirm"
-            v-model:value="cancelConfirm"
-            :placeholder="run.name"
-            autocomplete="off"
-            spellcheck="false"
-            :disabled="updateMutation.isPending.value"
-            @keydown.enter="canConfirmCancel && confirmCancel()"
-          />
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton
-            quaternary
-            :disabled="updateMutation.isPending.value"
-            @click="cancelOpen = false"
-          >
-            Keep running
-          </LButton>
-          <LButton
-            type="warning"
-            :disabled="!canConfirmCancel"
-            :loading="updateMutation.isPending.value"
-            @click="confirmCancel"
-          >
-            <XCircle class="mr-1 h-3 w-3" />
-            Cancel run
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Delete run confirmation ─────────────────────────────────── -->
-    <LDialog
-      v-model:show="deleteOpen"
-      title="Delete this run?"
-      width="480px"
-      @close="deleteConfirm = ''"
-    >
-      <div class="space-y-3">
-        <div
-          class="flex items-start gap-2 rounded-md border border-accent-danger/30 bg-accent-danger/10 p-3 text-xs"
-        >
-          <AlertTriangle class="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-danger" />
-          <div>
-            <div class="font-medium">
-              This permanently deletes the run, every metric, log line,
-              system metric, tag, and artifact attached to it.
-            </div>
-            <div class="text-fg-tertiary">
-              There is no undo. Consider preempting or adding notes instead.
-            </div>
-          </div>
-        </div>
-
-        <div class="space-y-1">
-          <label
-            for="run-delete-confirm"
-            class="text-xs font-medium text-fg-secondary"
-          >
-            Type the run name
-            <code class="font-mono text-fg-primary">{{ run.name }}</code>
-            to confirm.
-          </label>
-          <LInput
-            id="run-delete-confirm"
-            v-model:value="deleteConfirm"
-            :placeholder="run.name"
-            autocomplete="off"
-            spellcheck="false"
-            :disabled="deleteMutation.isPending.value"
-            @keydown.enter="canDelete && deleteMutation.mutate()"
-          />
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton
-            quaternary
-            :disabled="deleteMutation.isPending.value"
-            @click="deleteOpen = false"
-          >
-            Cancel
-          </LButton>
-          <LButton
-            type="error"
-            :disabled="!canDelete"
-            :loading="deleteMutation.isPending.value"
-            @click="deleteMutation.mutate()"
-          >
-            <Trash2 class="mr-1 h-3 w-3" />
-            Delete permanently
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Resume state ──────────────────────────────────────────────── -->
-    <LDialog
-      v-model:show="resumeOpen"
-      title="Resume state"
-      width="600px"
-      @close="resumeOpen = false"
-    >
-      <div v-if="isResumeStateLoading" class="py-8">
-        <LSkeleton text :repeat="3" />
-      </div>
-      <div v-else-if="resumeState" class="space-y-4 text-sm">
-        <div class="grid grid-cols-3 gap-3">
-          <LCard class="p-3">
-            <div class="text-[10px] uppercase tracking-wider text-fg-tertiary">History rows</div>
-            <div class="font-mono text-lg">{{ resumeState.historyLineCount }}</div>
-          </LCard>
-          <LCard class="p-3">
-            <div class="text-[10px] uppercase tracking-wider text-fg-tertiary">Events rows</div>
-            <div class="font-mono text-lg">{{ resumeState.eventsLineCount }}</div>
-          </LCard>
-          <LCard class="p-3">
-            <div class="text-[10px] uppercase tracking-wider text-fg-tertiary">Log lines</div>
-            <div class="font-mono text-lg">{{ resumeState.logLineCount }}</div>
-          </LCard>
-        </div>
-        <div>
-          <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-fg-tertiary">Tags</h4>
-          <div class="flex flex-wrap gap-2">
-            <LTag
-              v-for="tag in resumeState.tags"
-              :key="tag"
-              size="small"
-              round
-            >
-              {{ tag }}
-            </LTag>
-            <span v-if="resumeState.tags.length === 0" class="text-fg-tertiary">No tags</span>
-          </div>
-        </div>
-        <div>
-          <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-fg-tertiary">Config</h4>
-          <LJsonView :data="resumeState.config" :deep="2" />
-        </div>
-      </div>
-      <LEmpty
-        v-else
-        title="No resume state"
-        description="The run could not be found."
-      />
-      <template #footer>
-        <div class="flex justify-end">
-          <LButton @click="resumeOpen = false">Close</LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Rewind run ────────────────────────────────────────────────── -->
-    <LDialog
-      v-model:show="rewindOpen"
-      title="Rewind run"
-      width="480px"
-      @close="rewindError = null"
-    >
-      <div class="space-y-3">
-        <p class="text-xs text-fg-tertiary">
-          Rewind truncates metric history to the last step where the chosen
-          metric equalled the given value. The SDK can then resume from that
-          point.
-        </p>
-        <div>
-          <label
-            for="rewind-metric"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Metric name <span class="text-accent-danger">*</span>
-          </label>
-          <LInput
-            id="rewind-metric"
-            v-model:value="rewindMetricName"
-            placeholder="e.g. train/loss"
-          />
-        </div>
-        <div>
-          <label
-            for="rewind-value"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Metric value <span class="text-accent-danger">*</span>
-          </label>
-          <LInput
-            id="rewind-value"
-            v-model:value="rewindMetricValue"
-            placeholder="e.g. 0.42"
-          />
-        </div>
-        <div
-          v-if="rewindError"
-          class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
-        >
-          {{ rewindError }}
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton quaternary @click="rewindOpen = false">Cancel</LButton>
-          <LButton
-            :loading="rewindMutation.isPending.value"
-            :disabled="!rewindMetricName.trim() || !rewindMetricValue.trim()"
-            @click="submitRewind"
-          >
-            <RotateCcw class="mr-1 h-3 w-3" />
-            Rewind
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Send alert ────────────────────────────────────────────────── -->
-    <LDialog
-      v-model:show="alertOpen"
-      title="Send run alert"
-      width="480px"
-      @close="alertOpen = false"
-    >
-      <div class="space-y-3">
-        <div>
-          <label
-            for="alert-level"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Level
-          </label>
-          <LSelect
-            id="alert-level"
-            v-model:value="alertLevel"
-            :options="[
-              { value: 'INFO', label: 'Info' },
-              { value: 'WARN', label: 'Warning' },
-              { value: 'ERROR', label: 'Error' },
-            ]"
-          />
-        </div>
-        <div>
-          <label
-            for="alert-title"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Title <span class="text-accent-danger">*</span>
-          </label>
-          <LInput
-            id="alert-title"
-            v-model:value="alertTitle"
-            placeholder="e.g. Loss exploded"
-          />
-        </div>
-        <div>
-          <label
-            for="alert-text"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Message <span class="text-accent-danger">*</span>
-          </label>
-          <LTextarea
-            id="alert-text"
-            v-model:value="alertText"
-            :rows="3"
-            placeholder="Describe what happened..."
-          />
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton quaternary @click="alertOpen = false">Cancel</LButton>
-          <LButton
-            :loading="sendAlertMutation.isPending.value"
-            :disabled="!alertTitle.trim() || !alertText.trim()"
-            @click="submitAlert"
-          >
-            <Send class="mr-1 h-3 w-3" />
-            Send alert
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
-
-    <!-- ── Use artifact ──────────────────────────────────────────────── -->
-    <LDialog
-      v-model:show="useArtifactOpen"
-      title="Record artifact usage"
-      width="480px"
-      @close="useArtifactOpen = false"
-    >
-      <div class="space-y-3">
-        <p class="text-xs text-fg-tertiary">
-          Record that this run used an artifact version (input, output, job,
-          etc.). The link is stored in the run's artifact usage log.
-        </p>
-        <div>
-          <label
-            for="use-artifact-version"
-            class="mb-1 block text-xs font-medium text-fg-secondary"
-          >
-            Artifact version ID <span class="text-accent-danger">*</span>
-          </label>
-          <LInput
-            id="use-artifact-version"
-            v-model:value="useArtifactVersionId"
-            placeholder="e.g. 019234ab-…"
-          />
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <LButton quaternary @click="useArtifactOpen = false">Cancel</LButton>
-          <LButton
-            :loading="useArtifactMutation.isPending.value"
-            :disabled="!useArtifactVersionId.trim()"
-            @click="useArtifactMutation.mutate(useArtifactVersionId.trim())"
-          >
-            <Box class="mr-1 h-3 w-3" />
-            Record usage
-          </LButton>
-        </div>
-      </template>
-    </LDialog>
+    <RunDetailDialogs
+      :run="run"
+      v-model:notes-open="notesOpen"
+      v-model:notes-draft="notesDraft"
+      v-model:cancel-open="cancelOpen"
+      v-model:cancel-confirm="cancelConfirm"
+      v-model:delete-open="deleteOpen"
+      v-model:delete-confirm="deleteConfirm"
+      v-model:resume-open="resumeOpen"
+      :resume-state="resumeState"
+      :is-resume-state-loading="isResumeStateLoading"
+      v-model:rewind-open="rewindOpen"
+      v-model:rewind-metric-name="rewindMetricName"
+      v-model:rewind-metric-value="rewindMetricValue"
+      :rewind-error="rewindError"
+      v-model:alert-open="alertOpen"
+      v-model:alert-level="alertLevel"
+      v-model:alert-title="alertTitle"
+      v-model:alert-text="alertText"
+      v-model:use-artifact-open="useArtifactOpen"
+      v-model:use-artifact-version-id="useArtifactVersionId"
+      @submit-notes="saveNotes"
+      @submit-cancel="confirmCancel"
+      @submit-delete="deleteMutation.mutate"
+      @submit-rewind="submitRewind"
+      @submit-alert="submitAlert"
+      @submit-use-artifact="useArtifactMutation.mutate(useArtifactVersionId.trim())"
+    />
   </div>
 </template>

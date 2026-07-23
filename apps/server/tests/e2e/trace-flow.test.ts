@@ -68,39 +68,39 @@ describe("trace flow", () => {
       },
     );
     expect(traceRes.status).toBe(201);
-    const trace = (await traceRes.json()) as { id: string; name: string };
+    const trace = (await traceRes.json()) as { traceId: string; name: string };
     expect(trace.name).toBe("chat-completion");
 
     // Create root span.
-    const rootRes = await e2e.request(`/api/v1/traces/${trace.id}/spans`, {
+    const rootRes = await e2e.request(`/api/v1/traces/${trace.traceId}/spans`, {
       method: "POST",
       token: apiKey,
       body: JSON.stringify({ name: "chat-completion", kind: "agent" }),
     });
     expect(rootRes.status).toBe(201);
-    const root = (await rootRes.json()) as { id: string; parentSpanId: string | null };
+    const root = (await rootRes.json()) as { spanId: string; parentSpanId: string | null };
     expect(root.parentSpanId).toBeNull();
 
     // Create child span.
-    const childRes = await e2e.request(`/api/v1/traces/${trace.id}/spans`, {
+    const childRes = await e2e.request(`/api/v1/traces/${trace.traceId}/spans`, {
       method: "POST",
       token: apiKey,
-      body: JSON.stringify({ name: "llm-call", kind: "llm", parentSpanId: root.id }),
+      body: JSON.stringify({ name: "llm-call", kind: "llm", parentSpanId: root.spanId }),
     });
     expect(childRes.status).toBe(201);
-    const child = (await childRes.json()) as { id: string; parentSpanId: string | null };
-    expect(child.parentSpanId).toBe(root.id);
+    const child = (await childRes.json()) as { spanId: string; parentSpanId: string | null };
+    expect(child.parentSpanId).toBe(root.spanId);
 
     // List spans.
-    const listRes = await e2e.request(`/api/v1/traces/${trace.id}/spans`, {
+    const listRes = await e2e.request(`/api/v1/traces/${trace.traceId}/spans`, {
       token: apiKey,
     });
     expect(listRes.status).toBe(200);
-    const spans = (await listRes.json()) as Array<{ id: string; name: string }>;
-    expect(spans.length).toBeGreaterThanOrEqual(2);
-    const ids = new Set(spans.map((s) => s.id));
-    expect(ids.has(root.id)).toBe(true);
-    expect(ids.has(child.id)).toBe(true);
+    const listBody = (await listRes.json()) as { items: Array<{ spanId: string; name: string }> };
+    expect(listBody.items.length).toBeGreaterThanOrEqual(2);
+    const ids = new Set(listBody.items.map((s) => s.spanId));
+    expect(ids.has(root.spanId)).toBe(true);
+    expect(ids.has(child.spanId)).toBe(true);
   });
 
   it("closes a span with latency and finishes the trace", async () => {
@@ -115,23 +115,23 @@ describe("trace flow", () => {
         body: JSON.stringify({ name: "finish-test" }),
       },
     );
-    const trace = (await traceRes.json()) as { id: string };
+    const trace = (await traceRes.json()) as { traceId: string };
 
-    const spanRes = await e2e.request(`/api/v1/traces/${trace.id}/spans`, {
+    const spanRes = await e2e.request(`/api/v1/traces/${trace.traceId}/spans`, {
       method: "POST",
       token: apiKey,
       body: JSON.stringify({ name: "do-work", kind: "internal" }),
     });
-    const span = (await spanRes.json()) as { id: string };
+    const span = (await spanRes.json()) as { spanId: string };
 
-    const patchSpan = await e2e.request(`/api/v1/spans/${span.id}`, {
+    const patchSpan = await e2e.request(`/api/v1/spans/${span.spanId}`, {
       method: "PATCH",
       token: apiKey,
       body: JSON.stringify({ latencyMs: 250, status: "ok" }),
     });
     expect(patchSpan.status).toBe(200);
 
-    const patchTrace = await e2e.request(`/api/v1/traces/${trace.id}`, {
+    const patchTrace = await e2e.request(`/api/v1/traces/${trace.traceId}`, {
       method: "PATCH",
       token: apiKey,
       body: JSON.stringify({ latencyMs: 250, status: "ok" }),

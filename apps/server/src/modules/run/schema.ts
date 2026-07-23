@@ -57,6 +57,10 @@ export const UpdateRunSchema = z.object({
 
 export const ListRunsQuerySchema = z.object({
   project: z.string().optional(),
+  // `projectId` is the canonical internal UUID; if present it wins over
+  // `project` (a name lookup). Lets the dashboard filter by route param
+  // without going through findByName.
+  projectId: z.string().uuid().optional(),
   status: RunStatusSchema.optional(),
   createdAfter: z.coerce.date().optional(),
   createdBefore: z.coerce.date().optional(),

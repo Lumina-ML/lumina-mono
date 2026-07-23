@@ -51,6 +51,8 @@ export interface UpdateRunInput {
 
 export interface ListRunsQuery {
   project?: string;
+  /** Canonical project UUID. Wins over `project` (a name) on the server. */
+  projectId?: string;
   status?: RunStatus;
   createdAfter?: string;
   createdBefore?: string;

@@ -31,6 +31,10 @@ const textSizeClass = computed(() => {
 
 <template>
   <span class="inline-flex items-center gap-2 leading-none">
+    <!-- Brand logo image — kept as a raw <img> because it's a static
+         asset, not an avatar/photo, so LAvatar's src+alt contract
+         doesn't fit. Allowed exception to the dashboard atom-only rule. -->
+    <!-- eslint-disable-next-line vue/no-restricted-html-elements -->
     <img
       src="/Lumina-Ml.png"
       alt="Lumina"

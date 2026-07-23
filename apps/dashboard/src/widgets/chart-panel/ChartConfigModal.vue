@@ -161,12 +161,28 @@ function setColor(runId: string, color: string) {
 
 const colorList = RUN_COLOR_PALETTE;
 
-function addMetricKey() {
-  const key = window.prompt("Metric key", "train/loss");
-  if (!key) return;
+// Add metric key dialog (replaces window.prompt). The outer <LDialog> is the
+// chart config modal itself; this nested LDialog opens on top via Teleport.
+const addMetricKeyOpen = ref(false);
+const newMetricKeyDraft = ref("");
+const metricKeyError = ref<string | null>(null);
+
+function openAddMetricKey() {
+  newMetricKeyDraft.value = "";
+  metricKeyError.value = null;
+  addMetricKeyOpen.value = true;
+}
+
+function submitAddMetricKey() {
+  const key = newMetricKeyDraft.value.trim();
+  if (!key) {
+    metricKeyError.value = "Metric key is required";
+    return;
+  }
   if (!draft.value.metricKeys.includes(key)) {
     draft.value.metricKeys = [...draft.value.metricKeys, key];
   }
+  addMetricKeyOpen.value = false;
 }
 
 function removeMetricKey(key: string) {
@@ -200,7 +216,7 @@ function removeMetricKey(key: string) {
               >
                 {{ key }}
               </LTag>
-              <LButton size="xs" quaternary @click="addMetricKey">
+              <LButton size="xs" quaternary @click="openAddMetricKey">
                 <Plus class="mr-1 h-3 w-3" />
                 Add
               </LButton>
@@ -382,21 +398,22 @@ function removeMetricKey(key: string) {
               {{ runNames[runId] ?? runId }}
             </span>
             <div class="flex flex-wrap gap-1">
-              <button
+              <LButton
                 v-for="c in colorList"
                 :key="c"
-                type="button"
+                quaternary
+                size="xs"
                 :class="[
-                  'h-5 w-5 rounded-sm border transition-transform',
+                  '!h-5 !w-5 !rounded-sm !border !p-0',
                   (colorOverrides[runId] ?? '') === c
-                    ? 'border-fg-primary scale-110'
-                    : 'border-border hover:scale-105',
+                    ? '!border-fg-primary !scale-110'
+                    : '!border-border hover:!scale-105',
                 ]"
                 :style="{ backgroundColor: c }"
                 :aria-label="`Set color ${c}`"
                 @click="setColor(runId, c)"
               />
-            </div>
+          </div>
           </li>
         </ul>
       </LTabPane>
@@ -439,6 +456,44 @@ function removeMetricKey(key: string) {
           <LButton quaternary @click="emit('update:open', false)">Cancel</LButton>
           <LButton @click="save">Save</LButton>
         </div>
+      </div>
+    </template>
+  </LDialog>
+
+  <LDialog
+    v-model:show="addMetricKeyOpen"
+    title="Add metric key"
+    width="480px"
+    @close="metricKeyError = null"
+  >
+    <form class="space-y-3" @submit.prevent="submitAddMetricKey">
+      <div>
+        <label for="metric-key-input" class="mb-1 block text-xs font-medium text-fg-secondary">
+          Metric key <span class="text-accent-danger">*</span>
+        </label>
+        <LInput
+          id="metric-key-input"
+          v-model:value="newMetricKeyDraft"
+          placeholder="train/loss"
+          autofocus
+        />
+      </div>
+      <div
+        v-if="metricKeyError"
+        class="rounded-md border border-accent-danger/30 bg-accent-danger/10 px-3 py-2 text-xs text-accent-danger"
+      >
+        {{ metricKeyError }}
+      </div>
+    </form>
+    <template #footer>
+      <div class="flex justify-end gap-2">
+        <LButton quaternary @click="addMetricKeyOpen = false">Cancel</LButton>
+        <LButton
+          :disabled="!newMetricKeyDraft.trim()"
+          @click="submitAddMetricKey"
+        >
+          Add
+        </LButton>
       </div>
     </template>
   </LDialog>

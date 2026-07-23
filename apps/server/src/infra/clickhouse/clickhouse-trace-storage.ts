@@ -187,7 +187,13 @@ export class ClickHouseTraceStorage implements TraceStorage {
         query_params: params,
       });
     }
-    return this.findTrace(traceId);
+    // ALTER TABLE … UPDATE is async in ClickHouse — a follow-up read can
+    // still see the pre-update row. Return the *requested* updates merged
+    // with the latest read so callers don't observe stale `latencyMs` /
+    // `status` / `finishedAt` on the response they just sent.
+    const current = await this.findTrace(traceId);
+    if (!current) return null;
+    return { ...current, ...updates };
   }
 
   async insertSpan(row: SpanRow): Promise<void> {
@@ -290,7 +296,12 @@ export class ClickHouseTraceStorage implements TraceStorage {
         query_params: params,
       });
     }
-    return this.findSpan(spanId);
+    // Same eventual-consistency caveat as updateTrace — merge the
+    // requested updates onto the latest read so the response matches
+    // what the caller just sent.
+    const current = await this.findSpan(spanId);
+    if (!current) return null;
+    return { ...current, ...updates };
   }
 
   private parseTraceRow(r: TraceRowJson): TraceRow {
@@ -375,5 +386,17 @@ interface SpanRowJson {
 }
 
 function toClickHouseDate(value: Date | string | number): string {
-  return new Date(value).toISOString();
+  // ClickHouse's query-parameter parser is strict about DateTime64 format
+  // and rejects the trailing `Z` that `Date.toISOString()` emits — passing
+  // `2026-07-21T16:33:10.449Z` to `ALTER TABLE … UPDATE finishedAt = {p}`
+  // fails with "only 23 of 24 bytes was parsed". The space-separated form
+  // is accepted by both row-level inserts (lenient parser) and ALTER
+  // parameters (strict parser), so we always emit it.
+  const d = new Date(value);
+  const pad = (n: number, len = 2) => String(n).padStart(len, "0");
+  return (
+    `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
+    `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}.` +
+    `${String(d.getUTCMilliseconds()).padStart(3, "0")}`
+  );
 }

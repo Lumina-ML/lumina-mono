@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { LButton } from "@lumina/ui";
 import type { SpanNode } from "./types";
 import { timeBounds } from "./types";
 
@@ -77,13 +78,14 @@ const rows = computed(() => flattenForTimeline(props.spans));
 
       <!-- Bars -->
       <div>
-        <button
+        <LButton
           v-for="row in rows"
           :key="row.span.id"
-          type="button"
+          quaternary
+          size="xs"
           :class="[
-            'flex w-full items-center border-b border-border text-left transition-colors',
-            selectedSpanId === row.span.id ? 'bg-accent-primary/5' : 'hover:bg-canvas',
+            '!flex w-full !items-center !border-b !border-border !text-left !rounded-none !p-0',
+            selectedSpanId === row.span.id ? '!bg-accent-primary/5' : 'hover:!bg-canvas',
           ]"
           @click="emit('select', row.span.id)"
         >
@@ -107,7 +109,7 @@ const rows = computed(() => flattenForTimeline(props.spans));
               :title="`${row.span.name}: ${spanWidth(row.span)}`"
             />
           </div>
-        </button>
+        </LButton>
       </div>
     </div>
   </div>

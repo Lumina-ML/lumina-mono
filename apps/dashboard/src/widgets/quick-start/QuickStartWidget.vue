@@ -88,14 +88,15 @@ const hasKey = computed(() => Boolean(authStore.apiKey));
     <div class="divide-y divide-border">
       <!-- Step 1 — Install -->
       <div>
-        <button
-          type="button"
-          class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium hover:bg-canvas"
+        <LButton
+          quaternary
+          size="sm"
+          class="!flex w-full !items-center !gap-2 !px-4 !py-2 !text-left !text-sm !font-medium hover:!bg-canvas !justify-start"
           @click="toggleStep(1)"
         >
           <component :is="openStep === 1 ? ChevronDown : ChevronRight" class="h-3.5 w-3.5" />
           <span class="flex-1">1. Install the SDK</span>
-        </button>
+        </LButton>
         <div v-if="openStep === 1" class="px-4 pb-3 pt-1">
           <div class="flex items-center gap-2 rounded-md border border-border bg-canvas p-2 font-mono text-xs">
             <code class="min-w-0 flex-1 truncate">{{ installCmd }}</code>
@@ -111,14 +112,15 @@ const hasKey = computed(() => Boolean(authStore.apiKey));
 
       <!-- Step 2 — Configure -->
       <div>
-        <button
-          type="button"
-          class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium hover:bg-canvas"
+        <LButton
+          quaternary
+          size="sm"
+          class="!flex w-full !items-center !gap-2 !px-4 !py-2 !text-left !text-sm !font-medium hover:!bg-canvas !justify-start"
           @click="toggleStep(2)"
         >
           <component :is="openStep === 2 ? ChevronDown : ChevronRight" class="h-3.5 w-3.5" />
           <span class="flex-1">2. Configure environment</span>
-        </button>
+        </LButton>
         <div v-if="openStep === 2" class="space-y-3 px-4 pb-3 pt-1">
           <div>
             <div class="mb-1 text-[11px] font-medium text-fg-secondary">
@@ -166,14 +168,15 @@ const hasKey = computed(() => Boolean(authStore.apiKey));
 
       <!-- Step 3 — First run -->
       <div>
-        <button
-          type="button"
-          class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium hover:bg-canvas"
+        <LButton
+          quaternary
+          size="sm"
+          class="!flex w-full !items-center !gap-2 !px-4 !py-2 !text-left !text-sm !font-medium hover:!bg-canvas !justify-start"
           @click="toggleStep(3)"
         >
           <component :is="openStep === 3 ? ChevronDown : ChevronRight" class="h-3.5 w-3.5" />
           <span class="flex-1">3. Run your first experiment</span>
-        </button>
+        </LButton>
         <div v-if="openStep === 3" class="px-4 pb-3 pt-1">
           <div class="flex items-start gap-2 rounded-md border border-border bg-canvas p-2 font-mono text-[11px] leading-relaxed">
             <pre class="min-w-0 flex-1 whitespace-pre-wrap break-all">{{ firstRunSnippet }}</pre>

@@ -93,23 +93,22 @@ function onClickItem(n: AppNotification) {
       <div class="flex items-center justify-between border-b border-border px-3 py-2">
         <div class="text-sm font-medium">Notifications</div>
         <div class="flex items-center gap-1">
-          <button
+          <LIconButton
             v-if="notifications.items.length > 0"
-            type="button"
-            class="rounded p-1 text-xs text-fg-tertiary hover:bg-canvas hover:text-fg-primary"
+            aria-label="Mark all read"
+            class="!rounded !p-1 !text-fg-tertiary hover:!text-fg-primary"
             @click="notifications.markAllRead"
           >
             <Check class="h-3.5 w-3.5" />
-          </button>
-          <button
+          </LIconButton>
+          <LIconButton
             v-if="notifications.items.length > 0"
-            type="button"
-            class="rounded p-1 text-xs text-fg-tertiary hover:bg-canvas hover:text-accent-danger"
             aria-label="Clear all"
+            class="!rounded !p-1 !text-fg-tertiary hover:!text-accent-danger"
             @click="notifications.clear"
           >
             <Trash2 class="h-3.5 w-3.5" />
-          </button>
+          </LIconButton>
         </div>
       </div>
 
@@ -127,9 +126,10 @@ function onClickItem(n: AppNotification) {
             class="group flex items-start gap-2 px-3 py-2 hover:bg-canvas"
             :class="n.read ? 'opacity-60' : ''"
           >
-            <button
-              type="button"
-              class="flex min-w-0 flex-1 items-start gap-2 text-left"
+            <LButton
+              quaternary
+              size="xs"
+              class="!justify-start !flex w-full min-w-0 flex-1 items-start gap-2 !text-left !p-0"
               @click="onClickItem(n)"
             >
               <component
@@ -156,15 +156,14 @@ function onClickItem(n: AppNotification) {
                   {{ formatDate(n.occurredAt) }}
                 </div>
               </div>
-            </button>
-            <button
-              type="button"
-              class="rounded p-1 text-fg-tertiary opacity-0 hover:bg-canvas hover:text-accent-danger group-hover:opacity-100"
+            </LButton>
+            <LIconButton
               :aria-label="`Dismiss ${n.title}`"
+              class="!rounded !p-1 !text-fg-tertiary opacity-0 hover:!text-accent-danger group-hover:opacity-100"
               @click="notifications.dismiss(n.id)"
             >
               <X class="h-3 w-3" />
-            </button>
+            </LIconButton>
           </li>
         </ul>
       </div>

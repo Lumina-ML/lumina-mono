@@ -11,6 +11,7 @@ import {
   LDialog,
   LInput,
   LTextarea,
+  LSkeleton,
 } from "@lumina/ui";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { Plus } from "lucide-vue-next";
@@ -155,7 +156,11 @@ const createMutation = useMutation({
     </div>
 
     <LCard class="p-0">
+      <div v-if="isLoading" class="space-y-3 p-4">
+        <LSkeleton :repeat="6" text />
+      </div>
       <LDataTable
+        v-else
         :data="traces?.items ?? []"
         :columns="columns"
         :loading="isLoading"
